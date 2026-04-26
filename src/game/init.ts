@@ -136,10 +136,10 @@ export function buildInitialState(
   const map = generateMap(seed);
   const aiCount = DIFFICULTY_AI_COUNT[difficulty];
   const totalPlayers = 1 + aiCount;
-  const civs = pickRandomCountries(totalPlayers);
+  const realms = pickRandomCountries(totalPlayers);
   const spawns = pickSpawnPoints(map, totalPlayers);
 
-  const players: Player[] = civs.map((c, idx) => ({
+  const players: Player[] = realms.map((c, idx) => ({
     idx,
     name: c.name,
     iso: c.iso,

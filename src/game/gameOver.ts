@@ -18,7 +18,7 @@ export function checkGameOver(state: Snapshot): GameOverState | null {
     state.cities.some((c) => c.ownerIdx === HUMAN_IDX);
 
   if (!humanAlive) {
-    return { kind: 'lose', reason: 'Your civilization has fallen.' };
+    return { kind: 'lose', reason: 'Your realm has fallen.' };
   }
 
   // Tech victory: any player who researches Philosophy wins.
@@ -43,7 +43,7 @@ export function checkGameOver(state: Snapshot): GameOverState | null {
     if (!anyEnemyAlive) {
       return {
         kind: 'win',
-        reason: 'Every rival civilization has fallen. The world is yours.',
+        reason: 'Every rival realm has fallen. The world is yours.',
       };
     }
   }

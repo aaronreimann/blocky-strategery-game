@@ -41,7 +41,7 @@ export async function refreshLeaders(): Promise<LeaderMap | null> {
     const res = await fetch(url, {
       headers: {
         Accept: 'application/sparql-results+json',
-        'User-Agent': 'BlockyStrategery/0.0.1 (https://github.com/aaronr/civ-app)',
+        'User-Agent': 'BlockyStrategery/0.0.1 (https://github.com/aaronr/blocky-strategery-game)',
       },
     });
     if (!res.ok) return null;

@@ -1,11 +1,11 @@
-# Civ-App — Design Doc
+# Blocky Strategery — Design Doc
 
-A radically simplified Civ 1-style turn-based 4X for mobile. Target session length: **20–30 minutes**.
+A radically simplified classic 4X-style turn-based 4X for mobile. Target session length: **20–30 minutes**.
 
 ## Platforms & Tech
 
 - **Targets:** iOS + Android (no web, no desktop). Orientation: **landscape only**.
-- **App identity:** name `Civ-App`, bundle/package `com.aaronr.civapp` (placeholder, easy to rename pre-store).
+- **App identity:** name `Blocky Strategery`, bundle/package `com.aaronr.blockystrategery` (placeholder, easy to rename pre-store).
 - **Stack:** Expo (managed) + React Native + TypeScript.
 - **Navigation:** **Expo Router** (file-based routing).
 - **Renderer:** `@shopify/react-native-skia` for the map, sprites, and animations. Plain RN views for HUD, menus, dialogs.
@@ -25,7 +25,7 @@ A radically simplified Civ 1-style turn-based 4X for mobile. Target session leng
 ## Players
 
 - **1 human + N AIs**, where N = 3 / 5 / 7 by difficulty.
-- **Civs:** 8 are drawn at random per game from a pool of the 32 most populous countries (UN 2024 estimates).
+- **Realms:** 8 are drawn at random per game from a pool of the 32 most populous countries (UN 2024 estimates).
 - **Leaders:** Fetched from Wikidata at first launch, cached locally. Stale data is fine. If the fetch fails, fall back to a bundled JSON.
 
 ### Wikidata fetch
@@ -88,7 +88,7 @@ Starting roster: **1 Settler, 1 Warrior, 1 Worker.**
 
 Combat is a single dice roll: `attacker.attack + d6` vs `defender.defense + d6 + terrain bonus`. Loser dies, winner takes 0–1 damage. No HP bars to track — fast.
 
-**Stacking:** **1 unit per tile** (Civ 1 style). Moving onto a friendly-occupied tile is blocked. Moving onto an enemy-occupied tile triggers combat.
+**Stacking:** **1 unit per tile** (classic 4X style). Moving onto a friendly-occupied tile is blocked. Moving onto an enemy-occupied tile triggers combat.
 
 ## Buildings (per city)
 
@@ -115,7 +115,7 @@ Wonders (one per game, world-unique): Pyramids, Great Wall, Great Library. That'
 ## City Mechanics
 
 - **Minimum spacing:** new cities must be founded at least **3 tiles** (Chebyshev distance) from any existing city, friend or foe. Prevents spam and matches the working radius.
-- City works the 8 surrounding tiles + center (radius 1, not Civ's fat cross — simpler).
+- City works the 8 surrounding tiles + center (radius 1, not the classic fat-cross — simpler).
 - Each tile produces food / production / trade based on terrain + improvement.
 - **Growth:** city grows when food box fills (10 + size × 5 food).
 - **Irrigation gate:** every 2 size levels above 4 requires +1 irrigated tile in workable radius. Otherwise growth stalls. (This is the "city needs more irrigation" mechanic.)
@@ -138,7 +138,7 @@ Wonders (one per game, world-unique): Pyramids, Great Wall, Great Library. That'
 
 ## Win Conditions (first to any wins)
 
-1. **Conquest** — only civ with cities remaining.
+1. **Conquest** — only realm with cities remaining.
 2. **Domination** — control 50% of land tiles.
 3. **Tech** — research Philosophy.
 4. **Score** — at turn 60, highest score (cities × 5 + techs × 3 + wonders × 10 + population).
@@ -192,7 +192,7 @@ Capped at one event per turn.
 5. **M4 — Tech tree + research** (3 days).
 6. **M5 — AI** (5–10 days). Dumbest viable AI: greedy expansion, attack weakest neighbor.
 7. **M6 — Win conditions + difficulty** (2 days).
-8. **M7 — Wikidata fetch + civ/leader picker** (1 day).
+8. **M7 — Wikidata fetch + realm/leader picker** (1 day).
 9. **M8 — Polish, sound, save/load, intro** (open-ended).
 
 Total to playable v1: roughly 4–6 weeks of focused work.

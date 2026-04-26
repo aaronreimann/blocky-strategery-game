@@ -85,8 +85,8 @@ export default function TitleScreen() {
               ) : (
                 <>
                   <Text style={styles.slotMeta}>
-                    {info.humanCiv.name}
-                    {info.humanCiv.leader ? ` · ${info.humanCiv.leader}` : ''}
+                    {info.humanRealm.name}
+                    {info.humanRealm.leader ? ` · ${info.humanRealm.leader}` : ''}
                   </Text>
                   <Text style={styles.slotMetaDim}>
                     {DIFFICULTY_LABELS[info.difficulty]} · Turn {info.turn}

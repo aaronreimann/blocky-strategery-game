@@ -37,10 +37,10 @@ export default function DiplomacyScreen({ onClose }: Props) {
                 <View style={styles.rowLeft}>
                   <View style={[styles.colorChip, { backgroundColor: p.color }]} />
                   <View>
-                    <Text style={styles.civName}>
+                    <Text style={styles.realmName}>
                       {flagEmoji(p.iso)} {p.name}
                     </Text>
-                    <Text style={styles.civLeader}>{p.leader}</Text>
+                    <Text style={styles.realmLeader}>{p.leader}</Text>
                   </View>
                 </View>
                 <View style={styles.rowRight}>
@@ -131,8 +131,8 @@ const styles = StyleSheet.create({
   },
   rowLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   colorChip: { width: 18, height: 18, borderRadius: 4 },
-  civName: { color: THEME.ink, fontSize: 14, fontWeight: '700' },
-  civLeader: { color: THEME.inkMuted, fontSize: 11, marginTop: 2 },
+  realmName: { color: THEME.ink, fontSize: 14, fontWeight: '700' },
+  realmLeader: { color: THEME.inkMuted, fontSize: 11, marginTop: 2 },
   rowRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   status: { fontSize: 11, fontWeight: '800', letterSpacing: 1 },
   btn: {
