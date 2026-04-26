@@ -147,7 +147,14 @@ export function runAITurn(input: AITurnInput): AITurnOutput {
             .filter((u) => u.id !== enemy.id)
             .map((u) =>
               u.id === fresh.id
-                ? { ...u, x: enemy.x, y: enemy.y, movesLeft: 0 }
+                ? {
+                    ...u,
+                    x: enemy.x,
+                    y: enemy.y,
+                    movesLeft: 0,
+                    workingOn: null,
+                    workTurnsLeft: 0,
+                  }
                 : u,
             );
           if (cityHere) {

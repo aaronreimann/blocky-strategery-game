@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { IMPROVEMENT, tileKey } from '@/src/data/improvements';
 import { UNIT, UNIT_KINDS, type UnitKind } from '@/src/data/units';
 import { useGame } from '@/src/state/game';
 
@@ -10,6 +11,7 @@ export default function Hud() {
   const turn = useGame((s) => s.turn);
   const units = useGame((s) => s.units);
   const cities = useGame((s) => s.cities);
+  const improvements = useGame((s) => s.improvements);
   const players = useGame((s) => s.players);
   const currentSlot = useGame((s) => s.currentSlot);
   const selectedUnitId = useGame((s) => s.selectedUnitId);
@@ -18,6 +20,8 @@ export default function Hud() {
   const endTurn = useGame((s) => s.endTurn);
   const foundCity = useGame((s) => s.foundCity);
   const setCityBuild = useGame((s) => s.setCityBuild);
+  const startWork = useGame((s) => s.startWork);
+  const cancelWork = useGame((s) => s.cancelWork);
   const exitToTitle = useGame((s) => s.exitToTitle);
   const dismissBattle = useGame((s) => s.dismissBattle);
 
@@ -79,6 +83,29 @@ export default function Hud() {
               <Pressable style={styles.action} onPress={foundCity}>
                 <Text style={styles.actionText}>Found City</Text>
               </Pressable>
+            ) : null}
+            {selectedUnit.kind === 'laborer' ? (
+              selectedUnit.workingOn ? (
+                <View style={styles.workRow}>
+                  <Text style={styles.cardMeta}>
+                    Building {IMPROVEMENT[selectedUnit.workingOn].name}…{' '}
+                    {selectedUnit.workTurnsLeft} turn
+                    {selectedUnit.workTurnsLeft === 1 ? '' : 's'} left
+                  </Text>
+                  <Pressable style={styles.actionMuted} onPress={cancelWork}>
+                    <Text style={styles.actionMutedText}>Cancel</Text>
+                  </Pressable>
+                </View>
+              ) : improvements[tileKey(selectedUnit.x, selectedUnit.y)] ? (
+                <Text style={styles.cardMeta}>
+                  Tile already improved (
+                  {IMPROVEMENT[improvements[tileKey(selectedUnit.x, selectedUnit.y)]].name})
+                </Text>
+              ) : (
+                <Pressable style={styles.action} onPress={() => startWork('road')}>
+                  <Text style={styles.actionText}>Build Road (2 turns)</Text>
+                </Pressable>
+              )
             ) : null}
           </View>
         ) : selectedCity ? (
@@ -188,6 +215,18 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   actionText: { color: '#0a1729', fontWeight: '700', fontSize: 13 },
+  actionMuted: {
+    marginTop: 8,
+    backgroundColor: THEME.bg,
+    borderColor: THEME.border,
+    borderWidth: 1,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+  },
+  actionMutedText: { color: THEME.inkMuted, fontWeight: '700', fontSize: 12 },
+  workRow: { marginTop: 6 },
   buildRow: { flexDirection: 'row', gap: 6, marginTop: 8 },
   buildBtn: {
     backgroundColor: THEME.bg,

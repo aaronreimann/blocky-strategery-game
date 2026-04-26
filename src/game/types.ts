@@ -28,6 +28,8 @@ export type Player = {
   isHuman: boolean;
 };
 
+import type { ImprovementKind } from '@/src/data/improvements';
+
 export type Unit = {
   id: string;
   kind: UnitKind;
@@ -35,6 +37,8 @@ export type Unit = {
   x: number;
   y: number;
   movesLeft: number;
+  workingOn: ImprovementKind | null;
+  workTurnsLeft: number;
 };
 
 export type City = {

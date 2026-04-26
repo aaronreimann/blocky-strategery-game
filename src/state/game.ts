@@ -1,6 +1,12 @@
 import { create } from 'zustand';
 
 import type { LeaderMap } from '@/src/data/countries';
+import {
+  IMPROVEMENT,
+  tileKey,
+  type ImprovementKind,
+  type ImprovementMap,
+} from '@/src/data/improvements';
 import { TERRAIN } from '@/src/data/terrain';
 import { UNIT, type UnitKind } from '@/src/data/units';
 import { runAITurn } from '@/src/game/ai';
@@ -22,6 +28,7 @@ type GameState = {
   players: Player[];
   units: Unit[];
   cities: City[];
+  improvements: ImprovementMap;
   turn: number;
   seed: number;
   difficulty: Difficulty;
@@ -40,6 +47,8 @@ type GameState = {
   tapTile: (x: number, y: number) => void;
   foundCity: () => void;
   setCityBuild: (cityId: string, kind: UnitKind) => void;
+  startWork: (kind: ImprovementKind) => void;
+  cancelWork: () => void;
   endTurn: () => void;
   dismissBattle: () => void;
 };
@@ -81,6 +90,7 @@ function autosave(state: GameState): void {
     players: state.players,
     units: state.units,
     cities: state.cities,
+    improvements: state.improvements,
     gameOver: state.gameOver,
   }).catch((err) => console.warn('autosave failed', err));
 }
@@ -90,6 +100,7 @@ export const useGame = create<GameState>((set, get) => ({
   players: [],
   units: [],
   cities: [],
+  improvements: {},
   turn: 1,
   seed: 0,
   difficulty: 'normal',
@@ -110,6 +121,7 @@ export const useGame = create<GameState>((set, get) => ({
       players: initial.players,
       units: initial.units,
       cities: initial.cities,
+      improvements: {},
       turn: 1,
       seed,
       difficulty,
@@ -125,15 +137,22 @@ export const useGame = create<GameState>((set, get) => ({
   loadFromSlot: async (slot) => {
     const data = await loadSlot(slot);
     if (!data) return false;
+    // Forward-compat: older saves lacked workingOn / workTurnsLeft on units.
+    const normalizedUnits: Unit[] = data.units.map((u) => ({
+      ...u,
+      workingOn: u.workingOn ?? null,
+      workTurnsLeft: u.workTurnsLeft ?? 0,
+    }));
     syncIdCounters(
-      Math.max(0, ...data.units.map((u) => parseIdNum(u.id))),
+      Math.max(0, ...normalizedUnits.map((u) => parseIdNum(u.id))),
       Math.max(0, ...data.cities.map((c) => parseIdNum(c.id))),
     );
     set({
       map: data.map,
       players: data.players,
-      units: data.units,
+      units: normalizedUnits,
       cities: data.cities,
+      improvements: data.improvements ?? {},
       turn: data.turn,
       seed: data.seed,
       difficulty: data.difficulty,
@@ -152,6 +171,7 @@ export const useGame = create<GameState>((set, get) => ({
       players: [],
       units: [],
       cities: [],
+      improvements: {},
       turn: 1,
       seed: 0,
       difficulty: 'normal',
@@ -332,14 +352,61 @@ export const useGame = create<GameState>((set, get) => ({
     autosave(get());
   },
 
+  startWork: (kind) => {
+    const { units, selectedUnitId, improvements, gameOver } = get();
+    if (gameOver) return;
+    const sel = units.find((u) => u.id === selectedUnitId);
+    if (!sel || sel.kind !== 'laborer') return;
+    if (sel.ownerIdx !== 0) return;
+    if (sel.workingOn) return;
+    if (improvements[tileKey(sel.x, sel.y)]) return;
+    set({
+      units: units.map((u) =>
+        u.id === sel.id
+          ? { ...u, workingOn: kind, workTurnsLeft: IMPROVEMENT[kind].buildTurns, movesLeft: 0 }
+          : u,
+      ),
+    });
+    autosave(get());
+  },
+
+  cancelWork: () => {
+    const { units, selectedUnitId } = get();
+    const sel = units.find((u) => u.id === selectedUnitId);
+    if (!sel || !sel.workingOn) return;
+    set({
+      units: units.map((u) =>
+        u.id === sel.id ? { ...u, workingOn: null, workTurnsLeft: 0 } : u,
+      ),
+    });
+    autosave(get());
+  },
+
   endTurn: () => {
-    const { units, cities, turn, map, players, gameOver } = get();
+    const { units, cities, turn, map, players, improvements, gameOver } = get();
     if (gameOver || !map) return;
 
-    let workingUnits: Unit[] = units.map((u) => ({
-      ...u,
-      movesLeft: UNIT[u.kind].move,
-    }));
+    // Refresh moves; +1 movement bonus when starting on a road tile.
+    let workingUnits: Unit[] = units.map((u) => {
+      const baseMove = UNIT[u.kind].move;
+      const bonus = improvements[tileKey(u.x, u.y)] === 'road' ? 1 : 0;
+      return { ...u, movesLeft: baseMove + bonus };
+    });
+
+    // Advance any in-progress work; complete improvements when done.
+    let workingImprovements: ImprovementMap = improvements;
+    workingUnits = workingUnits.map((u) => {
+      if (!u.workingOn || u.workTurnsLeft <= 0) return u;
+      const next = u.workTurnsLeft - 1;
+      if (next <= 0) {
+        workingImprovements = {
+          ...workingImprovements,
+          [tileKey(u.x, u.y)]: u.workingOn,
+        };
+        return { ...u, workingOn: null, workTurnsLeft: 0 };
+      }
+      return { ...u, workingOn: u.workingOn, workTurnsLeft: next, movesLeft: 0 };
+    });
 
     let workingCities: City[] = cities.map((city) => {
       const accrued = city.production + city.productionPerTurn;
@@ -355,6 +422,8 @@ export const useGame = create<GameState>((set, get) => ({
         x: spawnPos.x,
         y: spawnPos.y,
         movesLeft: UNIT[city.building].move,
+        workingOn: null,
+        workTurnsLeft: 0,
       });
       return { ...city, production: accrued - cost };
     });
@@ -389,6 +458,7 @@ export const useGame = create<GameState>((set, get) => ({
       selectedCityId: null,
       units: workingUnits,
       cities: workingCities,
+      improvements: workingImprovements,
       lastBattle: lastAIBattle,
       gameOver: finished,
     });

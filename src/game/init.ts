@@ -88,6 +88,8 @@ function spawnStartingUnits(
       x: start.x,
       y: start.y,
       movesLeft: UNIT.pioneer.move,
+      workingOn: null,
+      workTurnsLeft: 0,
     },
     {
       id: nextUnitId(),
@@ -96,6 +98,8 @@ function spawnStartingUnits(
       x: clamp(start.x + 1, 0, map.width - 1),
       y: start.y,
       movesLeft: UNIT.footman.move,
+      workingOn: null,
+      workTurnsLeft: 0,
     },
     {
       id: nextUnitId(),
@@ -104,6 +108,8 @@ function spawnStartingUnits(
       x: start.x,
       y: clamp(start.y + 1, 0, map.height - 1),
       movesLeft: UNIT.laborer.move,
+      workingOn: null,
+      workTurnsLeft: 0,
     },
   ];
 }

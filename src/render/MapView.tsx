@@ -8,6 +8,7 @@ import Animated, {
   useSharedValue,
 } from 'react-native-reanimated';
 
+import type { ImprovementMap } from '@/src/data/improvements';
 import { RESOURCE } from '@/src/data/resources';
 import { TERRAIN } from '@/src/data/terrain';
 import type { GameMap } from '@/src/game/map';
@@ -24,6 +25,7 @@ type Props = {
   players: Player[];
   units: Unit[];
   cities: City[];
+  improvements: ImprovementMap;
   selectedUnitId: string | null;
   selectedCityId: string | null;
   moveTiles: Set<string>;
@@ -36,6 +38,7 @@ export default function MapView({
   players,
   units,
   cities,
+  improvements,
   selectedUnitId,
   selectedCityId,
   moveTiles,
@@ -174,6 +177,55 @@ export default function MapView({
     return out;
   }, [moveTiles, attackTiles]);
 
+  const roadLayer = useMemo(() => {
+    const out: React.ReactNode[] = [];
+    const isRoad = (x: number, y: number) => improvements[`${x},${y}`] === 'road';
+    for (const key in improvements) {
+      if (improvements[key] !== 'road') continue;
+      const [xs, ys] = key.split(',');
+      const x = Number(xs);
+      const y = Number(ys);
+      const cx = x * TILE_SIZE + TILE_SIZE / 2;
+      const cy = y * TILE_SIZE + TILE_SIZE / 2;
+      // Connect to any neighbors that also have a road.
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (dx === 0 && dy === 0) continue;
+          if (!isRoad(x + dx, y + dy)) continue;
+          if (dx > 0 || (dx === 0 && dy > 0)) {
+            const nx = (x + dx) * TILE_SIZE + TILE_SIZE / 2;
+            const ny = (y + dy) * TILE_SIZE + TILE_SIZE / 2;
+            out.push(
+              <Path
+                key={`rd-${key}-${dx}${dy}`}
+                path={`M ${cx} ${cy} L ${nx} ${ny}`}
+                color="#5a4326"
+                style="stroke"
+                strokeWidth={2.5}
+              />,
+            );
+          }
+        }
+      }
+      out.push(<Circle key={`rd-${key}`} cx={cx} cy={cy} r={3} color="#5a4326" />);
+    }
+    return out;
+  }, [improvements]);
+
+  const workIndicatorLayer = useMemo(() => {
+    return units
+      .filter((u) => u.workingOn && u.workTurnsLeft > 0)
+      .map((u) => (
+        <Circle
+          key={`wk-${u.id}`}
+          cx={u.x * TILE_SIZE + TILE_SIZE * 0.85}
+          cy={u.y * TILE_SIZE + TILE_SIZE * 0.15}
+          r={3}
+          color="#facc15"
+        />
+      ));
+  }, [units]);
+
   const cityLayer = useMemo(() => {
     return cities.map((c) => {
       const owner = players[c.ownerIdx];
@@ -295,10 +347,12 @@ export default function MapView({
           <Group transform={transform}>
             {baseLayer}
             {decorLayer}
+            {roadLayer}
             {resourceLayer}
             {highlightLayer}
             {cityLayer}
             {unitLayer}
+            {workIndicatorLayer}
             {selectionLayer}
           </Group>
         </Canvas>

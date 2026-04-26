@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import type { ImprovementMap } from '@/src/data/improvements';
 import type { GameMap } from '@/src/game/map';
 import type { City, Difficulty, GameOverState, Player, Unit } from '@/src/game/types';
 
@@ -18,6 +19,7 @@ export type SaveData = {
   players: Player[];
   units: Unit[];
   cities: City[];
+  improvements: ImprovementMap;
   gameOver: GameOverState | null;
   savedAt: string;
 };
