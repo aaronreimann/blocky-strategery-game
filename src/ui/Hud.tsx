@@ -47,6 +47,10 @@ export default function Hud() {
   const lastBattle = useGame((s) => s.lastBattle);
   const turnEvents = useGame((s) => s.turnEvents);
   const dismissTurnEvents = useGame((s) => s.dismissTurnEvents);
+  const tilePicker = useGame((s) => s.tilePicker);
+  const closeTilePicker = useGame((s) => s.closeTilePicker);
+  const selectUnitFromPicker = useGame((s) => s.selectUnitFromPicker);
+  const selectCityFromPicker = useGame((s) => s.selectCityFromPicker);
   const endTurn = useGame((s) => s.endTurn);
   const foundCity = useGame((s) => s.foundCity);
   const setCityBuild = useGame((s) => s.setCityBuild);
@@ -394,6 +398,44 @@ export default function Hud() {
       </View>
 
       {techOpen ? <TechScreen onClose={() => setTechOpen(false)} /> : null}
+
+      {tilePicker ? (() => {
+        const u = units.find(
+          (un) => un.x === tilePicker.x && un.y === tilePicker.y && un.ownerIdx === 0,
+        );
+        const c = cities.find(
+          (ci) => ci.x === tilePicker.x && ci.y === tilePicker.y && ci.ownerIdx === 0,
+        );
+        if (!u && !c) return null;
+        return (
+          <View style={styles.pickerBg}>
+            <View style={styles.pickerCard}>
+              <Text style={styles.pickerTitle}>What do you want?</Text>
+              {u ? (
+                <Pressable
+                  style={styles.pickerBtn}
+                  onPress={() => selectUnitFromPicker(u.id)}
+                >
+                  <Text style={styles.pickerBtnTitle}>{UNIT[u.kind].name}{u.stack.length > 1 ? ` (Army x${u.stack.length})` : ''}</Text>
+                  <Text style={styles.pickerBtnSub}>Move or attack with this unit</Text>
+                </Pressable>
+              ) : null}
+              {c ? (
+                <Pressable
+                  style={styles.pickerBtn}
+                  onPress={() => selectCityFromPicker(c.id)}
+                >
+                  <Text style={styles.pickerBtnTitle}>{c.name}</Text>
+                  <Text style={styles.pickerBtnSub}>Open city: build, focus</Text>
+                </Pressable>
+              ) : null}
+              <Pressable style={styles.pickerCancel} onPress={closeTilePicker}>
+                <Text style={styles.pickerCancelText}>Cancel</Text>
+              </Pressable>
+            </View>
+          </View>
+        );
+      })() : null}
     </SafeAreaView>
   );
 }
@@ -552,4 +594,40 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   endTurnText: { color: '#0a1729', fontWeight: '800', fontSize: 14 },
+  pickerBg: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(10, 23, 41, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pickerCard: {
+    backgroundColor: THEME.bgElevated,
+    borderColor: THEME.border,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 18,
+    minWidth: 280,
+  },
+  pickerTitle: {
+    color: THEME.warn,
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 1,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  pickerBtn: {
+    backgroundColor: 'rgba(10, 23, 41, 0.6)',
+    borderColor: THEME.border,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginBottom: 8,
+  },
+  pickerBtnTitle: { color: THEME.ink, fontSize: 14, fontWeight: '700' },
+  pickerBtnSub: { color: THEME.inkMuted, fontSize: 11, marginTop: 2 },
+  pickerCancel: { paddingVertical: 6, alignItems: 'center', marginTop: 4 },
+  pickerCancelText: { color: THEME.inkMuted, fontSize: 12, fontWeight: '600' },
 });

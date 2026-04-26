@@ -59,6 +59,7 @@ type Props = {
   attackTiles: Set<string>;
   onTileTap: (x: number, y: number) => void;
   onSetDestination: (unitId: string, x: number, y: number) => void;
+  onTileLongPress: (x: number, y: number) => void;
 };
 
 const BADGE_FONT = matchFont({ fontFamily: 'Helvetica', fontSize: 9, fontWeight: 'bold' });
@@ -76,6 +77,7 @@ export default function MapView({
   attackTiles,
   onTileTap,
   onSetDestination,
+  onTileLongPress,
 }: Props) {
   const { width: screenW, height: screenH } = useWindowDimensions();
 
@@ -205,7 +207,19 @@ export default function MapView({
     runOnJS(onTileTap)(gx, gy);
   });
 
-  const gesture = Gesture.Race(tap, Gesture.Simultaneous(pan, pinch));
+  const longPress = Gesture.LongPress()
+    .minDuration(380)
+    .onStart((e) => {
+      'worklet';
+      const wx = (e.x - tx.value) / scale.value;
+      const wy = (e.y - ty.value) / scale.value;
+      const gx = Math.floor(wx / TILE_SIZE);
+      const gy = Math.floor(wy / TILE_SIZE);
+      if (gx < 0 || gy < 0 || gx >= map.width || gy >= map.height) return;
+      runOnJS(onTileLongPress)(gx, gy);
+    });
+
+  const gesture = Gesture.Race(longPress, tap, Gesture.Simultaneous(pan, pinch));
 
   const transform = useDerivedValue(() => [
     { translateX: tx.value },

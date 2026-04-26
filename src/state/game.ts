@@ -55,6 +55,7 @@ type GameState = {
   selectedCityId: string | null;
   lastBattle: Battle | null;
   turnEvents: TurnEvent[];
+  tilePicker: { x: number; y: number } | null;
   gameOver: GameOverState | null;
 
   newGame: (slot: number, seed: number, difficulty: Difficulty, leaders: LeaderMap) => void;
@@ -72,6 +73,10 @@ type GameState = {
   cancelWork: () => void;
   setUnitDestination: (unitId: string, x: number, y: number) => void;
   clearUnitDestination: (unitId: string) => void;
+  openTilePicker: (x: number, y: number) => void;
+  closeTilePicker: () => void;
+  selectUnitFromPicker: (unitId: string) => void;
+  selectCityFromPicker: (cityId: string) => void;
   endTurn: () => void;
   dismissBattle: () => void;
   dismissTurnEvents: () => void;
@@ -133,6 +138,7 @@ export const useGame = create<GameState>((set, get) => ({
   selectedCityId: null,
   lastBattle: null,
   turnEvents: [],
+  tilePicker: null,
   gameOver: null,
 
   newGame: (slot, seed, difficulty, leaders) => {
@@ -531,6 +537,16 @@ export const useGame = create<GameState>((set, get) => ({
     autosave(get());
   },
 
+  openTilePicker: (x, y) => {
+    const { units, cities } = get();
+    const hasUnit = units.some((u) => u.x === x && u.y === y && u.ownerIdx === HUMAN_IDX);
+    const hasCity = cities.some((c) => c.x === x && c.y === y && c.ownerIdx === HUMAN_IDX);
+    if (!hasUnit && !hasCity) return;
+    set({ tilePicker: { x, y } });
+  },
+
+  closeTilePicker: () => set({ tilePicker: null }),
+
   endTurn: () => {
     const { units, cities, turn, map, players, improvements, gameOver } = get();
     if (gameOver || !map) return;
@@ -830,4 +846,11 @@ export const useGame = create<GameState>((set, get) => ({
 
   dismissBattle: () => set({ lastBattle: null }),
   dismissTurnEvents: () => set({ turnEvents: [] }),
+
+  selectUnitFromPicker: (unitId: string) => {
+    set({ selectedUnitId: unitId, selectedCityId: null, tilePicker: null });
+  },
+  selectCityFromPicker: (cityId: string) => {
+    set({ selectedCityId: cityId, selectedUnitId: null, tilePicker: null });
+  },
 }));

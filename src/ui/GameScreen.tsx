@@ -22,6 +22,7 @@ export default function GameScreen() {
   const selectedCityId = useGame((s) => s.selectedCityId);
   const tapTile = useGame((s) => s.tapTile);
   const setUnitDestination = useGame((s) => s.setUnitDestination);
+  const openTilePicker = useGame((s) => s.openTilePicker);
 
   const autoLaborerOwnerIdxs = useMemo(() => {
     const out = new Set<number>();
@@ -88,6 +89,7 @@ export default function GameScreen() {
         attackTiles={attackTiles}
         onTileTap={tapTile}
         onSetDestination={setUnitDestination}
+        onTileLongPress={openTilePicker}
       />
       <Hud />
       <GameOverOverlay />
