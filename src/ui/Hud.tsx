@@ -20,6 +20,7 @@ import { useGame } from '@/src/state/game';
 import DiplomacyScreen from './DiplomacyScreen';
 import KingdomMenu from './KingdomMenu';
 import { GameIcon } from './GameIcon';
+import LegendScreen from './LegendScreen';
 import { THEME } from './palette';
 import TechScreen from './TechScreen';
 
@@ -42,6 +43,7 @@ export default function Hud() {
   const [techOpen, setTechOpen] = useState(false);
   const [diploOpen, setDiploOpen] = useState(false);
   const [kingdomOpen, setKingdomOpen] = useState(false);
+  const [legendOpen, setLegendOpen] = useState(false);
   const [cityTab, setCityTab] = useState<'units' | 'buildings' | 'wonders'>('units');
   const turn = useGame((s) => s.turn);
   const map = useGame((s) => s.map);
@@ -160,6 +162,9 @@ export default function Hud() {
         </View>
         <Pressable style={styles.pillSquare} onPress={() => setDiploOpen(true)}>
           <FontAwesome5 name="handshake" size={14} color={THEME.ink} />
+        </Pressable>
+        <Pressable style={styles.pillSquare} onPress={() => setLegendOpen(true)}>
+          <FontAwesome5 name="question" size={14} color={THEME.ink} />
         </Pressable>
         <View style={{ flex: 1 }} />
         {players[0] ? (
@@ -567,6 +572,7 @@ export default function Hud() {
           onOpenTech={() => setTechOpen(true)}
         />
       ) : null}
+      {legendOpen ? <LegendScreen onClose={() => setLegendOpen(false)} /> : null}
 
       {tilePicker ? (() => {
         const u = units.find(

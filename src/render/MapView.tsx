@@ -25,7 +25,7 @@ import {
   type GameIconName,
 } from '@/src/data/gameIcons';
 import type { ImprovementMap } from '@/src/data/improvements';
-import { RESOURCE } from '@/src/data/resources';
+import { RESOURCE, type Resource } from '@/src/data/resources';
 import { TERRAIN } from '@/src/data/terrain';
 import { type UnitKind } from '@/src/data/units';
 import type { GameMap } from '@/src/game/map';
@@ -50,6 +50,20 @@ const UNIT_ICON: Record<UnitKind, GameIconName> = {
 };
 const CITY_CAPITAL_ICON: GameIconName = 'castle';
 const CITY_HOUSE_ICON: GameIconName = 'house';
+
+// Resource → game-icons mapping (rendered in the resource's color so the
+// existing color legend still applies).
+export const RESOURCE_ICON: Record<Resource, GameIconName> = {
+  wheat: 'wheat',
+  cattle: 'cow',
+  fish: 'salmon',
+  iron: 'metal_bar',
+  horses: 'horse_head',
+  gold: 'gold_bar',
+  wine: 'wine_bottle',
+  spices: 'salt_shaker',
+};
+const RESOURCE_ICON_SIZE = 14;
 
 // Pixel size each icon renders at on the map (camera then scales further).
 const ICON_SIZE = 26;
@@ -268,21 +282,33 @@ export default function MapView({
     [map],
   );
 
-  const resourceLayer = useMemo(
-    () =>
-      map.tiles
-        .filter((t) => t.resource)
-        .map((tile) => (
-          <Circle
-            key={`r-${tile.x}-${tile.y}`}
-            cx={tile.x * TILE_SIZE + TILE_SIZE / 2}
-            cy={tile.y * TILE_SIZE + TILE_SIZE / 2}
-            r={TILE_SIZE * 0.16}
-            color={RESOURCE[tile.resource!].color}
+  const resourceLayer = useMemo(() => {
+    const scale = RESOURCE_ICON_SIZE / ICON_VIEWBOX;
+    const out: React.ReactNode[] = [];
+    for (const tile of map.tiles) {
+      if (!tile.resource) continue;
+      const path = iconPath(RESOURCE_ICON[tile.resource]);
+      if (!path) continue;
+      const cx = tile.x * TILE_SIZE + TILE_SIZE / 2;
+      const cy = tile.y * TILE_SIZE + TILE_SIZE / 2;
+      const ox = cx - RESOURCE_ICON_SIZE / 2;
+      const oy = cy - RESOURCE_ICON_SIZE / 2;
+      out.push(
+        <Group
+          key={`r-${tile.x}-${tile.y}`}
+          transform={[{ translateX: ox }, { translateY: oy }, { scale }]}
+        >
+          <Path
+            path={path}
+            color="rgba(0,0,0,0.6)"
+            transform={[{ translateX: 18 }, { translateY: 18 }]}
           />
-        )),
-    [map],
-  );
+          <Path path={path} color={RESOURCE[tile.resource].color} />
+        </Group>,
+      );
+    }
+    return out;
+  }, [map]);
 
   const highlightLayer = useMemo(() => {
     const out: React.ReactNode[] = [];
