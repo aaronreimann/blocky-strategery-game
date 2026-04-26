@@ -1,7 +1,18 @@
+import { RESOURCE } from '@/src/data/resources';
 import { TERRAIN } from '@/src/data/terrain';
 
 import type { GameMap, Tile } from './map';
 import type { City, Wonder } from './types';
+
+function tileFood(t: Tile): number {
+  return TERRAIN[t.terrain].food + (t.resource ? RESOURCE[t.resource].food : 0);
+}
+function tileProd(t: Tile): number {
+  return TERRAIN[t.terrain].prod + (t.resource ? RESOURCE[t.resource].prod : 0);
+}
+function tileTrade(t: Tile): number {
+  return TERRAIN[t.terrain].trade + (t.resource ? RESOURCE[t.resource].trade : 0);
+}
 
 export type CityYields = {
   rawFood: number;
@@ -27,9 +38,9 @@ export function computeCityYields(
   const hasPyramids = ownerWonders.some((w) => w.kind === 'pyramids');
   const hasGreatLibrary = ownerWonders.some((w) => w.kind === 'great_library');
   const center = map.tiles[city.y * map.width + city.x];
-  let rawFood = TERRAIN[center.terrain].food + (hasPyramids ? 1 : 0);
-  let prod = TERRAIN[center.terrain].prod;
-  let trade = TERRAIN[center.terrain].trade;
+  let rawFood = tileFood(center) + (hasPyramids ? 1 : 0);
+  let prod = tileProd(center);
+  let trade = tileTrade(center);
 
   const outer: Tile[] = [];
   for (let dy = -1; dy <= 1; dy++) {
@@ -41,9 +52,10 @@ export function computeCityYields(
       outer.push(map.tiles[y * map.width + x]);
     }
   }
+  // Pick the tiles with highest combined yield first (now resource-aware).
   outer.sort((a, b) => {
-    const av = TERRAIN[a.terrain].food + TERRAIN[a.terrain].prod;
-    const bv = TERRAIN[b.terrain].food + TERRAIN[b.terrain].prod;
+    const av = tileFood(a) + tileProd(a) + tileTrade(a);
+    const bv = tileFood(b) + tileProd(b) + tileTrade(b);
     return bv - av;
   });
 
@@ -51,9 +63,9 @@ export function computeCityYields(
   const worked: Tile[] = [center];
   for (let i = 0; i < workersAvailable; i++) {
     const t = outer[i];
-    rawFood += TERRAIN[t.terrain].food;
-    prod += TERRAIN[t.terrain].prod;
-    trade += TERRAIN[t.terrain].trade;
+    rawFood += tileFood(t);
+    prod += tileProd(t);
+    trade += tileTrade(t);
     worked.push(t);
   }
 
