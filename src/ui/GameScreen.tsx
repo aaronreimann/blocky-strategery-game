@@ -9,6 +9,8 @@ import { useGame } from '@/src/state/game';
 import Hud from './Hud';
 import { THEME } from './palette';
 
+const HUMAN_IDX = 0;
+
 export default function GameScreen() {
   const map = useGame((s) => s.map);
   const players = useGame((s) => s.players);
@@ -18,11 +20,12 @@ export default function GameScreen() {
   const selectedCityId = useGame((s) => s.selectedCityId);
   const tapTile = useGame((s) => s.tapTile);
 
-  const highlightTiles = useMemo(() => {
-    const set = new Set<string>();
-    if (!map || !selectedUnitId) return set;
+  const { moveTiles, attackTiles } = useMemo(() => {
+    const move = new Set<string>();
+    const attack = new Set<string>();
+    if (!map || !selectedUnitId) return { moveTiles: move, attackTiles: attack };
     const sel = units.find((u) => u.id === selectedUnitId);
-    if (!sel || sel.movesLeft <= 0) return set;
+    if (!sel || sel.movesLeft <= 0) return { moveTiles: move, attackTiles: attack };
 
     for (let dy = -sel.movesLeft; dy <= sel.movesLeft; dy++) {
       for (let dx = -sel.movesLeft; dx <= sel.movesLeft; dx++) {
@@ -31,14 +34,33 @@ export default function GameScreen() {
         const ny = sel.y + dy;
         if (nx < 0 || ny < 0 || nx >= map.width || ny >= map.height) continue;
         if (chebyshev(sel.x, sel.y, nx, ny) > sel.movesLeft) continue;
+
         const t = map.tiles[ny * map.width + nx];
         if (!TERRAIN[t.terrain].passable) continue;
-        if (units.some((u) => u.x === nx && u.y === ny && u.ownerIdx === sel.ownerIdx)) continue;
-        set.add(`${nx},${ny}`);
+
+        const enemyHere = units.some(
+          (u) => u.x === nx && u.y === ny && u.ownerIdx !== sel.ownerIdx,
+        );
+        if (enemyHere) {
+          attack.add(`${nx},${ny}`);
+          continue;
+        }
+
+        const friendlyHere = units.some(
+          (u) => u.x === nx && u.y === ny && u.ownerIdx === sel.ownerIdx,
+        );
+        if (friendlyHere) continue;
+
+        const enemyCityHere = cities.some(
+          (c) => c.x === nx && c.y === ny && c.ownerIdx !== sel.ownerIdx,
+        );
+        if (enemyCityHere) continue;
+
+        move.add(`${nx},${ny}`);
       }
     }
-    return set;
-  }, [map, units, selectedUnitId]);
+    return { moveTiles: move, attackTiles: attack };
+  }, [map, units, cities, selectedUnitId]);
 
   if (!map) return <View style={styles.root} />;
 
@@ -51,7 +73,8 @@ export default function GameScreen() {
         cities={cities}
         selectedUnitId={selectedUnitId}
         selectedCityId={selectedCityId}
-        highlightTiles={highlightTiles}
+        moveTiles={moveTiles}
+        attackTiles={attackTiles}
         onTileTap={tapTile}
       />
       <Hud />
@@ -62,3 +85,6 @@ export default function GameScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: THEME.bg },
 });
+
+// Suppress unused import warning if HUMAN_IDX isn't used elsewhere here.
+void HUMAN_IDX;

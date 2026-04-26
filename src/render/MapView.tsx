@@ -26,7 +26,8 @@ type Props = {
   cities: City[];
   selectedUnitId: string | null;
   selectedCityId: string | null;
-  highlightTiles: Set<string>;
+  moveTiles: Set<string>;
+  attackTiles: Set<string>;
   onTileTap: (x: number, y: number) => void;
 };
 
@@ -37,7 +38,8 @@ export default function MapView({
   cities,
   selectedUnitId,
   selectedCityId,
-  highlightTiles,
+  moveTiles,
+  attackTiles,
   onTileTap,
 }: Props) {
   const { width: screenW, height: screenH } = useWindowDimensions();
@@ -143,23 +145,34 @@ export default function MapView({
 
   const highlightLayer = useMemo(() => {
     const out: React.ReactNode[] = [];
-    for (const key of highlightTiles) {
+    for (const key of moveTiles) {
       const [xs, ys] = key.split(',');
-      const x = Number(xs);
-      const y = Number(ys);
       out.push(
         <Rect
-          key={`hl-${key}`}
-          x={x * TILE_SIZE}
-          y={y * TILE_SIZE}
+          key={`mv-${key}`}
+          x={Number(xs) * TILE_SIZE}
+          y={Number(ys) * TILE_SIZE}
           width={TILE_SIZE}
           height={TILE_SIZE}
           color="#ffe66455"
         />,
       );
     }
+    for (const key of attackTiles) {
+      const [xs, ys] = key.split(',');
+      out.push(
+        <Rect
+          key={`at-${key}`}
+          x={Number(xs) * TILE_SIZE}
+          y={Number(ys) * TILE_SIZE}
+          width={TILE_SIZE}
+          height={TILE_SIZE}
+          color="#ef444466"
+        />,
+      );
+    }
     return out;
-  }, [highlightTiles]);
+  }, [moveTiles, attackTiles]);
 
   const cityLayer = useMemo(() => {
     return cities.map((c) => {

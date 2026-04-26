@@ -2,6 +2,8 @@ import { create } from 'zustand';
 
 import { TERRAIN } from '@/src/data/terrain';
 import { UNIT, type UnitKind } from '@/src/data/units';
+import { runAITurn } from '@/src/game/ai';
+import { resolveCombat, type Battle } from '@/src/game/combat';
 import { nextCityId, nextUnitId, parseIdNum, syncIdCounters } from '@/src/game/ids';
 import { buildInitialState } from '@/src/game/init';
 import { chebyshev, type GameMap } from '@/src/game/map';
@@ -11,6 +13,7 @@ import { loadSlot, saveSlot } from './saves';
 
 const MIN_CITY_SPACING = 3;
 const DEFAULT_PRODUCTION_PER_TURN = 3;
+const HUMAN_IDX = 0;
 
 type GameState = {
   map: GameMap | null;
@@ -22,6 +25,7 @@ type GameState = {
   currentSlot: number | null;
   selectedUnitId: string | null;
   selectedCityId: string | null;
+  lastBattle: Battle | null;
 
   newGame: (slot: number, seed: number) => void;
   loadFromSlot: (slot: number) => Promise<boolean>;
@@ -33,6 +37,7 @@ type GameState = {
   foundCity: () => void;
   setCityBuild: (cityId: string, kind: UnitKind) => void;
   endTurn: () => void;
+  dismissBattle: () => void;
 };
 
 const CITY_NAMES = [
@@ -84,6 +89,7 @@ export const useGame = create<GameState>((set, get) => ({
   currentSlot: null,
   selectedUnitId: null,
   selectedCityId: null,
+  lastBattle: null,
 
   newGame: (slot, seed) => {
     const initial = buildInitialState(seed);
@@ -101,6 +107,7 @@ export const useGame = create<GameState>((set, get) => ({
       currentSlot: slot,
       selectedUnitId: null,
       selectedCityId: null,
+      lastBattle: null,
     });
     autosave(get());
   },
@@ -122,6 +129,7 @@ export const useGame = create<GameState>((set, get) => ({
       currentSlot: slot,
       selectedUnitId: null,
       selectedCityId: null,
+      lastBattle: null,
     });
     return true;
   },
@@ -137,6 +145,7 @@ export const useGame = create<GameState>((set, get) => ({
       currentSlot: null,
       selectedUnitId: null,
       selectedCityId: null,
+      lastBattle: null,
     });
   },
 
@@ -147,27 +156,60 @@ export const useGame = create<GameState>((set, get) => ({
     const { units, cities, selectedUnitId, selectedCityId, map } = get();
     if (!map) return;
 
-    const unitAtTile = units.find((u) => u.x === x && u.y === y && u.ownerIdx === 0);
-    const friendlyCityAtTile = cities.find((c) => c.x === x && c.y === y && c.ownerIdx === 0);
+    const friendlyUnitAtTile = units.find(
+      (u) => u.x === x && u.y === y && u.ownerIdx === HUMAN_IDX,
+    );
+    const enemyUnitAtTile = units.find(
+      (u) => u.x === x && u.y === y && u.ownerIdx !== HUMAN_IDX,
+    );
+    const friendlyCityAtTile = cities.find(
+      (c) => c.x === x && c.y === y && c.ownerIdx === HUMAN_IDX,
+    );
     const selected = units.find((u) => u.id === selectedUnitId) ?? null;
 
     if (selected) {
-      if (unitAtTile && unitAtTile.id !== selected.id) {
-        set({ selectedUnitId: unitAtTile.id, selectedCityId: null });
+      if (friendlyUnitAtTile && friendlyUnitAtTile.id !== selected.id) {
+        set({ selectedUnitId: friendlyUnitAtTile.id, selectedCityId: null });
         return;
       }
-      if (unitAtTile && unitAtTile.id === selected.id) {
+      if (friendlyUnitAtTile && friendlyUnitAtTile.id === selected.id) {
         set({ selectedUnitId: null, selectedCityId: null });
         return;
       }
+
+      // Attack an enemy unit on the target tile.
+      if (enemyUnitAtTile) {
+        if (selected.movesLeft <= 0) return;
+        const dist = chebyshev(selected.x, selected.y, x, y);
+        if (dist > selected.movesLeft) return;
+        const defenderTile = map.tiles[y * map.width + x];
+        const battle = resolveCombat(selected.kind, enemyUnitAtTile.kind, defenderTile);
+        if (battle.attackerWon) {
+          set({
+            units: units
+              .filter((u) => u.id !== enemyUnitAtTile.id)
+              .map((u) => (u.id === selected.id ? { ...u, x, y, movesLeft: 0 } : u)),
+            lastBattle: battle,
+          });
+        } else {
+          set({
+            units: units.filter((u) => u.id !== selected.id),
+            selectedUnitId: null,
+            lastBattle: battle,
+          });
+        }
+        autosave(get());
+        return;
+      }
+
+      // Move
       if (selected.movesLeft <= 0) return;
       const dist = chebyshev(selected.x, selected.y, x, y);
       if (dist > selected.movesLeft) return;
-
       const targetTile = map.tiles[y * map.width + x];
       if (!TERRAIN[targetTile.terrain].passable) return;
+      if (cities.some((c) => c.x === x && c.y === y && c.ownerIdx !== selected.ownerIdx)) return;
       if (units.some((u) => u.x === x && u.y === y && u.ownerIdx === selected.ownerIdx)) return;
-
       set({
         units: units.map((u) =>
           u.id === selected.id ? { ...u, x, y, movesLeft: u.movesLeft - dist } : u,
@@ -177,8 +219,8 @@ export const useGame = create<GameState>((set, get) => ({
       return;
     }
 
-    if (unitAtTile) {
-      set({ selectedUnitId: unitAtTile.id, selectedCityId: null });
+    if (friendlyUnitAtTile) {
+      set({ selectedUnitId: friendlyUnitAtTile.id, selectedCityId: null });
       return;
     }
     if (friendlyCityAtTile) {
@@ -236,28 +278,24 @@ export const useGame = create<GameState>((set, get) => ({
   },
 
   endTurn: () => {
-    const { units, cities, turn, map } = get();
+    const { units, cities, turn, map, players } = get();
     if (!map) return;
 
-    const refreshedUnits: Unit[] = units.map((u) => ({
+    // Refresh all units' moves for the new turn.
+    let workingUnits: Unit[] = units.map((u) => ({
       ...u,
       movesLeft: UNIT[u.kind].move,
     }));
 
-    const newCities: City[] = cities.map((city) => {
+    // Accrue production for every city; spawn produced units.
+    let workingCities: City[] = cities.map((city) => {
       const accrued = city.production + city.productionPerTurn;
-      if (!city.building) {
-        return { ...city, production: accrued };
-      }
+      if (!city.building) return { ...city, production: accrued };
       const cost = UNIT[city.building].cost;
-      if (accrued < cost) {
-        return { ...city, production: accrued };
-      }
-      const spawnPos = findSpawnTile(city, refreshedUnits, map);
-      if (!spawnPos) {
-        return { ...city, production: accrued };
-      }
-      refreshedUnits.push({
+      if (accrued < cost) return { ...city, production: accrued };
+      const spawnPos = findSpawnTile(city, workingUnits, map);
+      if (!spawnPos) return { ...city, production: accrued };
+      workingUnits.push({
         id: nextUnitId(),
         kind: city.building,
         ownerIdx: city.ownerIdx,
@@ -268,13 +306,33 @@ export const useGame = create<GameState>((set, get) => ({
       return { ...city, production: accrued - cost };
     });
 
+    // Run AI turns.
+    let lastAIBattle: Battle | null = null;
+    for (const player of players) {
+      if (player.isHuman) continue;
+      const result = runAITurn({
+        ownerIdx: player.idx,
+        map,
+        units: workingUnits,
+        cities: workingCities,
+      });
+      workingUnits = result.units;
+      workingCities = result.cities;
+      if (result.battles.length > 0) {
+        lastAIBattle = result.battles[result.battles.length - 1];
+      }
+    }
+
     set({
       turn: turn + 1,
       selectedUnitId: null,
       selectedCityId: null,
-      units: refreshedUnits,
-      cities: newCities,
+      units: workingUnits,
+      cities: workingCities,
+      lastBattle: lastAIBattle,
     });
     autosave(get());
   },
+
+  dismissBattle: () => set({ lastBattle: null }),
 }));

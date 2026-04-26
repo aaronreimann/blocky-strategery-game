@@ -10,18 +10,24 @@ export default function Hud() {
   const turn = useGame((s) => s.turn);
   const units = useGame((s) => s.units);
   const cities = useGame((s) => s.cities);
+  const players = useGame((s) => s.players);
   const currentSlot = useGame((s) => s.currentSlot);
   const selectedUnitId = useGame((s) => s.selectedUnitId);
   const selectedCityId = useGame((s) => s.selectedCityId);
+  const lastBattle = useGame((s) => s.lastBattle);
   const endTurn = useGame((s) => s.endTurn);
   const foundCity = useGame((s) => s.foundCity);
   const setCityBuild = useGame((s) => s.setCityBuild);
   const exitToTitle = useGame((s) => s.exitToTitle);
+  const dismissBattle = useGame((s) => s.dismissBattle);
 
   const selectedUnit = selectedUnitId ? units.find((u) => u.id === selectedUnitId) : null;
   const unitSpec = selectedUnit ? UNIT[selectedUnit.kind] : null;
-
   const selectedCity = selectedCityId ? cities.find((c) => c.id === selectedCityId) : null;
+
+  // Friendly = human player only for HUD context.
+  const myUnitsCount = units.filter((u) => u.ownerIdx === 0).length;
+  const myCitiesCount = cities.filter((c) => c.ownerIdx === 0).length;
 
   return (
     <SafeAreaView style={styles.root} pointerEvents="box-none">
@@ -35,12 +41,31 @@ export default function Hud() {
           </Text>
         </View>
         <View style={styles.pill}>
-          <Text style={styles.pillText}>Cities {cities.length}</Text>
+          <Text style={styles.pillText}>
+            Cities {myCitiesCount} · Units {myUnitsCount}
+          </Text>
         </View>
-        <View style={styles.pill}>
-          <Text style={styles.pillText}>Units {units.length}</Text>
-        </View>
+        {players.length > 1 ? (
+          <View style={[styles.pill, { borderColor: players[1].color }]}>
+            <Text style={[styles.pillText, { color: players[1].color }]}>
+              vs {players[1].name}
+            </Text>
+          </View>
+        ) : null}
       </View>
+
+      {lastBattle ? (
+        <View style={styles.toastWrap} pointerEvents="box-none">
+          <Pressable style={styles.toast} onPress={dismissBattle}>
+            <Text style={styles.toastText}>
+              {UNIT[lastBattle.attackerKind].name} {lastBattle.attackerWon ? 'beat' : 'lost to'}{' '}
+              {UNIT[lastBattle.defenderKind].name} ({lastBattle.attackerRoll} vs{' '}
+              {lastBattle.defenderRoll})
+            </Text>
+            <Text style={styles.toastDismiss}>tap to dismiss</Text>
+          </Pressable>
+        </View>
+      ) : null}
 
       <View style={styles.bottomRow} pointerEvents="box-none">
         {selectedUnit && unitSpec ? (
@@ -91,7 +116,9 @@ export default function Hud() {
           </View>
         ) : (
           <View style={styles.hint} pointerEvents="none">
-            <Text style={styles.hintText}>Tap a unit or city · drag to pan · pinch to zoom</Text>
+            <Text style={styles.hintText}>
+              Tap a unit/city · yellow tiles = move · red tiles = attack
+            </Text>
           </View>
         )}
 
@@ -105,7 +132,7 @@ export default function Hud() {
 
 const styles = StyleSheet.create({
   root: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'space-between' },
-  topRow: { flexDirection: 'row', gap: 8, padding: 12 },
+  topRow: { flexDirection: 'row', gap: 8, padding: 12, flexWrap: 'wrap' },
   pill: {
     backgroundColor: THEME.bgElevated,
     borderColor: THEME.border,
@@ -115,6 +142,24 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   pillText: { color: THEME.ink, fontSize: 12, fontWeight: '600' },
+  toastWrap: {
+    position: 'absolute',
+    top: 56,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  toast: {
+    backgroundColor: THEME.bgElevated,
+    borderColor: THEME.warn,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  toastText: { color: THEME.ink, fontSize: 13, fontWeight: '700' },
+  toastDismiss: { color: THEME.inkMuted, fontSize: 10, marginTop: 2 },
   bottomRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
