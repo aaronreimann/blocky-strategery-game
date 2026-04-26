@@ -25,6 +25,7 @@ import type {
   Difficulty,
   GameOverState,
   Player,
+  TurnEvent,
   Unit,
 } from '@/src/game/types';
 import { computeCityYields, foodNeededToGrow } from '@/src/game/yields';
@@ -53,6 +54,7 @@ type GameState = {
   selectedUnitId: string | null;
   selectedCityId: string | null;
   lastBattle: Battle | null;
+  turnEvents: TurnEvent[];
   gameOver: GameOverState | null;
 
   newGame: (slot: number, seed: number, difficulty: Difficulty, leaders: LeaderMap) => void;
@@ -72,6 +74,7 @@ type GameState = {
   clearUnitDestination: (unitId: string) => void;
   endTurn: () => void;
   dismissBattle: () => void;
+  dismissTurnEvents: () => void;
 };
 
 const CITY_NAMES = [
@@ -129,6 +132,7 @@ export const useGame = create<GameState>((set, get) => ({
   selectedUnitId: null,
   selectedCityId: null,
   lastBattle: null,
+  turnEvents: [],
   gameOver: null,
 
   newGame: (slot, seed, difficulty, leaders) => {
@@ -287,6 +291,8 @@ export const useGame = create<GameState>((set, get) => ({
           battle = resolveCombat(
             selected.kind,
             enemyUnitAtTile.kind,
+            selected.ownerIdx,
+            enemyUnitAtTile.ownerIdx,
             defenderTile,
             wallsBonus,
           );
@@ -507,6 +513,9 @@ export const useGame = create<GameState>((set, get) => ({
     const { units, cities, turn, map, players, improvements, gameOver } = get();
     if (gameOver || !map) return;
 
+    const events: TurnEvent[] = [];
+    const playerName = (idx: number) => players[idx]?.name ?? `Player ${idx}`;
+
     // Refresh moves; +1 movement bonus when starting on a road tile.
     let workingUnits: Unit[] = units.map((u) => {
       const baseMove = UNIT[u.kind].move;
@@ -541,6 +550,9 @@ export const useGame = create<GameState>((set, get) => ({
         nextPop += 1;
         const hasGranary = city.buildings.includes('granary');
         nextFood = hasGranary ? Math.floor(threshold / 2) : 0;
+        if (city.ownerIdx === HUMAN_IDX) {
+          events.push({ kind: 'grew', text: `${city.name} grew to size ${nextPop}.` });
+        }
       }
 
       // Production: accumulate prod from yields toward the current build.
@@ -571,6 +583,12 @@ export const useGame = create<GameState>((set, get) => ({
           workTurnsLeft: 0,
           destination: null,
         });
+        if (city.ownerIdx === HUMAN_IDX) {
+          events.push({
+            kind: 'built',
+            text: `${city.name} built a ${UNIT[unitKind].name}.`,
+          });
+        }
         return {
           ...city,
           population: nextPop,
@@ -590,6 +608,12 @@ export const useGame = create<GameState>((set, get) => ({
           production: 0,
           building: { kind: 'unit', unit: 'footman' },
         };
+      }
+      if (city.ownerIdx === HUMAN_IDX) {
+        events.push({
+          kind: 'built',
+          text: `${city.name} finished ${BUILDING[kind].name}.`,
+        });
       }
       return {
         ...city,
@@ -696,13 +720,18 @@ export const useGame = create<GameState>((set, get) => ({
       let researched = p.researched;
       // Complete research if we have enough.
       while (researching && science >= TECH[researching].cost) {
-        science -= TECH[researching].cost;
-        researched = [...researched, researching];
+        const finished = researching;
+        science -= TECH[finished].cost;
+        researched = [...researched, finished];
         researching = null;
-        // For non-human players, immediately pick next.
+        if (p.isHuman) {
+          events.push({
+            kind: 'research',
+            text: `Researched ${TECH[finished].name}.`,
+          });
+        }
         if (!p.isHuman) researching = pickCheapestAvailable(researched);
       }
-      // Non-human players never sit idle.
       if (!p.isHuman && !researching) {
         researching = pickCheapestAvailable(researched);
       }
@@ -720,6 +749,22 @@ export const useGame = create<GameState>((set, get) => ({
       });
       workingUnits = result.units;
       workingCities = result.cities;
+      for (const b of result.battles) {
+        if (b.attackerOwnerIdx === HUMAN_IDX || b.defenderOwnerIdx === HUMAN_IDX) {
+          const ours = b.attackerOwnerIdx === HUMAN_IDX ? b.attackerKind : b.defenderKind;
+          const theirs = b.attackerOwnerIdx === HUMAN_IDX ? b.defenderKind : b.attackerKind;
+          const theirOwner = b.attackerOwnerIdx === HUMAN_IDX
+            ? b.defenderOwnerIdx
+            : b.attackerOwnerIdx;
+          const weWon =
+            (b.attackerOwnerIdx === HUMAN_IDX && b.attackerWon) ||
+            (b.defenderOwnerIdx === HUMAN_IDX && !b.attackerWon);
+          events.push({
+            kind: 'battle',
+            text: `${UNIT[ours].name} ${weWon ? 'beat' : 'lost to'} ${playerName(theirOwner)} ${UNIT[theirs].name} (${b.attackerRoll} vs ${b.defenderRoll}).`,
+          });
+        }
+      }
       if (result.battles.length > 0) {
         lastAIBattle = result.battles[result.battles.length - 1];
       }
@@ -742,10 +787,12 @@ export const useGame = create<GameState>((set, get) => ({
       cities: workingCities,
       improvements: workingImprovements,
       lastBattle: lastAIBattle,
+      turnEvents: events,
       gameOver: finished,
     });
     autosave(get());
   },
 
   dismissBattle: () => set({ lastBattle: null }),
+  dismissTurnEvents: () => set({ turnEvents: [] }),
 }));

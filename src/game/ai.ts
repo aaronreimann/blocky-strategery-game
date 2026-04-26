@@ -141,7 +141,14 @@ export function runAITurn(input: AITurnInput): AITurnOutput {
           (c) => c.x === enemy.x && c.y === enemy.y && c.ownerIdx === enemy.ownerIdx,
         );
         const wallsBonus = cityHere?.buildings.includes('walls') ? 1 : 0;
-        const battle = resolveCombat(fresh.kind, enemy.kind, defenderTile, wallsBonus);
+        const battle = resolveCombat(
+          fresh.kind,
+          enemy.kind,
+          fresh.ownerIdx,
+          enemy.ownerIdx,
+          defenderTile,
+          wallsBonus,
+        );
         battles.push(battle);
         if (battle.attackerWon) {
           // Move attacker onto defender's tile; capture any enemy city there.

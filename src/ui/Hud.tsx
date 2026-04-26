@@ -17,6 +17,21 @@ import { useGame } from '@/src/state/game';
 import { THEME } from './palette';
 import TechScreen from './TechScreen';
 
+function eventStyle(kind: string): { color: string } {
+  switch (kind) {
+    case 'battle':
+      return { color: '#ef4444' };
+    case 'grew':
+      return { color: '#3aa675' };
+    case 'built':
+      return { color: '#facc15' };
+    case 'research':
+      return { color: '#06b6d4' };
+    default:
+      return { color: '#f5f1e8' };
+  }
+}
+
 export default function Hud() {
   const [techOpen, setTechOpen] = useState(false);
   const [cityTab, setCityTab] = useState<'units' | 'buildings'>('units');
@@ -30,6 +45,8 @@ export default function Hud() {
   const selectedUnitId = useGame((s) => s.selectedUnitId);
   const selectedCityId = useGame((s) => s.selectedCityId);
   const lastBattle = useGame((s) => s.lastBattle);
+  const turnEvents = useGame((s) => s.turnEvents);
+  const dismissTurnEvents = useGame((s) => s.dismissTurnEvents);
   const endTurn = useGame((s) => s.endTurn);
   const foundCity = useGame((s) => s.foundCity);
   const setCityBuild = useGame((s) => s.setCityBuild);
@@ -107,6 +124,33 @@ export default function Hud() {
             </Text>
             <Text style={styles.toastDismiss}>tap to dismiss</Text>
           </Pressable>
+        </View>
+      ) : null}
+
+      {turnEvents.length > 0 ? (
+        <View style={styles.eventsWrap} pointerEvents="box-none">
+          <View style={styles.eventsCard} pointerEvents="auto">
+            <View style={styles.eventsHeader}>
+              <Text style={styles.eventsTitle}>Last turn</Text>
+              <Pressable onPress={dismissTurnEvents} style={styles.eventsClose}>
+                <Text style={styles.eventsCloseText}>Dismiss</Text>
+              </Pressable>
+            </View>
+            {turnEvents.slice(0, 8).map((ev, i) => (
+              <Text
+                key={i}
+                style={[styles.eventLine, eventStyle(ev.kind)]}
+                numberOfLines={2}
+              >
+                · {ev.text}
+              </Text>
+            ))}
+            {turnEvents.length > 8 ? (
+              <Text style={styles.eventOverflow}>
+                +{turnEvents.length - 8} more
+              </Text>
+            ) : null}
+          </View>
         </View>
       ) : null}
 
@@ -353,6 +397,30 @@ const styles = StyleSheet.create({
   },
   toastText: { color: THEME.ink, fontSize: 13, fontWeight: '700' },
   toastDismiss: { color: THEME.inkMuted, fontSize: 10, marginTop: 2 },
+  eventsWrap: {
+    position: 'absolute',
+    top: 56,
+    left: 12,
+    maxWidth: 320,
+  },
+  eventsCard: {
+    backgroundColor: 'rgba(21, 33, 54, 0.92)',
+    borderColor: THEME.border,
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 10,
+  },
+  eventsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    marginBottom: 6,
+  },
+  eventsTitle: { color: THEME.warn, fontSize: 12, fontWeight: '800', letterSpacing: 1 },
+  eventsClose: { paddingHorizontal: 6, paddingVertical: 2 },
+  eventsCloseText: { color: THEME.inkMuted, fontSize: 11, fontWeight: '700' },
+  eventLine: { color: THEME.ink, fontSize: 11, marginTop: 2 },
+  eventOverflow: { color: THEME.inkMuted, fontSize: 10, marginTop: 4 },
   bottomRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',

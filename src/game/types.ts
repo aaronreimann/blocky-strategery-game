@@ -23,6 +23,11 @@ export type GameOverState = {
   reason: string;
 };
 
+export type TurnEvent = {
+  kind: 'battle' | 'grew' | 'built' | 'research' | 'captured' | 'lost';
+  text: string;
+};
+
 export type Player = {
   idx: number;
   name: string;   // country name

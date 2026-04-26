@@ -6,6 +6,8 @@ import type { Tile } from './map';
 export type Battle = {
   attackerKind: UnitKind;
   defenderKind: UnitKind;
+  attackerOwnerIdx: number;
+  defenderOwnerIdx: number;
   attackerWon: boolean;
   attackerRoll: number;
   defenderRoll: number;
@@ -18,6 +20,8 @@ function d6(): number {
 export function resolveCombat(
   attackerKind: UnitKind,
   defenderKind: UnitKind,
+  attackerOwnerIdx: number,
+  defenderOwnerIdx: number,
   defenderTile: Tile,
   defenderWallsBonus = 0,
 ): Battle {
@@ -30,6 +34,8 @@ export function resolveCombat(
   return {
     attackerKind,
     defenderKind,
+    attackerOwnerIdx,
+    defenderOwnerIdx,
     attackerWon: attackerRoll > defenderRoll,
     attackerRoll,
     defenderRoll,
