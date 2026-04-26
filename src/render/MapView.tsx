@@ -32,7 +32,7 @@ import MiniMap from './MiniMap';
 // Font Awesome 5 Free Solid glyphs (private-use Unicode points).
 const UNIT_GLYPH: Record<UnitKind, string> = {
   pioneer:   '', // person-walking
-  laborer:   '', // hammer
+  worker:    '', // hammer
   footman:   '', // gavel (mallet)
   spearman:  '', // shield-alt
   horseman:  '', // horse
@@ -56,7 +56,7 @@ type Props = {
   improvements: ImprovementMap;
   selectedUnitId: string | null;
   selectedCityId: string | null;
-  autoLaborerOwnerIdxs: Set<number>;
+  autoWorkerOwnerIdxs: Set<number>;
   moveTiles: Set<string>;
   attackTiles: Set<string>;
   onTileTap: (x: number, y: number) => void;
@@ -74,7 +74,7 @@ export default function MapView({
   improvements,
   selectedUnitId,
   selectedCityId,
-  autoLaborerOwnerIdxs,
+  autoWorkerOwnerIdxs,
   moveTiles,
   attackTiles,
   onTileTap,
@@ -402,7 +402,10 @@ export default function MapView({
 
     for (const u of units) {
       const hasDest = u.destination !== null;
-      const isAuto = u.kind === 'laborer' && autoLaborerOwnerIdxs.has(u.ownerIdx) && !hasDest;
+      const isAuto =
+        u.kind === 'worker' &&
+        (u.autoMode || autoWorkerOwnerIdxs.has(u.ownerIdx)) &&
+        !hasDest;
       if (hasDest || isAuto) {
         const letter = hasDest ? 'M' : 'A';
         drawBadge(
@@ -422,7 +425,7 @@ export default function MapView({
       }
     }
     return out;
-  }, [units, autoLaborerOwnerIdxs]);
+  }, [units, autoWorkerOwnerIdxs]);
 
   // Direction arrows on each highlight tile pointing from selected unit
   // toward that tile, so it's obvious where the unit can step.

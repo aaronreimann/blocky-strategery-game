@@ -24,7 +24,7 @@ export default function GameScreen() {
   const setUnitDestination = useGame((s) => s.setUnitDestination);
   const openTilePicker = useGame((s) => s.openTilePicker);
 
-  const autoLaborerOwnerIdxs = useMemo(() => {
+  const autoWorkerOwnerIdxs = useMemo(() => {
     const out = new Set<number>();
     for (const c of cities) {
       if (c.focus === 'roads') out.add(c.ownerIdx);
@@ -84,7 +84,7 @@ export default function GameScreen() {
         improvements={improvements}
         selectedUnitId={selectedUnitId}
         selectedCityId={selectedCityId}
-        autoLaborerOwnerIdxs={autoLaborerOwnerIdxs}
+        autoWorkerOwnerIdxs={autoWorkerOwnerIdxs}
         moveTiles={moveTiles}
         attackTiles={attackTiles}
         onTileTap={tapTile}

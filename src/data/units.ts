@@ -2,7 +2,7 @@ import type { TechId } from './tech';
 
 export const UNIT_KINDS = [
   'pioneer',
-  'laborer',
+  'worker',
   'footman',
   'spearman',
   'horseman',
@@ -24,7 +24,7 @@ export type UnitSpec = {
 
 export const UNIT: Record<UnitKind, UnitSpec> = {
   pioneer:   { name: 'Pioneer',   move: 1, attack: 0, defense: 1, cost: 30, glyph: '◆', tech: null },
-  laborer:   { name: 'Laborer',   move: 1, attack: 0, defense: 1, cost: 20, glyph: '●', tech: null },
+  worker:    { name: 'Worker',    move: 1, attack: 0, defense: 1, cost: 20, glyph: '●', tech: null },
   footman:   { name: 'Footman',   move: 1, attack: 1, defense: 1, cost: 10, glyph: '■', tech: null },
   spearman:  { name: 'Spearman',  move: 1, attack: 1, defense: 3, cost: 20, glyph: '▲', tech: 'bronze_working' },
   horseman:  { name: 'Horseman',  move: 2, attack: 2, defense: 1, cost: 25, glyph: '▶', tech: 'horseback_riding' },

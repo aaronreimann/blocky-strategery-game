@@ -51,6 +51,7 @@ export type Unit = {
   workingOn: ImprovementKind | null;
   workTurnsLeft: number;
   destination: { x: number; y: number } | null;
+  autoMode: boolean;     // Worker only: auto-build / connect roads
 };
 
 export type CityBuildTarget =

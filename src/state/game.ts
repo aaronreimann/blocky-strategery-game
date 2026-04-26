@@ -74,6 +74,7 @@ type GameState = {
   cancelWork: () => void;
   setUnitDestination: (unitId: string, x: number, y: number) => void;
   clearUnitDestination: (unitId: string) => void;
+  toggleWorkerAuto: () => void;
   openTilePicker: (x: number, y: number) => void;
   closeTilePicker: () => void;
   selectUnitFromPicker: (unitId: string) => void;
@@ -172,14 +173,24 @@ export const useGame = create<GameState>((set, get) => ({
   loadFromSlot: async (slot) => {
     const data = await loadSlot(slot);
     if (!data) return false;
-    // Forward-compat: older saves lacked workingOn / workTurnsLeft / destination / stack.
-    const normalizedUnits: Unit[] = data.units.map((u) => ({
-      ...u,
-      workingOn: u.workingOn ?? null,
-      workTurnsLeft: u.workTurnsLeft ?? 0,
-      destination: u.destination ?? null,
-      stack: (u.stack && u.stack.length > 0 ? u.stack : [u.kind]) as Unit['stack'],
-    }));
+    // Forward-compat: older saves lacked workingOn / workTurnsLeft / destination
+    // / stack / autoMode. We also rename 'laborer' to 'worker'.
+    const migrateKind = (k: string): UnitKind =>
+      (k === 'laborer' ? 'worker' : k) as UnitKind;
+    const normalizedUnits: Unit[] = data.units.map((u) => {
+      const rawStack: string[] = (u.stack && u.stack.length > 0
+        ? (u.stack as unknown as string[])
+        : [u.kind as unknown as string]);
+      return {
+        ...u,
+        kind: migrateKind(u.kind as unknown as string),
+        stack: rawStack.map(migrateKind),
+        workingOn: u.workingOn ?? null,
+        workTurnsLeft: u.workTurnsLeft ?? 0,
+        destination: u.destination ?? null,
+        autoMode: u.autoMode ?? false,
+      };
+    });
     const normalizedPlayers: Player[] = data.players.map((p) => ({
       ...p,
       iso: p.iso ?? '',
@@ -194,13 +205,18 @@ export const useGame = create<GameState>((set, get) => ({
       const raw = c as City & { building?: unknown };
       let building: CityBuildTarget | null = null;
       if (raw.building && typeof raw.building === 'string') {
-        building = { kind: 'unit', unit: raw.building as UnitKind };
+        building = { kind: 'unit', unit: migrateKind(raw.building) };
       } else if (
         raw.building &&
         typeof raw.building === 'object' &&
         'kind' in raw.building
       ) {
-        building = raw.building as CityBuildTarget;
+        const b = raw.building as CityBuildTarget;
+        if (b.kind === 'unit') {
+          building = { kind: 'unit', unit: migrateKind(b.unit as unknown as string) };
+        } else {
+          building = b;
+        }
       }
       return {
         ...c,
@@ -304,9 +320,15 @@ export const useGame = create<GameState>((set, get) => ({
 
       // Attack / capture path.
       if (enemyUnitAtTile || enemyCityAtTile) {
-        if (selected.movesLeft <= 0) return;
+        if (selected.movesLeft <= 0) {
+          set({ selectedUnitId: null });
+          return;
+        }
         const dist = chebyshev(selected.x, selected.y, x, y);
-        if (dist > selected.movesLeft) return;
+        if (dist > selected.movesLeft) {
+          set({ selectedUnitId: null });
+          return;
+        }
 
         let nextUnits = units;
         let nextCities = cities;
@@ -368,13 +390,20 @@ export const useGame = create<GameState>((set, get) => ({
         return;
       }
 
-      // Plain move.
-      if (selected.movesLeft <= 0) return;
+      // Plain move — but if the tap can't possibly become a move (no moves
+      // left, out of range, impassable, blocked) then treat the tap as a
+      // deselect instead of a no-op.
       const dist = chebyshev(selected.x, selected.y, x, y);
-      if (dist > selected.movesLeft) return;
       const targetTile = map.tiles[y * map.width + x];
-      if (!TERRAIN[targetTile.terrain].passable) return;
-      if (units.some((u) => u.x === x && u.y === y && u.ownerIdx === selected.ownerIdx)) return;
+      const cantMove =
+        selected.movesLeft <= 0 ||
+        dist > selected.movesLeft ||
+        !TERRAIN[targetTile.terrain].passable ||
+        units.some((u) => u.x === x && u.y === y && u.ownerIdx === selected.ownerIdx);
+      if (cantMove) {
+        set({ selectedUnitId: null, selectedCityId: null });
+        return;
+      }
       set({
         units: units.map((u) =>
           u.id === selected.id ? { ...u, x, y, movesLeft: u.movesLeft - dist } : u,
@@ -474,7 +503,7 @@ export const useGame = create<GameState>((set, get) => ({
     const { units, selectedUnitId, improvements, gameOver } = get();
     if (gameOver) return;
     const sel = units.find((u) => u.id === selectedUnitId);
-    if (!sel || sel.kind !== 'laborer') return;
+    if (!sel || sel.kind !== 'worker') return;
     if (sel.ownerIdx !== 0) return;
     if (sel.workingOn) return;
     if (improvements[tileKey(sel.x, sel.y)]) return;
@@ -556,6 +585,27 @@ export const useGame = create<GameState>((set, get) => ({
     set({
       units: get().units.map((u) =>
         u.id === unitId ? { ...u, destination: null } : u,
+      ),
+    });
+    autosave(get());
+  },
+
+  toggleWorkerAuto: () => {
+    const { units, selectedUnitId, gameOver } = get();
+    if (gameOver) return;
+    const sel = units.find((u) => u.id === selectedUnitId);
+    if (!sel || sel.kind !== 'worker' || sel.ownerIdx !== HUMAN_IDX) return;
+    set({
+      units: units.map((u) =>
+        u.id === sel.id
+          ? {
+              ...u,
+              autoMode: !u.autoMode,
+              // Turning auto on clears any manual destination so the Worker
+              // can pick its own next move.
+              destination: !u.autoMode ? null : u.destination,
+            }
+          : u,
       ),
     });
     autosave(get());
@@ -675,6 +725,7 @@ export const useGame = create<GameState>((set, get) => ({
           workTurnsLeft: 0,
           destination: null,
           stack: [unitKind],
+          autoMode: false,
         });
         if (city.ownerIdx === HUMAN_IDX) {
           events.push({
@@ -777,16 +828,20 @@ export const useGame = create<GameState>((set, get) => ({
       return moved;
     });
 
-    // Auto-Laborer pass: any player whose city has focus='roads' gets their
-    // free Laborers (no manual destination, not already busy) either building
-    // on the current tile or stepping toward the closest other friendly city.
+    // Auto-Worker pass: any Worker whose city has focus='roads' OR whose
+    // own autoMode flag is set (and isn't already busy / has no manual
+    // destination) either builds on the current tile or steps toward the
+    // closest friendly city.
     const playersWantingRoads = new Set(
       workingCities.filter((c) => c.focus === 'roads').map((c) => c.ownerIdx),
     );
-    if (playersWantingRoads.size > 0) {
+    const anyWorkerOnAuto = workingUnits.some(
+      (u) => u.kind === 'worker' && u.autoMode,
+    );
+    if (playersWantingRoads.size > 0 || anyWorkerOnAuto) {
       workingUnits = workingUnits.map((u) => {
-        if (u.kind !== 'laborer') return u;
-        if (!playersWantingRoads.has(u.ownerIdx)) return u;
+        if (u.kind !== 'worker') return u;
+        if (!playersWantingRoads.has(u.ownerIdx) && !u.autoMode) return u;
         if (u.workingOn) return u;
         if (u.destination) return u; // manual order takes priority
         if (u.movesLeft <= 0) return u;

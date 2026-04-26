@@ -92,35 +92,35 @@ export function nextStepToTiles(
   return null;
 }
 
-// BFS one step toward the closest friendly city other than the laborer's
+// BFS one step toward the closest friendly city other than the worker's
 // current tile. Returns the next tile to step into, or null if unreachable.
 export function nextStepToFriendlyCity(
-  laborer: Unit,
+  worker: Unit,
   cities: City[],
   units: Unit[],
   map: GameMap,
 ): { x: number; y: number } | null {
   const targets = new Set(
     cities
-      .filter((c) => c.ownerIdx === laborer.ownerIdx)
-      .filter((c) => !(c.x === laborer.x && c.y === laborer.y))
+      .filter((c) => c.ownerIdx === worker.ownerIdx)
+      .filter((c) => !(c.x === worker.x && c.y === worker.y))
       .map((c) => `${c.x},${c.y}`),
   );
   if (targets.size === 0) return null;
 
   type Node = { x: number; y: number; firstStep: { x: number; y: number } | null };
-  const start: Node = { x: laborer.x, y: laborer.y, firstStep: null };
+  const start: Node = { x: worker.x, y: worker.y, firstStep: null };
   const visited = new Set<string>([`${start.x},${start.y}`]);
   const queue: Node[] = [start];
 
   // Pre-build a set of blocked tiles: enemy units and any other friendly unit.
   const blocked = new Set<string>();
   for (const u of units) {
-    if (u.id === laborer.id) continue;
+    if (u.id === worker.id) continue;
     blocked.add(`${u.x},${u.y}`);
   }
   const enemyCities = new Set(
-    cities.filter((c) => c.ownerIdx !== laborer.ownerIdx).map((c) => `${c.x},${c.y}`),
+    cities.filter((c) => c.ownerIdx !== worker.ownerIdx).map((c) => `${c.x},${c.y}`),
   );
 
   while (queue.length > 0) {

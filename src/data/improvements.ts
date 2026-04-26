@@ -1,4 +1,4 @@
-// Tile improvements built by Laborers. Road is shipped now; farm/mine/
+// Tile improvements built by Workers. Road is shipped now; farm/mine/
 // irrigation slots are reserved for M6e (city tile yields) so the
 // rendering and state code don't need a second refactor.
 

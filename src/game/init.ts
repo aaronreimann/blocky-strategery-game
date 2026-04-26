@@ -92,6 +92,7 @@ function spawnStartingUnits(
       workTurnsLeft: 0,
       destination: null,
       stack: ['pioneer'],
+      autoMode: false,
     },
     {
       id: nextUnitId(),
@@ -104,18 +105,20 @@ function spawnStartingUnits(
       workTurnsLeft: 0,
       destination: null,
       stack: ['footman'],
+      autoMode: false,
     },
     {
       id: nextUnitId(),
-      kind: 'laborer',
+      kind: 'worker',
       ownerIdx,
       x: start.x,
       y: clamp(start.y + 1, 0, map.height - 1),
-      movesLeft: UNIT.laborer.move,
+      movesLeft: UNIT.worker.move,
       workingOn: null,
       workTurnsLeft: 0,
       destination: null,
-      stack: ['laborer'],
+      stack: ['worker'],
+      autoMode: false,
     },
   ];
 }

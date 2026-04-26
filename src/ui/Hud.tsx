@@ -63,6 +63,7 @@ export default function Hud() {
   const cancelSetDestination = useGame((s) => s.cancelSetDestination);
   const awaitingDestinationFor = useGame((s) => s.awaitingDestinationFor);
   const clearUnitDestination = useGame((s) => s.clearUnitDestination);
+  const toggleWorkerAuto = useGame((s) => s.toggleWorkerAuto);
   const exitToTitle = useGame((s) => s.exitToTitle);
   const dismissBattle = useGame((s) => s.dismissBattle);
 
@@ -238,8 +239,26 @@ export default function Hud() {
                   <Text style={styles.actionMutedText}>Cancel destination</Text>
                 </Pressable>
               ) : null}
+              {selectedUnit.kind === 'worker' ? (
+                <Pressable
+                  style={[
+                    styles.actionMuted,
+                    selectedUnit.autoMode && styles.actionAutoOn,
+                  ]}
+                  onPress={toggleWorkerAuto}
+                >
+                  <Text
+                    style={[
+                      styles.actionMutedText,
+                      selectedUnit.autoMode && styles.actionAutoOnText,
+                    ]}
+                  >
+                    Auto: {selectedUnit.autoMode ? 'on' : 'off'}
+                  </Text>
+                </Pressable>
+              ) : null}
             </View>
-            {selectedUnit.kind === 'laborer' ? (
+            {selectedUnit.kind === 'worker' ? (
               selectedUnit.workingOn ? (
                 <View style={styles.workRow}>
                   <Text style={styles.cardMeta}>
@@ -596,6 +615,8 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   actionMutedText: { color: THEME.inkMuted, fontWeight: '700', fontSize: 12 },
+  actionAutoOn: { backgroundColor: THEME.warn, borderColor: THEME.warn },
+  actionAutoOnText: { color: '#0a1729' },
   workRow: { marginTop: 6 },
   unitActionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 },
   focusRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },

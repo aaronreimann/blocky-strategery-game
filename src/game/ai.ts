@@ -329,7 +329,7 @@ export function runAITurn(input: AITurnInput): AITurnOutput {
       continue;
     }
 
-    // Laborer or other non-combat unit — wander.
+    // Worker or other non-combat unit — wander.
     units = tryMove(fresh, units, cities, map);
   }
 
