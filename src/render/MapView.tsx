@@ -328,33 +328,21 @@ export default function MapView({
       ));
   }, [units]);
 
-  // A/M badges in the bottom-right of each unit's tile.
+  // A/M badges in the bottom-right of each unit's tile + xN stack badges
+  // in the top-right.
   const badgeLayer = useMemo(() => {
     const out: React.ReactNode[] = [];
-    for (const u of units) {
-      const hasDest = u.destination !== null;
-      const isAuto = u.kind === 'laborer' && autoLaborerOwnerIdxs.has(u.ownerIdx) && !hasDest;
-      if (!hasDest && !isAuto) continue;
-      const letter = hasDest ? 'M' : 'A';
-      const bx = u.x * TILE_SIZE + TILE_SIZE - 9;
-      const by = u.y * TILE_SIZE + TILE_SIZE - 9;
+    const drawBadge = (key: string, x: number, y: number, text: string) => {
       out.push(
-        <Rect
-          key={`bd-${u.id}-bg`}
-          x={bx}
-          y={by}
-          width={8}
-          height={8}
-          color="#0a1729"
-        />,
+        <Rect key={`${key}-bg`} x={x} y={y} width={10} height={9} color="#0a1729" />,
       );
       out.push(
         <Rect
-          key={`bd-${u.id}-bo`}
-          x={bx}
-          y={by}
-          width={8}
-          height={8}
+          key={`${key}-bo`}
+          x={x}
+          y={y}
+          width={10}
+          height={9}
           color="#facc15"
           style="stroke"
           strokeWidth={1}
@@ -362,14 +350,36 @@ export default function MapView({
       );
       out.push(
         <SkText
-          key={`bd-${u.id}-t`}
-          x={bx + 1.5}
-          y={by + 7}
-          text={letter}
+          key={`${key}-t`}
+          x={x + 1.5}
+          y={y + 7.5}
+          text={text}
           font={BADGE_FONT}
           color="#facc15"
         />,
       );
+    };
+
+    for (const u of units) {
+      const hasDest = u.destination !== null;
+      const isAuto = u.kind === 'laborer' && autoLaborerOwnerIdxs.has(u.ownerIdx) && !hasDest;
+      if (hasDest || isAuto) {
+        const letter = hasDest ? 'M' : 'A';
+        drawBadge(
+          `bd-am-${u.id}`,
+          u.x * TILE_SIZE + TILE_SIZE - 11,
+          u.y * TILE_SIZE + TILE_SIZE - 10,
+          letter,
+        );
+      }
+      if (u.stack.length > 1) {
+        drawBadge(
+          `bd-stk-${u.id}`,
+          u.x * TILE_SIZE + TILE_SIZE - 11,
+          u.y * TILE_SIZE + 1,
+          `x${u.stack.length}`,
+        );
+      }
     }
     return out;
   }, [units, autoLaborerOwnerIdxs]);
@@ -504,9 +514,9 @@ export default function MapView({
           <Path
             key={`u-${u.id}-s`}
             path={path}
-            color="#ffffff"
+            color={u.stack.length > 1 ? '#facc15' : '#ffffff'}
             style="stroke"
-            strokeWidth={1.2}
+            strokeWidth={u.stack.length > 1 ? 2.2 : 1.2}
           />,
         );
       } else if (u.kind === 'laborer') {
@@ -517,9 +527,9 @@ export default function MapView({
             cx={cx}
             cy={cy}
             r={r}
-            color="#ffffff"
+            color={u.stack.length > 1 ? '#facc15' : '#ffffff'}
             style="stroke"
-            strokeWidth={1.2}
+            strokeWidth={u.stack.length > 1 ? 2.2 : 1.2}
           />,
         );
       } else if (u.kind === 'horseman') {
@@ -530,9 +540,9 @@ export default function MapView({
           <Path
             key={`u-${u.id}-s`}
             path={path}
-            color="#ffffff"
+            color={u.stack.length > 1 ? '#facc15' : '#ffffff'}
             style="stroke"
-            strokeWidth={1.2}
+            strokeWidth={u.stack.length > 1 ? 2.2 : 1.2}
           />,
         );
       } else if (u.kind === 'spearman') {
@@ -547,9 +557,9 @@ export default function MapView({
             y={cy - r * 0.7}
             width={r * 2}
             height={r * 1.7}
-            color="#ffffff"
+            color={u.stack.length > 1 ? '#facc15' : '#ffffff'}
             style="stroke"
-            strokeWidth={1.2}
+            strokeWidth={u.stack.length > 1 ? 2.2 : 1.2}
           />,
         );
         const spear = `M ${cx} ${cy - r * 1.4} L ${cx - r * 0.4} ${cy - r * 0.7} L ${cx + r * 0.4} ${cy - r * 0.7} Z`;
@@ -567,9 +577,9 @@ export default function MapView({
             y={cy - sr}
             width={sr * 2}
             height={sr * 2}
-            color="#ffffff"
+            color={u.stack.length > 1 ? '#facc15' : '#ffffff'}
             style="stroke"
-            strokeWidth={1.4}
+            strokeWidth={u.stack.length > 1 ? 2.2 : 1.4}
           />,
         );
         const x1 = `M ${cx - sr * 0.5} ${cy - sr * 0.5} L ${cx + sr * 0.5} ${cy + sr * 0.5}`;
@@ -590,9 +600,9 @@ export default function MapView({
             y={cy - h}
             width={w * 2}
             height={h * 2}
-            color="#ffffff"
+            color={u.stack.length > 1 ? '#facc15' : '#ffffff'}
             style="stroke"
-            strokeWidth={1.2}
+            strokeWidth={u.stack.length > 1 ? 2.2 : 1.2}
           />,
         );
         // little wheel dots
@@ -617,9 +627,9 @@ export default function MapView({
             y={cy - r}
             width={r * 2}
             height={r * 2}
-            color="#ffffff"
+            color={u.stack.length > 1 ? '#facc15' : '#ffffff'}
             style="stroke"
-            strokeWidth={1.2}
+            strokeWidth={u.stack.length > 1 ? 2.2 : 1.2}
           />,
         );
       }

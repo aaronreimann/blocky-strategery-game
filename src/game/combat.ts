@@ -2,10 +2,13 @@ import { TERRAIN } from '@/src/data/terrain';
 import { UNIT, type UnitKind } from '@/src/data/units';
 
 import type { Tile } from './map';
+import type { Unit } from './types';
 
 export type Battle = {
   attackerKind: UnitKind;
   defenderKind: UnitKind;
+  attackerStackSize: number;
+  defenderStackSize: number;
   attackerOwnerIdx: number;
   defenderOwnerIdx: number;
   attackerWon: boolean;
@@ -17,25 +20,33 @@ function d6(): number {
   return 1 + Math.floor(Math.random() * 6);
 }
 
+export function unitAttack(unit: Unit): number {
+  return unit.stack.reduce((sum, k) => sum + UNIT[k].attack, 0);
+}
+
+export function unitDefense(unit: Unit): number {
+  return unit.stack.reduce((sum, k) => sum + UNIT[k].defense, 0);
+}
+
 export function resolveCombat(
-  attackerKind: UnitKind,
-  defenderKind: UnitKind,
-  attackerOwnerIdx: number,
-  defenderOwnerIdx: number,
+  attacker: Unit,
+  defender: Unit,
   defenderTile: Tile,
   defenderWallsBonus = 0,
 ): Battle {
-  const attackerRoll = UNIT[attackerKind].attack + d6();
+  const attackerRoll = unitAttack(attacker) + d6();
   const defenderRoll =
-    UNIT[defenderKind].defense
+    unitDefense(defender)
     + TERRAIN[defenderTile.terrain].defenseBonus
     + defenderWallsBonus
     + d6();
   return {
-    attackerKind,
-    defenderKind,
-    attackerOwnerIdx,
-    defenderOwnerIdx,
+    attackerKind: attacker.kind,
+    defenderKind: defender.kind,
+    attackerStackSize: attacker.stack.length,
+    defenderStackSize: defender.stack.length,
+    attackerOwnerIdx: attacker.ownerIdx,
+    defenderOwnerIdx: defender.ownerIdx,
     attackerWon: attackerRoll > defenderRoll,
     attackerRoll,
     defenderRoll,

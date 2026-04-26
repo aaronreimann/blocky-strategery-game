@@ -41,7 +41,8 @@ export type Player = {
 
 export type Unit = {
   id: string;
-  kind: UnitKind;
+  kind: UnitKind;        // primary kind for display + spawn behavior
+  stack: UnitKind[];     // stacked-army members; length 1-3, stack[0] === kind
   ownerIdx: number;
   x: number;
   y: number;

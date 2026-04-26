@@ -91,6 +91,7 @@ function spawnStartingUnits(
       workingOn: null,
       workTurnsLeft: 0,
       destination: null,
+      stack: ['pioneer'],
     },
     {
       id: nextUnitId(),
@@ -102,6 +103,7 @@ function spawnStartingUnits(
       workingOn: null,
       workTurnsLeft: 0,
       destination: null,
+      stack: ['footman'],
     },
     {
       id: nextUnitId(),
@@ -113,6 +115,7 @@ function spawnStartingUnits(
       workingOn: null,
       workTurnsLeft: 0,
       destination: null,
+      stack: ['laborer'],
     },
   ];
 }

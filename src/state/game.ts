@@ -162,12 +162,13 @@ export const useGame = create<GameState>((set, get) => ({
   loadFromSlot: async (slot) => {
     const data = await loadSlot(slot);
     if (!data) return false;
-    // Forward-compat: older saves lacked workingOn / workTurnsLeft / destination on units.
+    // Forward-compat: older saves lacked workingOn / workTurnsLeft / destination / stack.
     const normalizedUnits: Unit[] = data.units.map((u) => ({
       ...u,
       workingOn: u.workingOn ?? null,
       workTurnsLeft: u.workTurnsLeft ?? 0,
       destination: u.destination ?? null,
+      stack: (u.stack && u.stack.length > 0 ? u.stack : [u.kind]) as Unit['stack'],
     }));
     const normalizedPlayers: Player[] = data.players.map((p) => ({
       ...p,
@@ -288,14 +289,7 @@ export const useGame = create<GameState>((set, get) => ({
             (c) => c.x === x && c.y === y && c.ownerIdx === enemyUnitAtTile.ownerIdx,
           );
           const wallsBonus = cityHere?.buildings.includes('walls') ? 1 : 0;
-          battle = resolveCombat(
-            selected.kind,
-            enemyUnitAtTile.kind,
-            selected.ownerIdx,
-            enemyUnitAtTile.ownerIdx,
-            defenderTile,
-            wallsBonus,
-          );
+          battle = resolveCombat(selected, enemyUnitAtTile, defenderTile, wallsBonus);
           if (!battle.attackerWon) {
             nextUnits = nextUnits.filter((u) => u.id !== selected.id);
             const finished = checkGameOver({
@@ -483,13 +477,41 @@ export const useGame = create<GameState>((set, get) => ({
     if (!u || u.ownerIdx !== HUMAN_IDX) return;
     if (x < 0 || y < 0 || x >= map.width || y >= map.height) return;
     if (u.x === x && u.y === y) {
-      // Tapping the unit's own tile clears destination.
       set({
         units: units.map((v) => (v.id === unitId ? { ...v, destination: null } : v)),
       });
       autosave(get());
       return;
     }
+
+    // Drag onto a friendly military unit on an adjacent tile -> merge into army.
+    const friendlyHere = units.find(
+      (o) => o.x === x && o.y === y && o.ownerIdx === HUMAN_IDX && o.id !== unitId,
+    );
+    if (friendlyHere) {
+      const dist = chebyshev(u.x, u.y, x, y);
+      const military: UnitKind[] = ['footman', 'spearman', 'horseman', 'swordsman', 'catapult'];
+      if (
+        dist === 1 &&
+        military.includes(u.kind) &&
+        military.includes(friendlyHere.kind) &&
+        u.stack.length + friendlyHere.stack.length <= 3
+      ) {
+        set({
+          units: units
+            .filter((o) => o.id !== u.id)
+            .map((o) =>
+              o.id === friendlyHere.id
+                ? { ...o, stack: [...o.stack, ...u.stack] }
+                : o,
+            ),
+          selectedUnitId: friendlyHere.id,
+        });
+        autosave(get());
+      }
+      return;
+    }
+
     const tile = map.tiles[y * map.width + x];
     if (!TERRAIN[tile.terrain].passable) return;
     set({
@@ -582,6 +604,7 @@ export const useGame = create<GameState>((set, get) => ({
           workingOn: null,
           workTurnsLeft: 0,
           destination: null,
+          stack: [unitKind],
         });
         if (city.ownerIdx === HUMAN_IDX) {
           events.push({

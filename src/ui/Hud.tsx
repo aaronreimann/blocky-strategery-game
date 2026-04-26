@@ -157,10 +157,21 @@ export default function Hud() {
       <View style={styles.bottomRow} pointerEvents="box-none">
         {selectedUnit && unitSpec ? (
           <View style={styles.card} pointerEvents="auto">
-            <Text style={styles.cardTitle}>{unitSpec.name}</Text>
-            <Text style={styles.cardMeta}>
-              Moves {selectedUnit.movesLeft}/{unitSpec.move} · ATK {unitSpec.attack} · DEF {unitSpec.defense}
+            <Text style={styles.cardTitle}>
+              {unitSpec.name}
+              {selectedUnit.stack.length > 1 ? ` (Army x${selectedUnit.stack.length})` : ''}
             </Text>
+            {selectedUnit.stack.length > 1 ? (
+              <Text style={styles.cardMeta}>
+                Moves {selectedUnit.movesLeft}/{unitSpec.move} · ATK{' '}
+                {selectedUnit.stack.reduce((s, k) => s + UNIT[k].attack, 0)} · DEF{' '}
+                {selectedUnit.stack.reduce((s, k) => s + UNIT[k].defense, 0)}
+              </Text>
+            ) : (
+              <Text style={styles.cardMeta}>
+                Moves {selectedUnit.movesLeft}/{unitSpec.move} · ATK {unitSpec.attack} · DEF {unitSpec.defense}
+              </Text>
+            )}
             {selectedUnit.kind === 'pioneer' ? (
               <Pressable style={styles.action} onPress={foundCity}>
                 <Text style={styles.actionText}>Found City</Text>
