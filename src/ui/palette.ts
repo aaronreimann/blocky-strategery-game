@@ -1,12 +1,14 @@
+// Bright, saturated colors that contrast against green/brown/blue terrain.
+// No greens, no browns, no muddy blues.
 export const PLAYER_PALETTE = [
-  '#3aa675',
-  '#c25450',
-  '#e0b04a',
-  '#5d8ec9',
-  '#a06ec5',
-  '#d77a3a',
-  '#4fb6c4',
-  '#b8b09a',
+  '#ef4444', // red       — human player by default
+  '#f97316', // orange
+  '#facc15', // yellow
+  '#ec4899', // magenta
+  '#a855f7', // purple
+  '#6366f1', // indigo
+  '#06b6d4', // cyan
+  '#f8fafc', // white
 ] as const;
 
 export type PlayerColor = (typeof PLAYER_PALETTE)[number];
