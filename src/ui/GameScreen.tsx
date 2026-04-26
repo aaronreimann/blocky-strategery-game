@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { TERRAIN } from '@/src/data/terrain';
+import { canEnterTerrain } from '@/src/data/units';
 import { chebyshev } from '@/src/game/map';
 import MapView from '@/src/render/MapView';
 import { useGame } from '@/src/state/game';
@@ -48,7 +48,7 @@ export default function GameScreen() {
         if (chebyshev(sel.x, sel.y, nx, ny) > sel.movesLeft) continue;
 
         const t = map.tiles[ny * map.width + nx];
-        if (!TERRAIN[t.terrain].passable) continue;
+        if (!canEnterTerrain(sel.kind, t.terrain)) continue;
 
         const friendlyUnitHere = units.some(
           (u) => u.x === nx && u.y === ny && u.ownerIdx === sel.ownerIdx,

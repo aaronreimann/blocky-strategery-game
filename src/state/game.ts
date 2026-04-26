@@ -11,7 +11,7 @@ import {
 } from '@/src/data/improvements';
 import { pickCheapestAvailable, prereqsMet, TECH, type TechId } from '@/src/data/tech';
 import { TERRAIN } from '@/src/data/terrain';
-import { UNIT, type UnitKind } from '@/src/data/units';
+import { canEnterTerrain, UNIT, type UnitKind } from '@/src/data/units';
 import { pickAINextBuild, runAITurn } from '@/src/game/ai';
 import { resolveCombat, type Battle } from '@/src/game/combat';
 import { checkGameOver } from '@/src/game/gameOver';
@@ -99,8 +99,13 @@ function findSpawnTile(
   city: City,
   units: Unit[],
   map: GameMap,
+  unitKind: UnitKind,
 ): { x: number; y: number } | null {
-  const candidates: { x: number; y: number }[] = [{ x: city.x, y: city.y }];
+  const isSea = UNIT[unitKind].domain === 'sea';
+  // Sea units must spawn on adjacent water; can't sit on the city tile.
+  const candidates: { x: number; y: number }[] = isSea
+    ? []
+    : [{ x: city.x, y: city.y }];
   for (let dy = -1; dy <= 1; dy++) {
     for (let dx = -1; dx <= 1; dx++) {
       if (dx === 0 && dy === 0) continue;
@@ -110,7 +115,7 @@ function findSpawnTile(
   for (const c of candidates) {
     if (c.x < 0 || c.y < 0 || c.x >= map.width || c.y >= map.height) continue;
     const tile = map.tiles[c.y * map.width + c.x];
-    if (!TERRAIN[tile.terrain].passable) continue;
+    if (!canEnterTerrain(unitKind, tile.terrain)) continue;
     if (units.some((u) => u.x === c.x && u.y === c.y && u.ownerIdx === city.ownerIdx)) continue;
     return c;
   }
@@ -414,7 +419,7 @@ export const useGame = create<GameState>((set, get) => ({
       const cantMove =
         selected.movesLeft <= 0 ||
         dist > selected.movesLeft ||
-        !TERRAIN[targetTile.terrain].passable ||
+        !canEnterTerrain(selected.kind, targetTile.terrain) ||
         units.some((u) => u.x === x && u.y === y && u.ownerIdx === selected.ownerIdx);
       if (cantMove) {
         set({ selectedUnitId: null, selectedCityId: null });
@@ -588,7 +593,7 @@ export const useGame = create<GameState>((set, get) => ({
     }
 
     const tile = map.tiles[y * map.width + x];
-    if (!TERRAIN[tile.terrain].passable) return;
+    if (!canEnterTerrain(u.kind, tile.terrain)) return;
     set({
       units: units.map((v) =>
         v.id === unitId ? { ...v, destination: { x, y }, workingOn: null, workTurnsLeft: 0 } : v,
@@ -752,7 +757,7 @@ export const useGame = create<GameState>((set, get) => ({
       // Completed something.
       if (city.building.kind === 'unit') {
         const unitKind = city.building.unit;
-        const spawnPos = findSpawnTile(city, workingUnits, map);
+        const spawnPos = findSpawnTile(city, workingUnits, map, unitKind);
         if (!spawnPos) {
           return { ...city, population: nextPop, food: nextFood, production: accrued };
         }

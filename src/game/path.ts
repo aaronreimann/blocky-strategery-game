@@ -1,16 +1,18 @@
-import { TERRAIN } from '@/src/data/terrain';
+import { canEnterTerrain, type UnitKind } from '@/src/data/units';
 
 import type { GameMap } from './map';
 import type { City, Unit } from './types';
 
 // BFS from `start` to a specific `target`. Returns the full path (inclusive
 // of both start and target) or null if unreachable. `blocked` tiles are
-// walls except for the target tile itself.
+// walls except for the target tile itself. `unitKind` decides which terrain
+// is passable (land vs sea).
 export function pathToTile(
   start: { x: number; y: number },
   target: { x: number; y: number },
   blocked: Set<string>,
   map: GameMap,
+  unitKind: UnitKind,
 ): { x: number; y: number }[] | null {
   if (start.x === target.x && start.y === target.y) {
     return [{ x: start.x, y: start.y }];
@@ -39,7 +41,7 @@ export function pathToTile(
         const k = `${nx},${ny}`;
         if (visited.has(k)) continue;
         const tile = map.tiles[ny * map.width + nx];
-        if (!TERRAIN[tile.terrain].passable) continue;
+        if (!canEnterTerrain(unitKind, tile.terrain)) continue;
         if (blocked.has(k) && k !== targetKey) continue;
         visited.add(k);
         queue.push({ x: nx, y: ny, prev: node });
@@ -57,6 +59,7 @@ export function nextStepToTiles(
   targets: Set<string>,
   blocked: Set<string>,
   map: GameMap,
+  unitKind: UnitKind,
 ): { x: number; y: number } | null {
   if (targets.size === 0) return null;
   const startKey = `${start.x},${start.y}`;
@@ -81,7 +84,7 @@ export function nextStepToTiles(
         const nk = `${nx},${ny}`;
         if (visited.has(nk)) continue;
         const tile = map.tiles[ny * map.width + nx];
-        if (!TERRAIN[tile.terrain].passable) continue;
+        if (!canEnterTerrain(unitKind, tile.terrain)) continue;
         if (blocked.has(nk) && !targets.has(nk)) continue;
         visited.add(nk);
         const firstStep = node.firstStep ?? { x: nx, y: ny };
@@ -113,7 +116,6 @@ export function nextStepToFriendlyCity(
   const visited = new Set<string>([`${start.x},${start.y}`]);
   const queue: Node[] = [start];
 
-  // Pre-build a set of blocked tiles: enemy units and any other friendly unit.
   const blocked = new Set<string>();
   for (const u of units) {
     if (u.id === worker.id) continue;
@@ -138,11 +140,8 @@ export function nextStepToFriendlyCity(
         const nk = `${nx},${ny}`;
         if (visited.has(nk)) continue;
         const tile = map.tiles[ny * map.width + nx];
-        if (!TERRAIN[tile.terrain].passable) continue;
-        // Allow stepping into a friendly destination city, but not enemy cities.
+        if (!canEnterTerrain(worker.kind, tile.terrain)) continue;
         if (enemyCities.has(nk)) continue;
-        // Allow stepping onto target tile even if technically "blocked" by
-        // the city (cities do not occupy a unit slot in our model).
         if (blocked.has(nk) && !targets.has(nk)) continue;
         visited.add(nk);
         const firstStep = node.firstStep ?? { x: nx, y: ny };

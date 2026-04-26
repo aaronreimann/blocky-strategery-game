@@ -445,9 +445,26 @@ export default function Hud() {
                         );
                       })
                     : cityTab === 'units'
-                    ? UNIT_KINDS.filter(
-                        (k) => UNIT[k].tech === null || researched.includes(UNIT[k].tech!),
-                      ).map((kind) => {
+                    ? UNIT_KINDS.filter((k) => {
+                        if (UNIT[k].tech !== null && !researched.includes(UNIT[k].tech!)) {
+                          return false;
+                        }
+                        if (UNIT[k].domain === 'sea' && map) {
+                          // Sea units need a water tile adjacent to the city.
+                          for (let dy = -1; dy <= 1; dy++) {
+                            for (let dx = -1; dx <= 1; dx++) {
+                              if (dx === 0 && dy === 0) continue;
+                              const nx = selectedCity.x + dx;
+                              const ny = selectedCity.y + dy;
+                              if (nx < 0 || ny < 0 || nx >= map.width || ny >= map.height) continue;
+                              const t = map.tiles[ny * map.width + nx];
+                              if (t.terrain === 'coast' || t.terrain === 'ocean') return true;
+                            }
+                          }
+                          return false;
+                        }
+                        return true;
+                      }).map((kind) => {
                         const target: CityBuildTarget = { kind: 'unit', unit: kind };
                         const cur = isCurrentTarget(target);
                         return (

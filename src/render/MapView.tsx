@@ -38,6 +38,7 @@ const UNIT_GLYPH: Record<UnitKind, string> = {
   horseman:  '', // horse
   swordsman: '', // skull-crossbones
   catapult:  '', // fire
+  galley:    '', // ship
 };
 const CITY_CAPITAL_GLYPH = ''; // chess-rook
 const CITY_HOUSE_GLYPH = '';   // home
@@ -502,6 +503,7 @@ export default function MapView({
       sel.destination,
       blocked,
       map,
+      sel.kind,
     );
     if (!path || path.length < 2) return null;
     const d = path

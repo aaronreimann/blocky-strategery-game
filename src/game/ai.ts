@@ -1,5 +1,5 @@
 import { TERRAIN } from '@/src/data/terrain';
-import { UNIT, type UnitKind } from '@/src/data/units';
+import { canEnterTerrain, UNIT, type UnitKind } from '@/src/data/units';
 
 import { resolveCombat, type Battle } from './combat';
 import { nextCityId } from './ids';
@@ -90,7 +90,7 @@ function tryMove(unit: Unit, units: Unit[], cities: City[], map: GameMap): Unit[
     const ny = unit.y + dy;
     if (nx < 0 || ny < 0 || nx >= map.width || ny >= map.height) continue;
     const tile = map.tiles[ny * map.width + nx];
-    if (!TERRAIN[tile.terrain].passable) continue;
+    if (!canEnterTerrain(unit.kind, tile.terrain)) continue;
     if (units.some((u) => u.x === nx && u.y === ny && u.ownerIdx === unit.ownerIdx)) continue;
     if (cities.some((c) => c.x === nx && c.y === ny && c.ownerIdx !== unit.ownerIdx)) continue;
     return units.map((u) =>
@@ -127,7 +127,7 @@ function moveTowardTargets(
       if (!targets.has(k)) blocked.add(k);
     }
   }
-  const next = nextStepToTiles({ x: unit.x, y: unit.y }, targets, blocked, map);
+  const next = nextStepToTiles({ x: unit.x, y: unit.y }, targets, blocked, map, unit.kind);
   if (!next) return null;
   // Don't blunder into a target with adjacent enemy without combat handling.
   const enemyOnNext = units.some((u) => u.x === next.x && u.y === next.y && u.ownerIdx !== unit.ownerIdx);
