@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -19,6 +19,7 @@ import TechScreen from './TechScreen';
 
 export default function Hud() {
   const [techOpen, setTechOpen] = useState(false);
+  const [cityTab, setCityTab] = useState<'units' | 'buildings'>('units');
   const turn = useGame((s) => s.turn);
   const map = useGame((s) => s.map);
   const units = useGame((s) => s.units);
@@ -41,6 +42,14 @@ export default function Hud() {
   const selectedUnit = selectedUnitId ? units.find((u) => u.id === selectedUnitId) : null;
   const unitSpec = selectedUnit ? UNIT[selectedUnit.kind] : null;
   const selectedCity = selectedCityId ? cities.find((c) => c.id === selectedCityId) : null;
+
+  // Reset the tab when switching to a different city; default it to whatever
+  // the city is currently building.
+  useEffect(() => {
+    if (!selectedCity) return;
+    setCityTab(selectedCity.building?.kind === 'building' ? 'buildings' : 'units');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCityId]);
 
   // Friendly = human player only for HUD context.
   const myUnitsCount = units.filter((u) => u.ownerIdx === 0).length;
@@ -199,76 +208,97 @@ export default function Hud() {
                     );
                   })}
                 </View>
+                <View style={styles.tabsRow}>
+                  {(['units', 'buildings'] as const).map((t) => {
+                    const cur = cityTab === t;
+                    const isCurrentBuildHere =
+                      (t === 'units' && selectedCity.building?.kind === 'unit') ||
+                      (t === 'buildings' && selectedCity.building?.kind === 'building');
+                    return (
+                      <Pressable
+                        key={t}
+                        style={[styles.tab, cur && styles.tabActive]}
+                        onPress={() => setCityTab(t)}
+                      >
+                        <Text style={[styles.tabText, cur && styles.tabTextActive]}>
+                          {t === 'units' ? 'Units' : 'Buildings'}
+                          {isCurrentBuildHere ? ' ●' : ''}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
                 <View style={styles.buildRow}>
-                  {UNIT_KINDS.filter(
-                    (k) => UNIT[k].tech === null || researched.includes(UNIT[k].tech!),
-                  ).map((kind) => {
-                    const target: CityBuildTarget = { kind: 'unit', unit: kind };
-                    const cur = isCurrentTarget(target);
-                    return (
-                      <Pressable
-                        key={`u-${kind}`}
-                        style={[styles.buildBtn, cur && styles.buildBtnActive]}
-                        onPress={() => setCityBuild(selectedCity.id, target)}
-                      >
-                        <Text
-                          style={[
-                            styles.buildBtnText,
-                            cur && styles.buildBtnTextActive,
-                          ]}
-                        >
-                          {UNIT[kind].name}
-                        </Text>
-                        <Text
-                          style={[
-                            styles.buildBtnCost,
-                            cur && styles.buildBtnTextActive,
-                          ]}
-                        >
-                          {UNIT[kind].cost}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                  {BUILDING_KINDS.filter(
-                    (k) => BUILDING[k].tech === null || researched.includes(BUILDING[k].tech!),
-                  ).map((kind) => {
-                    const target: CityBuildTarget = { kind: 'building', building: kind };
-                    const cur = isCurrentTarget(target);
-                    const owned = owns(kind);
-                    return (
-                      <Pressable
-                        key={`b-${kind}`}
-                        style={[
-                          styles.buildBtn,
-                          styles.buildBtnBuilding,
-                          cur && styles.buildBtnActive,
-                          owned && styles.buildBtnOwned,
-                        ]}
-                        disabled={owned}
-                        onPress={() => setCityBuild(selectedCity.id, target)}
-                      >
-                        <Text
-                          style={[
-                            styles.buildBtnText,
-                            cur && styles.buildBtnTextActive,
-                            owned && styles.buildBtnOwnedText,
-                          ]}
-                        >
-                          {BUILDING[kind].name}
-                        </Text>
-                        <Text
-                          style={[
-                            styles.buildBtnCost,
-                            cur && styles.buildBtnTextActive,
-                            owned && styles.buildBtnOwnedText,
-                          ]}
-                        >
-                          {owned ? 'owned' : BUILDING[kind].cost}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
+                  {cityTab === 'units'
+                    ? UNIT_KINDS.filter(
+                        (k) => UNIT[k].tech === null || researched.includes(UNIT[k].tech!),
+                      ).map((kind) => {
+                        const target: CityBuildTarget = { kind: 'unit', unit: kind };
+                        const cur = isCurrentTarget(target);
+                        return (
+                          <Pressable
+                            key={`u-${kind}`}
+                            style={[styles.buildBtn, cur && styles.buildBtnActive]}
+                            onPress={() => setCityBuild(selectedCity.id, target)}
+                          >
+                            <Text
+                              style={[
+                                styles.buildBtnText,
+                                cur && styles.buildBtnTextActive,
+                              ]}
+                            >
+                              {UNIT[kind].name}
+                            </Text>
+                            <Text
+                              style={[
+                                styles.buildBtnCost,
+                                cur && styles.buildBtnTextActive,
+                              ]}
+                            >
+                              {UNIT[kind].cost}
+                            </Text>
+                          </Pressable>
+                        );
+                      })
+                    : BUILDING_KINDS.filter(
+                        (k) => BUILDING[k].tech === null || researched.includes(BUILDING[k].tech!),
+                      ).map((kind) => {
+                        const target: CityBuildTarget = { kind: 'building', building: kind };
+                        const cur = isCurrentTarget(target);
+                        const owned = owns(kind);
+                        return (
+                          <Pressable
+                            key={`b-${kind}`}
+                            style={[
+                              styles.buildBtn,
+                              styles.buildBtnBuilding,
+                              cur && styles.buildBtnActive,
+                              owned && styles.buildBtnOwned,
+                            ]}
+                            disabled={owned}
+                            onPress={() => setCityBuild(selectedCity.id, target)}
+                          >
+                            <Text
+                              style={[
+                                styles.buildBtnText,
+                                cur && styles.buildBtnTextActive,
+                                owned && styles.buildBtnOwnedText,
+                              ]}
+                            >
+                              {BUILDING[kind].name}
+                            </Text>
+                            <Text
+                              style={[
+                                styles.buildBtnCost,
+                                cur && styles.buildBtnTextActive,
+                                owned && styles.buildBtnOwnedText,
+                              ]}
+                            >
+                              {owned ? 'owned' : BUILDING[kind].cost}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
                 </View>
               </View>
             );
@@ -295,7 +325,7 @@ const styles = StyleSheet.create({
   root: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'space-between' },
   topRow: { flexDirection: 'row', gap: 8, padding: 12, flexWrap: 'wrap' },
   pill: {
-    backgroundColor: THEME.bgElevated,
+    backgroundColor: 'rgba(21, 33, 54, 0.88)',
     borderColor: THEME.border,
     borderWidth: 1,
     paddingHorizontal: 10,
@@ -331,14 +361,33 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   card: {
-    backgroundColor: THEME.bgElevated,
+    backgroundColor: 'rgba(21, 33, 54, 0.92)',
     borderColor: THEME.border,
     borderWidth: 1,
     borderRadius: 10,
     padding: 10,
     minWidth: 240,
-    maxWidth: 360,
+    maxWidth: 380,
   },
+  tabsRow: {
+    flexDirection: 'row',
+    gap: 4,
+    marginTop: 8,
+    borderTopColor: THEME.border,
+    borderTopWidth: 1,
+    paddingTop: 8,
+  },
+  tab: {
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+    backgroundColor: 'rgba(10, 23, 41, 0.6)',
+  },
+  tabActive: {
+    backgroundColor: THEME.warn,
+  },
+  tabText: { color: THEME.inkMuted, fontSize: 11, fontWeight: '700' },
+  tabTextActive: { color: '#0a1729' },
   cardTitle: { color: THEME.ink, fontSize: 14, fontWeight: '700' },
   cardMeta: { color: THEME.inkMuted, fontSize: 11, marginTop: 2 },
   action: {
