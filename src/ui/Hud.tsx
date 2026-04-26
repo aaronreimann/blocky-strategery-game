@@ -18,6 +18,7 @@ import {
 import { useGame } from '@/src/state/game';
 
 import DiplomacyScreen from './DiplomacyScreen';
+import KingdomMenu from './KingdomMenu';
 import { THEME } from './palette';
 import TechScreen from './TechScreen';
 
@@ -39,6 +40,7 @@ function eventStyle(kind: string): { color: string } {
 export default function Hud() {
   const [techOpen, setTechOpen] = useState(false);
   const [diploOpen, setDiploOpen] = useState(false);
+  const [kingdomOpen, setKingdomOpen] = useState(false);
   const [cityTab, setCityTab] = useState<'units' | 'buildings' | 'wonders'>('units');
   const turn = useGame((s) => s.turn);
   const map = useGame((s) => s.map);
@@ -117,13 +119,6 @@ export default function Hud() {
         <Pressable style={styles.pillSquare} onPress={exitToTitle}>
           <FontAwesome5 name="home" size={14} color={THEME.ink} />
         </Pressable>
-        {players[0] ? (
-          <View style={[styles.pill, { borderColor: players[0].color }]}>
-            <Text style={[styles.pillText, { color: players[0].color }]}>
-              {flagEmoji(players[0].iso)} {players[0].name}
-            </Text>
-          </View>
-        ) : null}
         <View style={styles.pill}>
           <Text style={styles.pillText}>Turn {turn}</Text>
         </View>
@@ -165,6 +160,17 @@ export default function Hud() {
         <Pressable style={styles.pillSquare} onPress={() => setDiploOpen(true)}>
           <FontAwesome5 name="handshake" size={14} color={THEME.ink} />
         </Pressable>
+        <View style={{ flex: 1 }} />
+        {players[0] ? (
+          <Pressable
+            style={[styles.pill, { borderColor: players[0].color }]}
+            onPress={() => setKingdomOpen(true)}
+          >
+            <Text style={[styles.pillText, { color: players[0].color }]}>
+              {flagEmoji(players[0].iso)} {players[0].name}
+            </Text>
+          </Pressable>
+        ) : null}
       </View>
 
       {lastBattle ? (
@@ -554,6 +560,12 @@ export default function Hud() {
 
       {techOpen ? <TechScreen onClose={() => setTechOpen(false)} /> : null}
       {diploOpen ? <DiplomacyScreen onClose={() => setDiploOpen(false)} /> : null}
+      {kingdomOpen ? (
+        <KingdomMenu
+          onClose={() => setKingdomOpen(false)}
+          onOpenTech={() => setTechOpen(true)}
+        />
+      ) : null}
 
       {tilePicker ? (() => {
         const u = units.find(

@@ -63,6 +63,7 @@ type GameState = {
   turnEvents: TurnEvent[];
   tilePicker: { x: number; y: number } | null;
   awaitingDestinationFor: string | null;
+  pendingJumpTo: { x: number; y: number } | null;
   gameOver: GameOverState | null;
 
   newGame: (slot: number, seed: number, difficulty: Difficulty, leaders: LeaderMap) => void;
@@ -84,6 +85,8 @@ type GameState = {
   rushBuild: (cityId: string) => void;
   proposePeace: (otherIdx: number) => boolean;
   declareWar: (otherIdx: number) => void;
+  requestJumpTo: (x: number, y: number) => void;
+  clearJumpRequest: () => void;
   openTilePicker: (x: number, y: number) => void;
   closeTilePicker: () => void;
   selectUnitFromPicker: (unitId: string) => void;
@@ -162,6 +165,7 @@ export const useGame = create<GameState>((set, get) => ({
   turnEvents: [],
   tilePicker: null,
   awaitingDestinationFor: null,
+  pendingJumpTo: null,
   gameOver: null,
 
   newGame: (slot, seed, difficulty, leaders) => {
@@ -683,6 +687,9 @@ export const useGame = create<GameState>((set, get) => ({
     autosave(get());
     return accept;
   },
+
+  requestJumpTo: (x, y) => set({ pendingJumpTo: { x, y } }),
+  clearJumpRequest: () => set({ pendingJumpTo: null }),
 
   declareWar: (otherIdx) => {
     const { relations, players, gameOver } = get();

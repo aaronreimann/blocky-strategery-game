@@ -25,6 +25,7 @@ import type { GameMap } from '@/src/game/map';
 import type { City, Player, Unit } from '@/src/game/types';
 
 import { pathToTile } from '@/src/game/path';
+import { useGame } from '@/src/state/game';
 
 import { decorateTile } from './decor';
 import MiniMap from './MiniMap';
@@ -683,6 +684,19 @@ export default function MapView({
     tx.value = screenW / 2 - worldX * scale.value;
     ty.value = screenH / 2 - worldY * scale.value;
   };
+
+  // Honor jump-to requests from elsewhere in the UI (Kingdom Menu).
+  const pendingJumpTo = useGame((s) => s.pendingJumpTo);
+  const clearJumpRequest = useGame((s) => s.clearJumpRequest);
+  useEffect(() => {
+    if (!pendingJumpTo) return;
+    jumpTo(
+      pendingJumpTo.x * TILE_SIZE + TILE_SIZE / 2,
+      pendingJumpTo.y * TILE_SIZE + TILE_SIZE / 2,
+    );
+    clearJumpRequest();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingJumpTo]);
 
   return (
     <Animated.View style={{ flex: 1 }}>
