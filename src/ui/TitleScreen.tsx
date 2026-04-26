@@ -70,7 +70,6 @@ export default function TitleScreen() {
       <SafeAreaView style={[styles.root, { backgroundColor: 'transparent' }]}>
         <View style={styles.header}>
           <Image source={require('../../assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
-          <Text style={styles.subtitle}>Pick a realm</Text>
         </View>
 
       <View style={styles.slotRow}>
@@ -145,11 +144,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 24,
   },
-  header: { alignItems: 'center', marginBottom: 32 },
-  logo: { 
-    width: 420, 
-    height: 180, 
-    marginBottom: 4,
+  header: { alignItems: 'center', marginTop: 60, marginBottom: 16 },
+  logo: {
+    width: 420,
+    height: 180,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.6,
