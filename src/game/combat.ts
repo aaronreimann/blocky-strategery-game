@@ -19,10 +19,14 @@ export function resolveCombat(
   attackerKind: UnitKind,
   defenderKind: UnitKind,
   defenderTile: Tile,
+  defenderWallsBonus = 0,
 ): Battle {
   const attackerRoll = UNIT[attackerKind].attack + d6();
   const defenderRoll =
-    UNIT[defenderKind].defense + TERRAIN[defenderTile.terrain].defenseBonus + d6();
+    UNIT[defenderKind].defense
+    + TERRAIN[defenderTile.terrain].defenseBonus
+    + defenderWallsBonus
+    + d6();
   return {
     attackerKind,
     defenderKind,

@@ -6,7 +6,6 @@ import { chebyshev, type GameMap } from './map';
 import type { City, Unit } from './types';
 
 const MIN_CITY_SPACING = 3;
-const DEFAULT_PRODUCTION_PER_TURN = 3;
 
 const AI_CITY_NAMES = [
   'Karakorum', 'Samarkand', 'Khiva', 'Bukhara', 'Tashkent',
@@ -120,9 +119,10 @@ export function runAITurn(input: AITurnInput): AITurnOutput {
           x: fresh.x,
           y: fresh.y,
           population: 1,
-          building: 'footman',
+          food: 0,
+          buildings: [],
+          building: { kind: 'unit', unit: 'footman' },
           production: 0,
-          productionPerTurn: DEFAULT_PRODUCTION_PER_TURN,
         };
         cities = [...cities, newCity];
         units = units.filter((u) => u.id !== fresh.id);
@@ -136,7 +136,11 @@ export function runAITurn(input: AITurnInput): AITurnOutput {
       const enemy = findAdjacentEnemy(fresh, units);
       if (enemy) {
         const defenderTile = map.tiles[enemy.y * map.width + enemy.x];
-        const battle = resolveCombat(fresh.kind, enemy.kind, defenderTile);
+        const cityHere = cities.find(
+          (c) => c.x === enemy.x && c.y === enemy.y && c.ownerIdx === enemy.ownerIdx,
+        );
+        const wallsBonus = cityHere?.buildings.includes('walls') ? 1 : 0;
+        const battle = resolveCombat(fresh.kind, enemy.kind, defenderTile, wallsBonus);
         battles.push(battle);
         if (battle.attackerWon) {
           // Move attacker onto defender's tile; capture any enemy city there.

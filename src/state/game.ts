@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 
+import { BUILDING, type BuildingKind } from '@/src/data/buildings';
 import type { LeaderMap } from '@/src/data/countries';
 import {
   IMPROVEMENT,
@@ -15,13 +16,26 @@ import { checkGameOver } from '@/src/game/gameOver';
 import { nextCityId, nextUnitId, parseIdNum, syncIdCounters } from '@/src/game/ids';
 import { buildInitialState } from '@/src/game/init';
 import { chebyshev, type GameMap } from '@/src/game/map';
-import type { City, Difficulty, GameOverState, Player, Unit } from '@/src/game/types';
+import type {
+  City,
+  CityBuildTarget,
+  Difficulty,
+  GameOverState,
+  Player,
+  Unit,
+} from '@/src/game/types';
+import { computeCityYields, foodNeededToGrow } from '@/src/game/yields';
 
 import { loadSlot, saveSlot } from './saves';
 
 const MIN_CITY_SPACING = 3;
-const DEFAULT_PRODUCTION_PER_TURN = 3;
 const HUMAN_IDX = 0;
+
+function buildCost(target: CityBuildTarget): number {
+  return target.kind === 'unit'
+    ? UNIT[target.unit].cost
+    : BUILDING[target.building].cost;
+}
 
 type GameState = {
   map: GameMap | null;
@@ -46,7 +60,7 @@ type GameState = {
   selectCity: (id: string | null) => void;
   tapTile: (x: number, y: number) => void;
   foundCity: () => void;
-  setCityBuild: (cityId: string, kind: UnitKind) => void;
+  setCityBuild: (cityId: string, target: CityBuildTarget) => void;
   startWork: (kind: ImprovementKind) => void;
   cancelWork: () => void;
   endTurn: () => void;
@@ -143,15 +157,37 @@ export const useGame = create<GameState>((set, get) => ({
       workingOn: u.workingOn ?? null,
       workTurnsLeft: u.workTurnsLeft ?? 0,
     }));
+    // Forward-compat: older cities used a string `building` and a numeric
+    // `productionPerTurn`. New schema uses a build target object and yields
+    // come from worked tiles.
+    const normalizedCities: City[] = data.cities.map((c) => {
+      const raw = c as City & { building?: unknown };
+      let building: CityBuildTarget | null = null;
+      if (raw.building && typeof raw.building === 'string') {
+        building = { kind: 'unit', unit: raw.building as UnitKind };
+      } else if (
+        raw.building &&
+        typeof raw.building === 'object' &&
+        'kind' in raw.building
+      ) {
+        building = raw.building as CityBuildTarget;
+      }
+      return {
+        ...c,
+        food: c.food ?? 0,
+        buildings: c.buildings ?? [],
+        building,
+      };
+    });
     syncIdCounters(
       Math.max(0, ...normalizedUnits.map((u) => parseIdNum(u.id))),
-      Math.max(0, ...data.cities.map((c) => parseIdNum(c.id))),
+      Math.max(0, ...normalizedCities.map((c) => parseIdNum(c.id))),
     );
     set({
       map: data.map,
       players: data.players,
       units: normalizedUnits,
-      cities: data.cities,
+      cities: normalizedCities,
       improvements: data.improvements ?? {},
       turn: data.turn,
       seed: data.seed,
@@ -228,7 +264,17 @@ export const useGame = create<GameState>((set, get) => ({
 
         if (enemyUnitAtTile) {
           const defenderTile = map.tiles[y * map.width + x];
-          battle = resolveCombat(selected.kind, enemyUnitAtTile.kind, defenderTile);
+          // Walls add +1 defense if the defender is inside their own city.
+          const cityHere = cities.find(
+            (c) => c.x === x && c.y === y && c.ownerIdx === enemyUnitAtTile.ownerIdx,
+          );
+          const wallsBonus = cityHere?.buildings.includes('walls') ? 1 : 0;
+          battle = resolveCombat(
+            selected.kind,
+            enemyUnitAtTile.kind,
+            defenderTile,
+            wallsBonus,
+          );
           if (!battle.attackerWon) {
             nextUnits = nextUnits.filter((u) => u.id !== selected.id);
             const finished = checkGameOver({
@@ -330,9 +376,10 @@ export const useGame = create<GameState>((set, get) => ({
       x: selected.x,
       y: selected.y,
       population: 1,
-      building: 'footman',
+      food: 0,
+      buildings: [],
+      building: { kind: 'unit', unit: 'footman' },
       production: 0,
-      productionPerTurn: DEFAULT_PRODUCTION_PER_TURN,
     };
 
     set({
@@ -344,10 +391,12 @@ export const useGame = create<GameState>((set, get) => ({
     autosave(get());
   },
 
-  setCityBuild: (cityId, kind) => {
+  setCityBuild: (cityId, target) => {
     if (get().gameOver) return;
     set({
-      cities: get().cities.map((c) => (c.id === cityId ? { ...c, building: kind } : c)),
+      cities: get().cities.map((c) =>
+        c.id === cityId ? { ...c, building: target } : c,
+      ),
     });
     autosave(get());
   },
@@ -409,23 +458,74 @@ export const useGame = create<GameState>((set, get) => ({
     });
 
     let workingCities: City[] = cities.map((city) => {
-      const accrued = city.production + city.productionPerTurn;
-      if (!city.building) return { ...city, production: accrued };
-      const cost = UNIT[city.building].cost;
-      if (accrued < cost) return { ...city, production: accrued };
-      const spawnPos = findSpawnTile(city, workingUnits, map);
-      if (!spawnPos) return { ...city, production: accrued };
-      workingUnits.push({
-        id: nextUnitId(),
-        kind: city.building,
-        ownerIdx: city.ownerIdx,
-        x: spawnPos.x,
-        y: spawnPos.y,
-        movesLeft: UNIT[city.building].move,
-        workingOn: null,
-        workTurnsLeft: 0,
-      });
-      return { ...city, production: accrued - cost };
+      const yields = computeCityYields(city, map);
+
+      // Food growth: surplus food goes into the city's larder; on overflow,
+      // grow a citizen. Granary keeps half of the larder on growth.
+      let nextPop = city.population;
+      let nextFood = Math.max(0, city.food + yields.food);
+      const threshold = foodNeededToGrow(nextPop);
+      if (nextFood >= threshold) {
+        nextPop += 1;
+        const hasGranary = city.buildings.includes('granary');
+        nextFood = hasGranary ? Math.floor(threshold / 2) : 0;
+      }
+
+      // Production: accumulate prod from yields toward the current build.
+      const accrued = city.production + yields.prod;
+      if (!city.building) {
+        return { ...city, population: nextPop, food: nextFood, production: accrued };
+      }
+      const cost = buildCost(city.building);
+      if (accrued < cost) {
+        return { ...city, population: nextPop, food: nextFood, production: accrued };
+      }
+
+      // Completed something.
+      if (city.building.kind === 'unit') {
+        const unitKind = city.building.unit;
+        const spawnPos = findSpawnTile(city, workingUnits, map);
+        if (!spawnPos) {
+          return { ...city, population: nextPop, food: nextFood, production: accrued };
+        }
+        workingUnits.push({
+          id: nextUnitId(),
+          kind: unitKind,
+          ownerIdx: city.ownerIdx,
+          x: spawnPos.x,
+          y: spawnPos.y,
+          movesLeft: UNIT[unitKind].move,
+          workingOn: null,
+          workTurnsLeft: 0,
+        });
+        return {
+          ...city,
+          population: nextPop,
+          food: nextFood,
+          production: accrued - cost,
+        };
+      }
+
+      // Building completed: add to buildings, default back to footman.
+      const kind = city.building.building;
+      if (city.buildings.includes(kind)) {
+        // Already owned — drop the prod and revert to footman.
+        return {
+          ...city,
+          population: nextPop,
+          food: nextFood,
+          production: 0,
+          building: { kind: 'unit', unit: 'footman' },
+        };
+      }
+      return {
+        ...city,
+        population: nextPop,
+        food: nextFood,
+        production: 0,
+        buildings: [...city.buildings, kind],
+        building: { kind: 'unit', unit: 'footman' },
+      };
     });
 
     let lastAIBattle: Battle | null = null;

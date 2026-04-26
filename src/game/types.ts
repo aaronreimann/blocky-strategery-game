@@ -1,3 +1,5 @@
+import type { BuildingKind } from '@/src/data/buildings';
+import type { ImprovementKind } from '@/src/data/improvements';
 import type { UnitKind } from '@/src/data/units';
 
 export const DIFFICULTIES = ['easy', 'normal', 'hard'] as const;
@@ -28,8 +30,6 @@ export type Player = {
   isHuman: boolean;
 };
 
-import type { ImprovementKind } from '@/src/data/improvements';
-
 export type Unit = {
   id: string;
   kind: UnitKind;
@@ -41,6 +41,10 @@ export type Unit = {
   workTurnsLeft: number;
 };
 
+export type CityBuildTarget =
+  | { kind: 'unit'; unit: UnitKind }
+  | { kind: 'building'; building: BuildingKind };
+
 export type City = {
   id: string;
   ownerIdx: number;
@@ -48,7 +52,8 @@ export type City = {
   x: number;
   y: number;
   population: number;
-  building: UnitKind | null;
+  food: number;
+  buildings: BuildingKind[];
+  building: CityBuildTarget | null;
   production: number;
-  productionPerTurn: number;
 };

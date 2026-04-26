@@ -1,14 +1,18 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { BUILDING, BUILDING_KINDS } from '@/src/data/buildings';
 import { IMPROVEMENT, tileKey } from '@/src/data/improvements';
-import { UNIT, UNIT_KINDS, type UnitKind } from '@/src/data/units';
+import { UNIT, UNIT_KINDS } from '@/src/data/units';
+import { computeCityYields, foodNeededToGrow } from '@/src/game/yields';
+import type { CityBuildTarget } from '@/src/game/types';
 import { useGame } from '@/src/state/game';
 
 import { THEME } from './palette';
 
 export default function Hud() {
   const turn = useGame((s) => s.turn);
+  const map = useGame((s) => s.map);
   const units = useGame((s) => s.units);
   const cities = useGame((s) => s.cities);
   const improvements = useGame((s) => s.improvements);
@@ -109,39 +113,115 @@ export default function Hud() {
             ) : null}
           </View>
         ) : selectedCity ? (
-          <View style={styles.card} pointerEvents="auto">
-            <Text style={styles.cardTitle}>{selectedCity.name}</Text>
-            <Text style={styles.cardMeta}>
-              Pop {selectedCity.population} · +{selectedCity.productionPerTurn}/turn
-            </Text>
-            {selectedCity.building ? (
-              <Text style={styles.cardMeta}>
-                Building: {UNIT[selectedCity.building].name} ({selectedCity.production}/
-                {UNIT[selectedCity.building].cost})
-              </Text>
-            ) : (
-              <Text style={styles.cardMeta}>Idle — pick something to build</Text>
-            )}
-            <View style={styles.buildRow}>
-              {UNIT_KINDS.map((kind) => {
-                const isCurrent = selectedCity.building === kind;
-                return (
-                  <Pressable
-                    key={kind}
-                    style={[styles.buildBtn, isCurrent && styles.buildBtnActive]}
-                    onPress={() => setCityBuild(selectedCity.id, kind as UnitKind)}
-                  >
-                    <Text style={[styles.buildBtnText, isCurrent && styles.buildBtnTextActive]}>
-                      {UNIT[kind].name}
-                    </Text>
-                    <Text style={[styles.buildBtnCost, isCurrent && styles.buildBtnTextActive]}>
-                      {UNIT[kind].cost}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
+          (() => {
+            const yields = map ? computeCityYields(selectedCity, map) : null;
+            const growthThreshold = foodNeededToGrow(selectedCity.population);
+            const buildTargetLabel = (() => {
+              if (!selectedCity.building) return 'Idle';
+              if (selectedCity.building.kind === 'unit') {
+                return UNIT[selectedCity.building.unit].name;
+              }
+              return BUILDING[selectedCity.building.building].name;
+            })();
+            const buildCost = (() => {
+              if (!selectedCity.building) return 0;
+              return selectedCity.building.kind === 'unit'
+                ? UNIT[selectedCity.building.unit].cost
+                : BUILDING[selectedCity.building.building].cost;
+            })();
+            const isCurrentTarget = (t: CityBuildTarget) => {
+              const cur = selectedCity.building;
+              if (!cur) return false;
+              if (cur.kind !== t.kind) return false;
+              return cur.kind === 'unit'
+                ? cur.unit === (t as { unit: string }).unit
+                : cur.building === (t as { building: string }).building;
+            };
+            const owns = (b: string) => selectedCity.buildings.includes(b as never);
+            return (
+              <View style={styles.card} pointerEvents="auto">
+                <Text style={styles.cardTitle}>
+                  {selectedCity.name} · Pop {selectedCity.population}
+                </Text>
+                {yields ? (
+                  <Text style={styles.cardMeta}>
+                    Food {selectedCity.food}/{growthThreshold} (
+                    {yields.food >= 0 ? '+' : ''}
+                    {yields.food}/turn) · Prod{' '}
+                    {selectedCity.production}/{buildCost} (+{yields.prod}/turn)
+                  </Text>
+                ) : null}
+                <Text style={styles.cardMeta}>Building: {buildTargetLabel}</Text>
+                <View style={styles.buildRow}>
+                  {UNIT_KINDS.map((kind) => {
+                    const target: CityBuildTarget = { kind: 'unit', unit: kind };
+                    const cur = isCurrentTarget(target);
+                    return (
+                      <Pressable
+                        key={`u-${kind}`}
+                        style={[styles.buildBtn, cur && styles.buildBtnActive]}
+                        onPress={() => setCityBuild(selectedCity.id, target)}
+                      >
+                        <Text
+                          style={[
+                            styles.buildBtnText,
+                            cur && styles.buildBtnTextActive,
+                          ]}
+                        >
+                          {UNIT[kind].name}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.buildBtnCost,
+                            cur && styles.buildBtnTextActive,
+                          ]}
+                        >
+                          {UNIT[kind].cost}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                  {BUILDING_KINDS.map((kind) => {
+                    const target: CityBuildTarget = { kind: 'building', building: kind };
+                    const cur = isCurrentTarget(target);
+                    const owned = owns(kind);
+                    return (
+                      <Pressable
+                        key={`b-${kind}`}
+                        style={[
+                          styles.buildBtn,
+                          styles.buildBtnBuilding,
+                          cur && styles.buildBtnActive,
+                          owned && styles.buildBtnOwned,
+                        ]}
+                        disabled={owned}
+                        onPress={() => setCityBuild(selectedCity.id, target)}
+                      >
+                        <Text
+                          style={[
+                            styles.buildBtnText,
+                            cur && styles.buildBtnTextActive,
+                            owned && styles.buildBtnOwnedText,
+                          ]}
+                        >
+                          {BUILDING[kind].name}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.buildBtnCost,
+                            cur && styles.buildBtnTextActive,
+                            owned && styles.buildBtnOwnedText,
+                          ]}
+                        >
+                          {owned ? 'owned' : BUILDING[kind].cost}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            );
+          })()
         ) : (
           <View style={styles.hint} pointerEvents="none">
             <Text style={styles.hintText}>
@@ -239,8 +319,11 @@ const styles = StyleSheet.create({
     minWidth: 60,
   },
   buildBtnActive: { backgroundColor: THEME.good, borderColor: THEME.good },
+  buildBtnBuilding: { borderColor: THEME.warn },
+  buildBtnOwned: { opacity: 0.4 },
   buildBtnText: { color: THEME.ink, fontSize: 12, fontWeight: '700' },
   buildBtnTextActive: { color: '#0a1729' },
+  buildBtnOwnedText: { color: THEME.inkMuted },
   buildBtnCost: { color: THEME.inkMuted, fontSize: 10 },
   hint: { flex: 1, alignSelf: 'center' },
   hintText: { color: THEME.inkMuted, fontSize: 11, textAlign: 'center' },
