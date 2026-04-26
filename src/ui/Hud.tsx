@@ -197,7 +197,7 @@ export default function Hud() {
         </Animated.View>
       ) : null}
 
-      <View style={styles.bottomRow} pointerEvents="box-none">
+      <View style={styles.bottomRightStack} pointerEvents="box-none">
         {selectedUnit && unitSpec ? (
           <View style={styles.card} pointerEvents="auto">
             <Text style={styles.cardTitle}>
@@ -420,13 +420,7 @@ export default function Hud() {
               </View>
             );
           })()
-        ) : (
-          <View style={styles.hint} pointerEvents="none">
-            <Text style={styles.hintText}>
-              Tap a unit/city · yellow tiles = move · red tiles = attack
-            </Text>
-          </View>
-        )}
+        ) : null}
 
         <Pressable style={styles.endTurn} onPress={endTurn}>
           <Text style={styles.endTurnText}>End Turn</Text>
@@ -545,12 +539,12 @@ const styles = StyleSheet.create({
   eventsCloseText: { color: THEME.inkMuted, fontSize: 11, fontWeight: '700' },
   eventLine: { color: THEME.ink, fontSize: 11, marginTop: 2 },
   eventOverflow: { color: THEME.inkMuted, fontSize: 10, marginTop: 4 },
-  bottomRow: {
-    flexDirection: 'row',
+  bottomRightStack: {
+    position: 'absolute',
+    bottom: 12,
+    right: 12,
     alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    padding: 12,
-    gap: 12,
+    gap: 8,
   },
   card: {
     backgroundColor: 'rgba(21, 33, 54, 0.92)',

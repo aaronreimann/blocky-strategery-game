@@ -86,8 +86,25 @@ export default function MiniMap({
     runOnJS(onJumpTo)(wx, wy);
   });
 
+  const pan = Gesture.Pan()
+    .minDistance(2)
+    .onStart((e) => {
+      'worklet';
+      const wx = (e.x / MM_W) * worldW;
+      const wy = (e.y / MM_H) * worldH;
+      runOnJS(onJumpTo)(wx, wy);
+    })
+    .onUpdate((e) => {
+      'worklet';
+      const wx = (e.x / MM_W) * worldW;
+      const wy = (e.y / MM_H) * worldH;
+      runOnJS(onJumpTo)(wx, wy);
+    });
+
+  const gesture = Gesture.Race(pan, tap);
+
   return (
-    <GestureDetector gesture={tap}>
+    <GestureDetector gesture={gesture}>
       <View style={styles.wrap}>
         <Canvas style={{ width: MM_W, height: MM_H }}>
           <Group>
