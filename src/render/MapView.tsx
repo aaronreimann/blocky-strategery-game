@@ -5,8 +5,10 @@ import {
   matchFont,
   Path,
   Rect,
+  Skia,
   Text as SkText,
   useFont,
+  type SkPath,
 } from '@shopify/react-native-skia';
 import { useEffect, useMemo } from 'react';
 import { useWindowDimensions } from 'react-native';
@@ -17,6 +19,11 @@ import Animated, {
   useSharedValue,
 } from 'react-native-reanimated';
 
+import {
+  ICON_PATHS,
+  ICON_VIEWBOX,
+  type GameIconName,
+} from '@/src/data/gameIcons';
 import type { ImprovementMap } from '@/src/data/improvements';
 import { RESOURCE } from '@/src/data/resources';
 import { TERRAIN } from '@/src/data/terrain';
@@ -30,21 +37,31 @@ import { useGame } from '@/src/state/game';
 import { decorateTile } from './decor';
 import MiniMap from './MiniMap';
 
-// Font Awesome 5 Free Solid glyphs (private-use Unicode points).
-const UNIT_GLYPH: Record<UnitKind, string> = {
-  pioneer:   '', // person-walking
-  worker:    '', // hammer
-  footman:   '', // gavel (mallet)
-  spearman:  '', // shield-alt
-  horseman:  '', // horse
-  swordsman: '', // skull-crossbones
-  catapult:  '', // fire
-  galley:    '', // ship
+// Map every unit/city kind to a game-icons glyph (medieval theme).
+const UNIT_ICON: Record<UnitKind, GameIconName> = {
+  pioneer:   'wood_axe',
+  worker:    'stone_axe',
+  footman:   'visored_helm',
+  spearman:  'spear_hook',
+  horseman:  'horse_head',
+  swordsman: 'broadsword',
+  catapult:  'catapult',
+  galley:    'caravel',
 };
-const CITY_CAPITAL_GLYPH = ''; // chess-rook
-const CITY_HOUSE_GLYPH = '';   // home
+const CITY_CAPITAL_ICON: GameIconName = 'castle';
+const CITY_HOUSE_ICON: GameIconName = 'house';
 
-const ICON_SIZE = 22;
+// Pixel size each icon renders at on the map (camera then scales further).
+const ICON_SIZE = 26;
+
+// Cache parsed Skia paths so we only convert each SVG string once.
+const PATH_CACHE = new Map<GameIconName, SkPath | null>();
+function iconPath(name: GameIconName): SkPath | null {
+  if (!PATH_CACHE.has(name)) {
+    PATH_CACHE.set(name, Skia.Path.MakeFromSVGString(ICON_PATHS[name]));
+  }
+  return PATH_CACHE.get(name) ?? null;
+}
 
 export const TILE_SIZE = 32;
 const MIN_SCALE = 0.35;
@@ -573,7 +590,6 @@ export default function MapView({
   const dragOpacity = useDerivedValue(() => (isDraggingUnit.value ? 1 : 0));
 
   const cityLayer = useMemo(() => {
-    if (!iconFont) return [];
     // First-founded city per player is treated as their capital.
     const firstCityByPlayer = new Map<number, string>();
     for (const c of cities) {
@@ -581,52 +597,48 @@ export default function MapView({
         firstCityByPlayer.set(c.ownerIdx, c.id);
       }
     }
+    const scale = ICON_SIZE / ICON_VIEWBOX;
     return cities.map((c) => {
       const owner = players[c.ownerIdx];
       const color = owner?.color ?? '#ffffff';
       const isCapital = firstCityByPlayer.get(c.ownerIdx) === c.id;
-      const glyph = isCapital ? CITY_CAPITAL_GLYPH : CITY_HOUSE_GLYPH;
-      const w = iconFont.measureText(glyph).width;
+      const path = iconPath(isCapital ? CITY_CAPITAL_ICON : CITY_HOUSE_ICON);
+      if (!path) return null;
       const cx = c.x * TILE_SIZE + TILE_SIZE / 2;
       const cy = c.y * TILE_SIZE + TILE_SIZE / 2;
-      const tx = cx - w / 2;
-      const ty = cy + ICON_SIZE * 0.35;
+      const ox = cx - ICON_SIZE / 2;
+      const oy = cy - ICON_SIZE / 2;
       return (
-        <Group key={`city-${c.id}`}>
-          <SkText
-            x={tx + 1}
-            y={ty + 1}
-            text={glyph}
-            font={iconFont}
-            color="rgba(0,0,0,0.7)"
-          />
-          <SkText x={tx} y={ty} text={glyph} font={iconFont} color={color} />
+        <Group
+          key={`city-${c.id}`}
+          transform={[{ translateX: ox }, { translateY: oy }, { scale }]}
+        >
+          <Path path={path} color="rgba(0,0,0,0.6)" transform={[{ translateX: 12 }, { translateY: 12 }]} />
+          <Path path={path} color={color} />
         </Group>
       );
     });
-  }, [cities, players, iconFont]);
+  }, [cities, players]);
 
   const unitLayer = useMemo(() => {
-    if (!iconFont) return [];
     const elements: React.ReactNode[] = [];
+    const scale = ICON_SIZE / ICON_VIEWBOX;
     for (const u of units) {
       const owner = players[u.ownerIdx];
       const color = owner?.color ?? '#ffffff';
-      const glyph = UNIT_GLYPH[u.kind];
-      if (!glyph) continue;
-      const w = iconFont.measureText(glyph).width;
+      const path = iconPath(UNIT_ICON[u.kind]);
+      if (!path) continue;
       const cx = u.x * TILE_SIZE + TILE_SIZE / 2;
       const cy = u.y * TILE_SIZE + TILE_SIZE / 2;
-      const tx = cx - w / 2;
-      const ty = cy + ICON_SIZE * 0.35;
-      // Stacked armies get a subtle gold ring background to make them pop.
+      const ox = cx - ICON_SIZE / 2;
+      const oy = cy - ICON_SIZE / 2;
       if (u.stack.length > 1) {
         elements.push(
           <Circle
             key={`u-${u.id}-ring`}
             cx={cx}
             cy={cy}
-            r={ICON_SIZE * 0.55}
+            r={ICON_SIZE * 0.6}
             color="#facc15"
             style="stroke"
             strokeWidth={2}
@@ -634,28 +646,21 @@ export default function MapView({
         );
       }
       elements.push(
-        <SkText
-          key={`u-${u.id}-sh`}
-          x={tx + 1}
-          y={ty + 1}
-          text={glyph}
-          font={iconFont}
-          color="rgba(0,0,0,0.7)"
-        />,
-      );
-      elements.push(
-        <SkText
-          key={`u-${u.id}-fg`}
-          x={tx}
-          y={ty}
-          text={glyph}
-          font={iconFont}
-          color={color}
-        />,
+        <Group
+          key={`u-${u.id}`}
+          transform={[{ translateX: ox }, { translateY: oy }, { scale }]}
+        >
+          <Path
+            path={path}
+            color="rgba(0,0,0,0.6)"
+            transform={[{ translateX: 12 }, { translateY: 12 }]}
+          />
+          <Path path={path} color={color} />
+        </Group>,
       );
     }
     return elements;
-  }, [units, players, iconFont]);
+  }, [units, players]);
 
   const selectionLayer = useMemo(() => {
     let coord: { x: number; y: number } | null = null;
