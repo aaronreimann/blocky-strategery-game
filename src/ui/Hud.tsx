@@ -1,3 +1,4 @@
+import { FontAwesome5 } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -100,14 +101,13 @@ export default function Hud() {
   return (
     <SafeAreaView style={styles.root} pointerEvents="box-none">
       <View style={styles.topRow} pointerEvents="box-none">
-        <Pressable style={styles.pill} onPress={exitToTitle}>
-          <Text style={styles.pillText}>← Title</Text>
+        <Pressable style={styles.pillSquare} onPress={exitToTitle}>
+          <FontAwesome5 name="home" size={14} color={THEME.ink} />
         </Pressable>
         {players[0] ? (
           <View style={[styles.pill, { borderColor: players[0].color }]}>
             <Text style={[styles.pillText, { color: players[0].color }]}>
               {players[0].name}
-              {players[0].leader ? ` · ${players[0].leader}` : ''}
             </Text>
           </View>
         ) : null}
@@ -117,21 +117,35 @@ export default function Hud() {
           </Text>
         </View>
         <View style={styles.pill}>
-          <Text style={styles.pillText}>
-            Cities {myCitiesCount} · Units {myUnitsCount}
-          </Text>
+          <FontAwesome5 name="chess-rook" size={12} color={THEME.ink} style={styles.pillIcon} />
+          <Text style={styles.pillText}>{myCitiesCount}</Text>
+          <FontAwesome5
+            name="shield-alt"
+            size={12}
+            color={THEME.ink}
+            style={[styles.pillIcon, { marginLeft: 10 }]}
+          />
+          <Text style={styles.pillText}>{myUnitsCount}</Text>
         </View>
         <Pressable
           style={[styles.pill, !researching && styles.pillAlert]}
           onPress={() => setTechOpen(true)}
         >
-          <Text
-            style={[styles.pillText, !researching && styles.pillAlertText]}
-          >
-            {researching
-              ? `Sci ${science}/${TECH[researching].cost} · ${TECH[researching].name}`
-              : `Sci ${science} · Pick research`}
-          </Text>
+          <FontAwesome5
+            name="flask"
+            size={12}
+            color={researching ? THEME.ink : THEME.warn}
+            style={styles.pillIcon}
+          />
+          {researching ? (
+            <Text style={styles.pillText}>
+              {science}/{TECH[researching].cost} · {TECH[researching].name}
+            </Text>
+          ) : (
+            <Text style={[styles.pillText, styles.pillAlertText]}>
+              {science} · pick research
+            </Text>
+          )}
         </Pressable>
       </View>
 
@@ -450,7 +464,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 999,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
+  pillSquare: {
+    backgroundColor: 'rgba(21, 33, 54, 0.88)',
+    borderColor: THEME.border,
+    borderWidth: 1,
+    width: 32,
+    height: 32,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pillIcon: { marginRight: 5 },
   pillText: { color: THEME.ink, fontSize: 12, fontWeight: '600' },
   pillAlert: { borderColor: THEME.warn },
   pillAlertText: { color: THEME.warn },
