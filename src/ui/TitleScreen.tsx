@@ -43,14 +43,14 @@ export default function TitleScreen() {
     <SafeAreaView style={styles.root}>
       <View style={styles.header}>
         <Text style={styles.title}>Civ-App</Text>
-        <Text style={styles.subtitle}>Pick a slot</Text>
+        <Text style={styles.subtitle}>Pick a realm</Text>
       </View>
 
       <View style={styles.slotRow}>
         {slots.map((info) => (
           <View key={info.slot} style={styles.slotWrap}>
             <Pressable style={styles.slotCard} onPress={() => onSlotPress(info.slot, info)}>
-              <Text style={styles.slotNumber}>Slot {info.slot + 1}</Text>
+              <Text style={styles.slotNumber}>Realm {info.slot + 1}</Text>
               {info.empty ? (
                 <>
                   <Text style={styles.slotEmpty}>Empty</Text>

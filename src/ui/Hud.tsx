@@ -31,7 +31,7 @@ export default function Hud() {
         </Pressable>
         <View style={styles.pill}>
           <Text style={styles.pillText}>
-            Slot {currentSlot !== null ? currentSlot + 1 : '?'} · Turn {turn}
+            Realm {currentSlot !== null ? currentSlot + 1 : '?'} · Turn {turn}
           </Text>
         </View>
         <View style={styles.pill}>
