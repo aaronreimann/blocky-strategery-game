@@ -53,6 +53,25 @@ function findAdjacentEnemy(unit: Unit, units: Unit[]): Unit | null {
   return null;
 }
 
+function findAdjacentUndefendedEnemyCity(
+  unit: Unit,
+  cities: City[],
+  units: Unit[],
+): City | null {
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      if (dx === 0 && dy === 0) continue;
+      const nx = unit.x + dx;
+      const ny = unit.y + dy;
+      const city = cities.find((c) => c.x === nx && c.y === ny && c.ownerIdx !== unit.ownerIdx);
+      if (!city) continue;
+      const defender = units.find((u) => u.x === nx && u.y === ny && u.ownerIdx !== unit.ownerIdx);
+      if (!defender) return city;
+    }
+  }
+  return null;
+}
+
 function tryMove(unit: Unit, units: Unit[], cities: City[], map: GameMap): Unit[] {
   const dirs = shuffled([
     [-1, -1], [-1, 0], [-1, 1],
@@ -65,9 +84,7 @@ function tryMove(unit: Unit, units: Unit[], cities: City[], map: GameMap): Unit[
     if (nx < 0 || ny < 0 || nx >= map.width || ny >= map.height) continue;
     const tile = map.tiles[ny * map.width + nx];
     if (!TERRAIN[tile.terrain].passable) continue;
-    // Don't bump into own unit.
     if (units.some((u) => u.x === nx && u.y === ny && u.ownerIdx === unit.ownerIdx)) continue;
-    // Don't try to walk through enemy cities (no capture in v1).
     if (cities.some((c) => c.x === nx && c.y === ny && c.ownerIdx !== unit.ownerIdx)) continue;
     return units.map((u) =>
       u.id === unit.id ? { ...u, x: nx, y: ny, movesLeft: u.movesLeft - 1 } : u,
@@ -83,7 +100,6 @@ export function runAITurn(input: AITurnInput): AITurnOutput {
   const myIdx = input.ownerIdx;
   const map = input.map;
 
-  // Snapshot of unit ids at start of turn so newly-built units don't act this turn.
   const myUnitIds = units.filter((u) => u.ownerIdx === myIdx).map((u) => u.id);
 
   for (const id of myUnitIds) {
@@ -123,21 +139,45 @@ export function runAITurn(input: AITurnInput): AITurnOutput {
         const battle = resolveCombat(fresh.kind, enemy.kind, defenderTile);
         battles.push(battle);
         if (battle.attackerWon) {
+          // Move attacker onto defender's tile; capture any enemy city there.
+          const cityHere = cities.find(
+            (c) => c.x === enemy.x && c.y === enemy.y && c.ownerIdx !== myIdx,
+          );
           units = units
             .filter((u) => u.id !== enemy.id)
             .map((u) =>
-              u.id === fresh.id ? { ...u, x: enemy.x, y: enemy.y, movesLeft: 0 } : u,
+              u.id === fresh.id
+                ? { ...u, x: enemy.x, y: enemy.y, movesLeft: 0 }
+                : u,
             );
+          if (cityHere) {
+            cities = cities.map((c) =>
+              c.id === cityHere.id ? { ...c, ownerIdx: myIdx, production: 0 } : c,
+            );
+          }
         } else {
           units = units.filter((u) => u.id !== fresh.id);
         }
         continue;
       }
+
+      const undefendedCity = findAdjacentUndefendedEnemyCity(fresh, cities, units);
+      if (undefendedCity) {
+        units = units.map((u) =>
+          u.id === fresh.id
+            ? { ...u, x: undefendedCity.x, y: undefendedCity.y, movesLeft: 0 }
+            : u,
+        );
+        cities = cities.map((c) =>
+          c.id === undefendedCity.id ? { ...c, ownerIdx: myIdx, production: 0 } : c,
+        );
+        continue;
+      }
+
       units = tryMove(fresh, units, cities, map);
       continue;
     }
 
-    // Laborer or anything else — wander.
     units = tryMove(fresh, units, cities, map);
   }
 

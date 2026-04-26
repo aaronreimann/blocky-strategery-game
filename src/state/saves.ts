@@ -1,10 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import type { GameMap } from '@/src/game/map';
-import type { City, Player, Unit } from '@/src/game/types';
+import type { City, GameOverState, Player, Unit } from '@/src/game/types';
 
 export const SLOT_COUNT = 3;
-const SAVE_VERSION = 1;
+const SAVE_VERSION = 2;
 const KEY_PREFIX = 'civ_save_';
 
 const slotKey = (slot: number) => `${KEY_PREFIX}${slot}`;
@@ -17,6 +17,7 @@ export type SaveData = {
   players: Player[];
   units: Unit[];
   cities: City[];
+  gameOver: GameOverState | null;
   savedAt: string;
 };
 

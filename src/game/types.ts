@@ -1,5 +1,10 @@
 import type { UnitKind } from '@/src/data/units';
 
+export type GameOverState = {
+  kind: 'win' | 'lose' | 'draw';
+  reason: string;
+};
+
 export type Player = {
   idx: number;
   name: string;

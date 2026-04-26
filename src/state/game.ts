@@ -4,10 +4,11 @@ import { TERRAIN } from '@/src/data/terrain';
 import { UNIT, type UnitKind } from '@/src/data/units';
 import { runAITurn } from '@/src/game/ai';
 import { resolveCombat, type Battle } from '@/src/game/combat';
+import { checkGameOver } from '@/src/game/gameOver';
 import { nextCityId, nextUnitId, parseIdNum, syncIdCounters } from '@/src/game/ids';
 import { buildInitialState } from '@/src/game/init';
 import { chebyshev, type GameMap } from '@/src/game/map';
-import type { City, Player, Unit } from '@/src/game/types';
+import type { City, GameOverState, Player, Unit } from '@/src/game/types';
 
 import { loadSlot, saveSlot } from './saves';
 
@@ -26,6 +27,7 @@ type GameState = {
   selectedUnitId: string | null;
   selectedCityId: string | null;
   lastBattle: Battle | null;
+  gameOver: GameOverState | null;
 
   newGame: (slot: number, seed: number) => void;
   loadFromSlot: (slot: number) => Promise<boolean>;
@@ -76,6 +78,7 @@ function autosave(state: GameState): void {
     players: state.players,
     units: state.units,
     cities: state.cities,
+    gameOver: state.gameOver,
   }).catch((err) => console.warn('autosave failed', err));
 }
 
@@ -90,6 +93,7 @@ export const useGame = create<GameState>((set, get) => ({
   selectedUnitId: null,
   selectedCityId: null,
   lastBattle: null,
+  gameOver: null,
 
   newGame: (slot, seed) => {
     const initial = buildInitialState(seed);
@@ -108,6 +112,7 @@ export const useGame = create<GameState>((set, get) => ({
       selectedUnitId: null,
       selectedCityId: null,
       lastBattle: null,
+      gameOver: null,
     });
     autosave(get());
   },
@@ -130,6 +135,7 @@ export const useGame = create<GameState>((set, get) => ({
       selectedUnitId: null,
       selectedCityId: null,
       lastBattle: null,
+      gameOver: data.gameOver ?? null,
     });
     return true;
   },
@@ -146,6 +152,7 @@ export const useGame = create<GameState>((set, get) => ({
       selectedUnitId: null,
       selectedCityId: null,
       lastBattle: null,
+      gameOver: null,
     });
   },
 
@@ -153,7 +160,9 @@ export const useGame = create<GameState>((set, get) => ({
   selectCity: (id) => set({ selectedCityId: id, selectedUnitId: id ? null : get().selectedUnitId }),
 
   tapTile: (x, y) => {
-    const { units, cities, selectedUnitId, selectedCityId, map } = get();
+    const state = get();
+    if (state.gameOver) return;
+    const { units, cities, selectedUnitId, selectedCityId, map, players, turn } = state;
     if (!map) return;
 
     const friendlyUnitAtTile = units.find(
@@ -164,6 +173,9 @@ export const useGame = create<GameState>((set, get) => ({
     );
     const friendlyCityAtTile = cities.find(
       (c) => c.x === x && c.y === y && c.ownerIdx === HUMAN_IDX,
+    );
+    const enemyCityAtTile = cities.find(
+      (c) => c.x === x && c.y === y && c.ownerIdx !== HUMAN_IDX,
     );
     const selected = units.find((u) => u.id === selectedUnitId) ?? null;
 
@@ -177,38 +189,73 @@ export const useGame = create<GameState>((set, get) => ({
         return;
       }
 
-      // Attack an enemy unit on the target tile.
-      if (enemyUnitAtTile) {
+      // Attack / capture path.
+      if (enemyUnitAtTile || enemyCityAtTile) {
         if (selected.movesLeft <= 0) return;
         const dist = chebyshev(selected.x, selected.y, x, y);
         if (dist > selected.movesLeft) return;
-        const defenderTile = map.tiles[y * map.width + x];
-        const battle = resolveCombat(selected.kind, enemyUnitAtTile.kind, defenderTile);
-        if (battle.attackerWon) {
-          set({
-            units: units
-              .filter((u) => u.id !== enemyUnitAtTile.id)
-              .map((u) => (u.id === selected.id ? { ...u, x, y, movesLeft: 0 } : u)),
-            lastBattle: battle,
-          });
-        } else {
-          set({
-            units: units.filter((u) => u.id !== selected.id),
-            selectedUnitId: null,
-            lastBattle: battle,
-          });
+
+        let nextUnits = units;
+        let nextCities = cities;
+        let battle: Battle | null = null;
+
+        if (enemyUnitAtTile) {
+          const defenderTile = map.tiles[y * map.width + x];
+          battle = resolveCombat(selected.kind, enemyUnitAtTile.kind, defenderTile);
+          if (!battle.attackerWon) {
+            nextUnits = nextUnits.filter((u) => u.id !== selected.id);
+            const finished = checkGameOver({
+              units: nextUnits,
+              cities: nextCities,
+              players,
+              turn,
+            });
+            set({
+              units: nextUnits,
+              selectedUnitId: null,
+              lastBattle: battle,
+              gameOver: finished,
+            });
+            autosave(get());
+            return;
+          }
+          nextUnits = nextUnits.filter((u) => u.id !== enemyUnitAtTile.id);
         }
+
+        nextUnits = nextUnits.map((u) =>
+          u.id === selected.id ? { ...u, x, y, movesLeft: 0 } : u,
+        );
+
+        if (enemyCityAtTile) {
+          nextCities = nextCities.map((c) =>
+            c.id === enemyCityAtTile.id
+              ? { ...c, ownerIdx: HUMAN_IDX, production: 0 }
+              : c,
+          );
+        }
+
+        const finished = checkGameOver({
+          units: nextUnits,
+          cities: nextCities,
+          players,
+          turn,
+        });
+        set({
+          units: nextUnits,
+          cities: nextCities,
+          lastBattle: battle,
+          gameOver: finished,
+        });
         autosave(get());
         return;
       }
 
-      // Move
+      // Plain move.
       if (selected.movesLeft <= 0) return;
       const dist = chebyshev(selected.x, selected.y, x, y);
       if (dist > selected.movesLeft) return;
       const targetTile = map.tiles[y * map.width + x];
       if (!TERRAIN[targetTile.terrain].passable) return;
-      if (cities.some((c) => c.x === x && c.y === y && c.ownerIdx !== selected.ownerIdx)) return;
       if (units.some((u) => u.x === x && u.y === y && u.ownerIdx === selected.ownerIdx)) return;
       set({
         units: units.map((u) =>
@@ -235,8 +282,8 @@ export const useGame = create<GameState>((set, get) => ({
   },
 
   foundCity: () => {
-    const { units, selectedUnitId, cities, map } = get();
-    if (!map) return;
+    const { units, selectedUnitId, cities, map, gameOver } = get();
+    if (gameOver || !map) return;
     const selected = units.find((u) => u.id === selectedUnitId);
     if (!selected || selected.kind !== 'pioneer') return;
 
@@ -271,6 +318,7 @@ export const useGame = create<GameState>((set, get) => ({
   },
 
   setCityBuild: (cityId, kind) => {
+    if (get().gameOver) return;
     set({
       cities: get().cities.map((c) => (c.id === cityId ? { ...c, building: kind } : c)),
     });
@@ -278,16 +326,14 @@ export const useGame = create<GameState>((set, get) => ({
   },
 
   endTurn: () => {
-    const { units, cities, turn, map, players } = get();
-    if (!map) return;
+    const { units, cities, turn, map, players, gameOver } = get();
+    if (gameOver || !map) return;
 
-    // Refresh all units' moves for the new turn.
     let workingUnits: Unit[] = units.map((u) => ({
       ...u,
       movesLeft: UNIT[u.kind].move,
     }));
 
-    // Accrue production for every city; spawn produced units.
     let workingCities: City[] = cities.map((city) => {
       const accrued = city.production + city.productionPerTurn;
       if (!city.building) return { ...city, production: accrued };
@@ -306,7 +352,6 @@ export const useGame = create<GameState>((set, get) => ({
       return { ...city, production: accrued - cost };
     });
 
-    // Run AI turns.
     let lastAIBattle: Battle | null = null;
     for (const player of players) {
       if (player.isHuman) continue;
@@ -323,13 +368,22 @@ export const useGame = create<GameState>((set, get) => ({
       }
     }
 
+    const newTurn = turn + 1;
+    const finished = checkGameOver({
+      units: workingUnits,
+      cities: workingCities,
+      players,
+      turn: newTurn,
+    });
+
     set({
-      turn: turn + 1,
+      turn: newTurn,
       selectedUnitId: null,
       selectedCityId: null,
       units: workingUnits,
       cities: workingCities,
       lastBattle: lastAIBattle,
+      gameOver: finished,
     });
     autosave(get());
   },

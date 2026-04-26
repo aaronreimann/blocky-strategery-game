@@ -6,6 +6,7 @@ import { chebyshev } from '@/src/game/map';
 import MapView from '@/src/render/MapView';
 import { useGame } from '@/src/state/game';
 
+import GameOverOverlay from './GameOverOverlay';
 import Hud from './Hud';
 import { THEME } from './palette';
 
@@ -38,23 +39,21 @@ export default function GameScreen() {
         const t = map.tiles[ny * map.width + nx];
         if (!TERRAIN[t.terrain].passable) continue;
 
-        const enemyHere = units.some(
-          (u) => u.x === nx && u.y === ny && u.ownerIdx !== sel.ownerIdx,
-        );
-        if (enemyHere) {
-          attack.add(`${nx},${ny}`);
-          continue;
-        }
-
-        const friendlyHere = units.some(
+        const friendlyUnitHere = units.some(
           (u) => u.x === nx && u.y === ny && u.ownerIdx === sel.ownerIdx,
         );
-        if (friendlyHere) continue;
+        if (friendlyUnitHere) continue;
 
+        const enemyUnitHere = units.some(
+          (u) => u.x === nx && u.y === ny && u.ownerIdx !== sel.ownerIdx,
+        );
         const enemyCityHere = cities.some(
           (c) => c.x === nx && c.y === ny && c.ownerIdx !== sel.ownerIdx,
         );
-        if (enemyCityHere) continue;
+        if (enemyUnitHere || enemyCityHere) {
+          attack.add(`${nx},${ny}`);
+          continue;
+        }
 
         move.add(`${nx},${ny}`);
       }
@@ -78,6 +77,7 @@ export default function GameScreen() {
         onTileTap={tapTile}
       />
       <Hud />
+      <GameOverOverlay />
     </View>
   );
 }
