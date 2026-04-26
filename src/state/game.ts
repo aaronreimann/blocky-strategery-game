@@ -18,7 +18,7 @@ import { checkGameOver } from '@/src/game/gameOver';
 import { nextCityId, nextUnitId, parseIdNum, syncIdCounters } from '@/src/game/ids';
 import { buildInitialState } from '@/src/game/init';
 import { chebyshev, type GameMap } from '@/src/game/map';
-import { nextStepToFriendlyCity } from '@/src/game/path';
+import { nextStepToFriendlyCity, nextStepToTiles } from '@/src/game/path';
 import {
   relationKey,
   type City,
@@ -951,8 +951,9 @@ export const useGame = create<GameState>((set, get) => ({
     });
 
     // Auto-move pass: any unit with a destination tries to step toward it.
-    // BFS from current position to destination. If blocked or destination
-    // reached, the destination clears.
+    // BFS from current position to the SPECIFIC destination tile (not
+    // any friendly city — earlier code did that and Pioneers near home
+    // would walk back to it instead of out).
     workingUnits = workingUnits.map((u) => {
       if (!u.destination) return u;
       if (u.movesLeft <= 0) return u;
@@ -960,36 +961,23 @@ export const useGame = create<GameState>((set, get) => ({
       if (u.x === u.destination.x && u.y === u.destination.y) {
         return { ...u, destination: null };
       }
-      const fakeCityForDest: City = {
-        id: '__dest__',
-        ownerIdx: u.ownerIdx,
-        name: 'dest',
-        x: u.destination.x,
-        y: u.destination.y,
-        population: 0,
-        food: 0,
-        buildings: [],
-        building: null,
-        production: 0,
-        focus: 'balanced',
-      };
-      const next = nextStepToFriendlyCity(
-        u,
-        [...workingCities, fakeCityForDest],
-        workingUnits,
+      const targets = new Set<string>([`${u.destination.x},${u.destination.y}`]);
+      const blocked = new Set<string>();
+      for (const o of workingUnits) {
+        if (o.id !== u.id) blocked.add(`${o.x},${o.y}`);
+      }
+      // Don't path through enemy cities.
+      for (const c of workingCities) {
+        if (c.ownerIdx !== u.ownerIdx) blocked.add(`${c.x},${c.y}`);
+      }
+      const next = nextStepToTiles(
+        { x: u.x, y: u.y },
+        targets,
+        blocked,
         map,
+        u.kind,
       );
       if (!next) return { ...u, destination: null };
-      const blockedByFriendly = workingUnits.some(
-        (o) => o.id !== u.id && o.x === next.x && o.y === next.y && o.ownerIdx === u.ownerIdx,
-      );
-      const blockedByEnemy = workingUnits.some(
-        (o) => o.x === next.x && o.y === next.y && o.ownerIdx !== u.ownerIdx,
-      );
-      if (blockedByFriendly || blockedByEnemy) {
-        // Stop short, keep destination so we'll try again next turn.
-        return u;
-      }
       const moved = { ...u, x: next.x, y: next.y, movesLeft: u.movesLeft - 1 };
       if (moved.x === moved.destination!.x && moved.y === moved.destination!.y) {
         moved.destination = null;
