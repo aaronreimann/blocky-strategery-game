@@ -373,6 +373,63 @@ export default function MapView({
     return out;
   }, [units, autoLaborerOwnerIdxs]);
 
+  // Direction arrows on each highlight tile pointing from selected unit
+  // toward that tile, so it's obvious where the unit can step.
+  const arrowLayer = useMemo(() => {
+    const out: React.ReactNode[] = [];
+    if (!selectedUnitId) return out;
+    const sel = units.find((u) => u.id === selectedUnitId);
+    if (!sel) return out;
+
+    const drawArrow = (
+      key: string,
+      gx: number,
+      gy: number,
+      color: string,
+    ) => {
+      const dx = gx - sel.x;
+      const dy = gy - sel.y;
+      if (dx === 0 && dy === 0) return;
+      const len = Math.hypot(dx, dy);
+      const ux = dx / len;
+      const uy = dy / len;
+      const cx = gx * TILE_SIZE + TILE_SIZE / 2;
+      const cy = gy * TILE_SIZE + TILE_SIZE / 2;
+      const size = TILE_SIZE * 0.28;
+      const tipX = cx + ux * size;
+      const tipY = cy + uy * size;
+      const px = -uy;
+      const py = ux;
+      const baseX = cx - ux * size * 0.4;
+      const baseY = cy - uy * size * 0.4;
+      const c1X = baseX + px * size * 0.6;
+      const c1Y = baseY + py * size * 0.6;
+      const c2X = baseX - px * size * 0.6;
+      const c2Y = baseY - py * size * 0.6;
+      const path = `M ${tipX} ${tipY} L ${c1X} ${c1Y} L ${c2X} ${c2Y} Z`;
+      out.push(<Path key={`ar-${key}-f`} path={path} color={color} />);
+      out.push(
+        <Path
+          key={`ar-${key}-s`}
+          path={path}
+          color="#0a1729"
+          style="stroke"
+          strokeWidth={0.8}
+        />,
+      );
+    };
+
+    for (const k of moveTiles) {
+      const [xs, ys] = k.split(',');
+      drawArrow(`m-${k}`, Number(xs), Number(ys), '#facc15');
+    }
+    for (const k of attackTiles) {
+      const [xs, ys] = k.split(',');
+      drawArrow(`a-${k}`, Number(xs), Number(ys), '#ef4444');
+    }
+    return out;
+  }, [selectedUnitId, units, moveTiles, attackTiles]);
+
   // Destination markers (yellow ring on each unit's destination tile).
   const destLayer = useMemo(() => {
     return units
@@ -602,6 +659,7 @@ export default function MapView({
             {roadLayer}
             {resourceLayer}
             {highlightLayer}
+            {arrowLayer}
             {destLayer}
             {cityLayer}
             {unitLayer}
