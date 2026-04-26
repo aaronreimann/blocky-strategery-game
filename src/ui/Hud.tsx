@@ -19,6 +19,7 @@ import { useGame } from '@/src/state/game';
 
 import DiplomacyScreen from './DiplomacyScreen';
 import KingdomMenu from './KingdomMenu';
+import { GameIcon } from './GameIcon';
 import { THEME } from './palette';
 import TechScreen from './TechScreen';
 
@@ -123,11 +124,11 @@ export default function Hud() {
           <Text style={styles.pillText}>Turn {turn}</Text>
         </View>
         <View style={styles.pill}>
-          <FontAwesome5 name="chess-rook" size={12} color={THEME.ink} style={styles.pillIcon} />
+          <GameIcon name="castle" size={16} color={THEME.ink} style={styles.pillIcon} />
           <Text style={styles.pillText}>{myCitiesCount}</Text>
-          <FontAwesome5
-            name="shield-alt"
-            size={12}
+          <GameIcon
+            name="crossed_swords"
+            size={16}
             color={THEME.ink}
             style={[styles.pillIcon, { marginLeft: 10 }]}
           />
@@ -154,7 +155,7 @@ export default function Hud() {
           )}
         </Pressable>
         <View style={styles.pill}>
-          <FontAwesome5 name="coins" size={12} color={THEME.warn} style={styles.pillIcon} />
+          <GameIcon name="gold_bar" size={16} color={THEME.warn} style={styles.pillIcon} />
           <Text style={styles.pillText}>{gold}</Text>
         </View>
         <Pressable style={styles.pillSquare} onPress={() => setDiploOpen(true)}>
