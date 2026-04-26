@@ -951,22 +951,21 @@ export const useGame = create<GameState>((set, get) => ({
     });
 
     // Auto-move pass: any unit with a destination tries to step toward it.
-    // BFS from current position to the SPECIFIC destination tile (not
-    // any friendly city — earlier code did that and Pioneers near home
-    // would walk back to it instead of out).
-    workingUnits = workingUnits.map((u) => {
-      if (!u.destination) return u;
-      if (u.movesLeft <= 0) return u;
-      if (u.workingOn) return u;
+    // BFS from current position to the SPECIFIC destination tile.
+    for (let i = 0; i < workingUnits.length; i++) {
+      const u = workingUnits[i];
+      if (!u.destination) continue;
+      if (u.movesLeft <= 0) continue;
+      if (u.workingOn) continue;
       if (u.x === u.destination.x && u.y === u.destination.y) {
-        return { ...u, destination: null };
+        workingUnits[i] = { ...u, destination: null };
+        continue;
       }
       const targets = new Set<string>([`${u.destination.x},${u.destination.y}`]);
       const blocked = new Set<string>();
       for (const o of workingUnits) {
         if (o.id !== u.id) blocked.add(`${o.x},${o.y}`);
       }
-      // Don't path through enemy cities.
       for (const c of workingCities) {
         if (c.ownerIdx !== u.ownerIdx) blocked.add(`${c.x},${c.y}`);
       }
@@ -977,13 +976,41 @@ export const useGame = create<GameState>((set, get) => ({
         map,
         u.kind,
       );
-      if (!next) return { ...u, destination: null };
-      const moved = { ...u, x: next.x, y: next.y, movesLeft: u.movesLeft - 1 };
+      if (!next) {
+        workingUnits[i] = { ...u, destination: null };
+        continue;
+      }
+      // Don't auto-attack into an enemy unit; stop short.
+      const enemyUnitAtNext = workingUnits.some(
+        (o) =>
+          o.id !== u.id && o.x === next.x && o.y === next.y && o.ownerIdx !== u.ownerIdx,
+      );
+      if (enemyUnitAtNext) continue;
+
+      // If the next tile is an undefended enemy city, capture it on arrival.
+      const enemyCityAtNext = workingCities.find(
+        (c) => c.x === next.x && c.y === next.y && c.ownerIdx !== u.ownerIdx,
+      );
+      const moved: Unit = {
+        ...u,
+        x: next.x,
+        y: next.y,
+        movesLeft: u.movesLeft - 1,
+      };
       if (moved.x === moved.destination!.x && moved.y === moved.destination!.y) {
         moved.destination = null;
       }
-      return moved;
-    });
+      workingUnits[i] = moved;
+      if (enemyCityAtNext) {
+        workingCities = workingCities.map((c) =>
+          c.id === enemyCityAtNext.id
+            ? { ...c, ownerIdx: u.ownerIdx, production: 0 }
+            : c,
+        );
+        // Capturing a city ends movement and clears destination.
+        workingUnits[i] = { ...moved, destination: null, movesLeft: 0 };
+      }
+    }
 
     // Auto-Worker pass: any Worker whose city has focus='roads' OR whose
     // own autoMode flag is set (and isn't already busy / has no manual
