@@ -1,0 +1,46 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Expo
+.expo/
+.expo-shared/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native
+ios/build/
+ios/Pods/
+android/build/
+android/app/build/
+android/.gradle/
+*.jks
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+
+# Env / secrets
+.env
+.env.local
+.env.*.local
+
+# Claude Code (local-only settings; project-shared settings.json should be committed)
+.claude/settings.local.json
+
+# Logs / coverage
+*.log
+coverage/
