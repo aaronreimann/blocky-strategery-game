@@ -1,42 +1,28 @@
-import { Canvas, Rect } from '@shopify/react-native-skia';
-import { useWindowDimensions, View, Text, StyleSheet } from 'react-native';
+import { useMemo } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { PLAYER_PALETTE } from '@/src/ui/palette';
+import { generateMap } from '@/src/game/mapgen';
+import MapView from '@/src/render/MapView';
+import { THEME } from '@/src/ui/palette';
+
+const SEED = 42;
 
 export default function Home() {
-  const { width, height } = useWindowDimensions();
+  const map = useMemo(() => generateMap(SEED), []);
 
   return (
     <View style={styles.root}>
-      <Canvas style={{ width, height }}>
-        {PLAYER_PALETTE.map((color, i) => (
-          <Rect
-            key={color}
-            x={20 + i * 70}
-            y={20}
-            width={60}
-            height={60}
-            color={color}
-          />
-        ))}
-      </Canvas>
-      <View style={styles.overlay} pointerEvents="none">
-        <Text style={styles.title}>Civ-App</Text>
-        <Text style={styles.subtitle}>M0 scaffold — Skia rendering 8 player colors</Text>
-      </View>
+      <MapView map={map} />
+      <SafeAreaView style={styles.hud} pointerEvents="none">
+        <Text style={styles.label}>Civ-App · seed {SEED} · drag to pan, pinch to zoom</Text>
+      </SafeAreaView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#0a1729' },
-  overlay: {
-    position: 'absolute',
-    bottom: 32,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-  },
-  title: { color: '#f5f1e8', fontSize: 32, fontWeight: '700', letterSpacing: 1 },
-  subtitle: { color: '#8a9bb8', fontSize: 14, marginTop: 4 },
+  root: { flex: 1, backgroundColor: THEME.bg },
+  hud: { position: 'absolute', top: 0, left: 0, right: 0, padding: 12 },
+  label: { color: THEME.inkMuted, fontSize: 12 },
 });
