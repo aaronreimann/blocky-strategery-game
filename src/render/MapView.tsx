@@ -6,6 +6,7 @@ import {
   Path,
   Rect,
   Text as SkText,
+  useFont,
 } from '@shopify/react-native-skia';
 import { useEffect, useMemo } from 'react';
 import { useWindowDimensions } from 'react-native';
@@ -19,11 +20,27 @@ import Animated, {
 import type { ImprovementMap } from '@/src/data/improvements';
 import { RESOURCE } from '@/src/data/resources';
 import { TERRAIN } from '@/src/data/terrain';
+import { type UnitKind } from '@/src/data/units';
 import type { GameMap } from '@/src/game/map';
 import type { City, Player, Unit } from '@/src/game/types';
 
 import { decorateTile } from './decor';
 import MiniMap from './MiniMap';
+
+// Font Awesome 5 Free Solid glyphs (private-use Unicode points).
+const UNIT_GLYPH: Record<UnitKind, string> = {
+  pioneer:   '', // person-walking
+  laborer:   '', // hammer
+  footman:   '', // fist-raised
+  spearman:  '', // shield-alt
+  horseman:  '', // horse
+  swordsman: '', // skull-crossbones
+  catapult:  '', // fire
+};
+const CITY_CAPITAL_GLYPH = ''; // chess-rook
+const CITY_HOUSE_GLYPH = '';   // home
+
+const ICON_SIZE = 22;
 
 export const TILE_SIZE = 32;
 const MIN_SCALE = 0.35;
@@ -61,6 +78,13 @@ export default function MapView({
   onSetDestination,
 }: Props) {
   const { width: screenW, height: screenH } = useWindowDimensions();
+
+  // Font Awesome 5 Solid for unit + city icons. While loading we just skip
+  // rendering them (units appear a beat later on first launch).
+  const iconFont = useFont(
+    require('@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome5_Solid.ttf'),
+    ICON_SIZE,
+  );
 
   const mapPxW = map.width * TILE_SIZE;
   const mapPxH = map.height * TILE_SIZE;
@@ -471,171 +495,89 @@ export default function MapView({
   const dragOpacity = useDerivedValue(() => (isDraggingUnit.value ? 1 : 0));
 
   const cityLayer = useMemo(() => {
+    if (!iconFont) return [];
+    // First-founded city per player is treated as their capital.
+    const firstCityByPlayer = new Map<number, string>();
+    for (const c of cities) {
+      if (!firstCityByPlayer.has(c.ownerIdx)) {
+        firstCityByPlayer.set(c.ownerIdx, c.id);
+      }
+    }
     return cities.map((c) => {
       const owner = players[c.ownerIdx];
+      const color = owner?.color ?? '#ffffff';
+      const isCapital = firstCityByPlayer.get(c.ownerIdx) === c.id;
+      const glyph = isCapital ? CITY_CAPITAL_GLYPH : CITY_HOUSE_GLYPH;
+      const w = iconFont.measureText(glyph).width;
       const cx = c.x * TILE_SIZE + TILE_SIZE / 2;
       const cy = c.y * TILE_SIZE + TILE_SIZE / 2;
-      const r = TILE_SIZE * 0.42;
-      // Castle silhouette: base rectangle + 3 crenellations.
-      const base = `M ${cx - r} ${cy + r * 0.6}
-                    L ${cx - r} ${cy - r * 0.2}
-                    L ${cx - r * 0.55} ${cy - r * 0.2}
-                    L ${cx - r * 0.55} ${cy - r * 0.55}
-                    L ${cx - r * 0.18} ${cy - r * 0.55}
-                    L ${cx - r * 0.18} ${cy - r * 0.2}
-                    L ${cx + r * 0.18} ${cy - r * 0.2}
-                    L ${cx + r * 0.18} ${cy - r * 0.55}
-                    L ${cx + r * 0.55} ${cy - r * 0.55}
-                    L ${cx + r * 0.55} ${cy - r * 0.2}
-                    L ${cx + r} ${cy - r * 0.2}
-                    L ${cx + r} ${cy + r * 0.6} Z`;
+      const tx = cx - w / 2;
+      const ty = cy + ICON_SIZE * 0.35;
       return (
         <Group key={`city-${c.id}`}>
-          <Path path={base} color={owner?.color ?? '#ffffff'} />
-          <Path path={base} color="#000000" style="stroke" strokeWidth={1} />
+          <SkText
+            x={tx + 1}
+            y={ty + 1}
+            text={glyph}
+            font={iconFont}
+            color="rgba(0,0,0,0.7)"
+          />
+          <SkText x={tx} y={ty} text={glyph} font={iconFont} color={color} />
         </Group>
       );
     });
-  }, [cities, players]);
+  }, [cities, players, iconFont]);
 
   const unitLayer = useMemo(() => {
+    if (!iconFont) return [];
     const elements: React.ReactNode[] = [];
     for (const u of units) {
       const owner = players[u.ownerIdx];
       const color = owner?.color ?? '#ffffff';
+      const glyph = UNIT_GLYPH[u.kind];
+      if (!glyph) continue;
+      const w = iconFont.measureText(glyph).width;
       const cx = u.x * TILE_SIZE + TILE_SIZE / 2;
       const cy = u.y * TILE_SIZE + TILE_SIZE / 2;
-      const r = TILE_SIZE * 0.32;
-
-      if (u.kind === 'pioneer') {
-        const path = `M ${cx} ${cy - r} L ${cx + r} ${cy} L ${cx} ${cy + r} L ${cx - r} ${cy} Z`;
-        elements.push(<Path key={`u-${u.id}-f`} path={path} color={color} />);
-        elements.push(
-          <Path
-            key={`u-${u.id}-s`}
-            path={path}
-            color={u.stack.length > 1 ? '#facc15' : '#ffffff'}
-            style="stroke"
-            strokeWidth={u.stack.length > 1 ? 2.2 : 1.2}
-          />,
-        );
-      } else if (u.kind === 'laborer') {
-        elements.push(<Circle key={`u-${u.id}-f`} cx={cx} cy={cy} r={r} color={color} />);
+      const tx = cx - w / 2;
+      const ty = cy + ICON_SIZE * 0.35;
+      // Stacked armies get a subtle gold ring background to make them pop.
+      if (u.stack.length > 1) {
         elements.push(
           <Circle
-            key={`u-${u.id}-s`}
+            key={`u-${u.id}-ring`}
             cx={cx}
             cy={cy}
-            r={r}
-            color={u.stack.length > 1 ? '#facc15' : '#ffffff'}
+            r={ICON_SIZE * 0.55}
+            color="#facc15"
             style="stroke"
-            strokeWidth={u.stack.length > 1 ? 2.2 : 1.2}
-          />,
-        );
-      } else if (u.kind === 'horseman') {
-        // right-pointing triangle
-        const path = `M ${cx - r} ${cy - r} L ${cx + r} ${cy} L ${cx - r} ${cy + r} Z`;
-        elements.push(<Path key={`u-${u.id}-f`} path={path} color={color} />);
-        elements.push(
-          <Path
-            key={`u-${u.id}-s`}
-            path={path}
-            color={u.stack.length > 1 ? '#facc15' : '#ffffff'}
-            style="stroke"
-            strokeWidth={u.stack.length > 1 ? 2.2 : 1.2}
-          />,
-        );
-      } else if (u.kind === 'spearman') {
-        // square + spear (white triangle on top)
-        elements.push(
-          <Rect key={`u-${u.id}-f`} x={cx - r} y={cy - r * 0.7} width={r * 2} height={r * 1.7} color={color} />,
-        );
-        elements.push(
-          <Rect
-            key={`u-${u.id}-s`}
-            x={cx - r}
-            y={cy - r * 0.7}
-            width={r * 2}
-            height={r * 1.7}
-            color={u.stack.length > 1 ? '#facc15' : '#ffffff'}
-            style="stroke"
-            strokeWidth={u.stack.length > 1 ? 2.2 : 1.2}
-          />,
-        );
-        const spear = `M ${cx} ${cy - r * 1.4} L ${cx - r * 0.4} ${cy - r * 0.7} L ${cx + r * 0.4} ${cy - r * 0.7} Z`;
-        elements.push(<Path key={`u-${u.id}-sp`} path={spear} color="#ffffff" />);
-      } else if (u.kind === 'swordsman') {
-        // bigger square with white X
-        const sr = r * 1.1;
-        elements.push(
-          <Rect key={`u-${u.id}-f`} x={cx - sr} y={cy - sr} width={sr * 2} height={sr * 2} color={color} />,
-        );
-        elements.push(
-          <Rect
-            key={`u-${u.id}-s`}
-            x={cx - sr}
-            y={cy - sr}
-            width={sr * 2}
-            height={sr * 2}
-            color={u.stack.length > 1 ? '#facc15' : '#ffffff'}
-            style="stroke"
-            strokeWidth={u.stack.length > 1 ? 2.2 : 1.4}
-          />,
-        );
-        const x1 = `M ${cx - sr * 0.5} ${cy - sr * 0.5} L ${cx + sr * 0.5} ${cy + sr * 0.5}`;
-        const x2 = `M ${cx + sr * 0.5} ${cy - sr * 0.5} L ${cx - sr * 0.5} ${cy + sr * 0.5}`;
-        elements.push(<Path key={`u-${u.id}-x1`} path={x1} color="#ffffff" style="stroke" strokeWidth={1.4} />);
-        elements.push(<Path key={`u-${u.id}-x2`} path={x2} color="#ffffff" style="stroke" strokeWidth={1.4} />);
-      } else if (u.kind === 'catapult') {
-        // wide rectangle (wagon)
-        const w = r * 1.4;
-        const h = r * 0.8;
-        elements.push(
-          <Rect key={`u-${u.id}-f`} x={cx - w} y={cy - h} width={w * 2} height={h * 2} color={color} />,
-        );
-        elements.push(
-          <Rect
-            key={`u-${u.id}-s`}
-            x={cx - w}
-            y={cy - h}
-            width={w * 2}
-            height={h * 2}
-            color={u.stack.length > 1 ? '#facc15' : '#ffffff'}
-            style="stroke"
-            strokeWidth={u.stack.length > 1 ? 2.2 : 1.2}
-          />,
-        );
-        // little wheel dots
-        elements.push(<Circle key={`u-${u.id}-w1`} cx={cx - w * 0.6} cy={cy + h * 0.7} r={2} color="#ffffff" />);
-        elements.push(<Circle key={`u-${u.id}-w2`} cx={cx + w * 0.6} cy={cy + h * 0.7} r={2} color="#ffffff" />);
-      } else {
-        // footman — plain square
-        elements.push(
-          <Rect
-            key={`u-${u.id}-f`}
-            x={cx - r}
-            y={cy - r}
-            width={r * 2}
-            height={r * 2}
-            color={color}
-          />,
-        );
-        elements.push(
-          <Rect
-            key={`u-${u.id}-s`}
-            x={cx - r}
-            y={cy - r}
-            width={r * 2}
-            height={r * 2}
-            color={u.stack.length > 1 ? '#facc15' : '#ffffff'}
-            style="stroke"
-            strokeWidth={u.stack.length > 1 ? 2.2 : 1.2}
+            strokeWidth={2}
           />,
         );
       }
+      elements.push(
+        <SkText
+          key={`u-${u.id}-sh`}
+          x={tx + 1}
+          y={ty + 1}
+          text={glyph}
+          font={iconFont}
+          color="rgba(0,0,0,0.7)"
+        />,
+      );
+      elements.push(
+        <SkText
+          key={`u-${u.id}-fg`}
+          x={tx}
+          y={ty}
+          text={glyph}
+          font={iconFont}
+          color={color}
+        />,
+      );
     }
     return elements;
-  }, [units, players]);
+  }, [units, players, iconFont]);
 
   const selectionLayer = useMemo(() => {
     let coord: { x: number; y: number } | null = null;
