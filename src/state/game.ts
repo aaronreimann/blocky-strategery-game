@@ -534,9 +534,23 @@ export const useGame = create<GameState>((set, get) => ({
     if (!human) return;
     if (human.researched.includes(tech)) return;
     if (!prereqsMet(human.researched, tech)) return;
+
+    // If we already have enough science (from a previous build-up on a
+    // different tech), complete this one immediately. Loop in case the
+    // remaining science also covers a chained next tech the player might
+    // pick.
+    let science = human.science;
+    let researched = human.researched;
+    let researching: typeof tech | null = tech;
+    while (researching && science >= TECH[researching].cost) {
+      science -= TECH[researching].cost;
+      researched = [...researched, researching];
+      researching = null; // human picks next manually
+    }
+
     set({
       players: players.map((p) =>
-        p.isHuman ? { ...p, researching: tech } : p,
+        p.isHuman ? { ...p, science, researched, researching } : p,
       ),
     });
     autosave(get());
