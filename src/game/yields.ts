@@ -4,10 +4,11 @@ import type { GameMap, Tile } from './map';
 import type { City } from './types';
 
 export type CityYields = {
-  rawFood: number;     // total food gathered
-  food: number;        // surplus after feeding population
-  prod: number;        // production from worked tiles
-  workedTiles: Tile[]; // center + chosen outer tiles
+  rawFood: number;
+  food: number;
+  prod: number;
+  science: number;
+  workedTiles: Tile[];
 };
 
 const FOOD_PER_CITIZEN = 2;
@@ -31,7 +32,6 @@ export function computeCityYields(city: City, map: GameMap): CityYields {
       outer.push(map.tiles[y * map.width + x]);
     }
   }
-  // Greedy: pick the outer tiles with highest combined food+prod first.
   outer.sort((a, b) => {
     const av = TERRAIN[a.terrain].food + TERRAIN[a.terrain].prod;
     const bv = TERRAIN[b.terrain].food + TERRAIN[b.terrain].prod;
@@ -48,5 +48,11 @@ export function computeCityYields(city: City, map: GameMap): CityYields {
   }
 
   const food = rawFood - city.population * FOOD_PER_CITIZEN;
-  return { rawFood, food, prod, workedTiles: worked };
+
+  // Science: each citizen contributes 1 science. Library doubles the city's
+  // science output.
+  let science = city.population;
+  if (city.buildings.includes('library')) science *= 2;
+
+  return { rawFood, food, prod, science, workedTiles: worked };
 }

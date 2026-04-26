@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BUILDING, BUILDING_KINDS } from '@/src/data/buildings';
 import { IMPROVEMENT, tileKey } from '@/src/data/improvements';
+import { TECH } from '@/src/data/tech';
 import { UNIT, UNIT_KINDS } from '@/src/data/units';
 import { computeCityYields, foodNeededToGrow } from '@/src/game/yields';
 import {
@@ -13,8 +15,10 @@ import {
 import { useGame } from '@/src/state/game';
 
 import { THEME } from './palette';
+import TechScreen from './TechScreen';
 
 export default function Hud() {
+  const [techOpen, setTechOpen] = useState(false);
   const turn = useGame((s) => s.turn);
   const map = useGame((s) => s.map);
   const units = useGame((s) => s.units);
@@ -41,6 +45,10 @@ export default function Hud() {
   // Friendly = human player only for HUD context.
   const myUnitsCount = units.filter((u) => u.ownerIdx === 0).length;
   const myCitiesCount = cities.filter((c) => c.ownerIdx === 0).length;
+  const human = players.find((p) => p.isHuman) ?? null;
+  const researched = human?.researched ?? [];
+  const researching = human?.researching ?? null;
+  const science = human?.science ?? 0;
 
   return (
     <SafeAreaView style={styles.root} pointerEvents="box-none">
@@ -66,6 +74,18 @@ export default function Hud() {
             Cities {myCitiesCount} · Units {myUnitsCount}
           </Text>
         </View>
+        <Pressable
+          style={[styles.pill, !researching && styles.pillAlert]}
+          onPress={() => setTechOpen(true)}
+        >
+          <Text
+            style={[styles.pillText, !researching && styles.pillAlertText]}
+          >
+            {researching
+              ? `Sci ${science}/${TECH[researching].cost} · ${TECH[researching].name}`
+              : `Sci ${science} · Pick research`}
+          </Text>
+        </Pressable>
       </View>
 
       {lastBattle ? (
@@ -180,7 +200,9 @@ export default function Hud() {
                   })}
                 </View>
                 <View style={styles.buildRow}>
-                  {UNIT_KINDS.map((kind) => {
+                  {UNIT_KINDS.filter(
+                    (k) => UNIT[k].tech === null || researched.includes(UNIT[k].tech!),
+                  ).map((kind) => {
                     const target: CityBuildTarget = { kind: 'unit', unit: kind };
                     const cur = isCurrentTarget(target);
                     return (
@@ -208,7 +230,9 @@ export default function Hud() {
                       </Pressable>
                     );
                   })}
-                  {BUILDING_KINDS.map((kind) => {
+                  {BUILDING_KINDS.filter(
+                    (k) => BUILDING[k].tech === null || researched.includes(BUILDING[k].tech!),
+                  ).map((kind) => {
                     const target: CityBuildTarget = { kind: 'building', building: kind };
                     const cur = isCurrentTarget(target);
                     const owned = owns(kind);
@@ -261,6 +285,8 @@ export default function Hud() {
           <Text style={styles.endTurnText}>End Turn</Text>
         </Pressable>
       </View>
+
+      {techOpen ? <TechScreen onClose={() => setTechOpen(false)} /> : null}
     </SafeAreaView>
   );
 }
@@ -277,6 +303,8 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   pillText: { color: THEME.ink, fontSize: 12, fontWeight: '600' },
+  pillAlert: { borderColor: THEME.warn },
+  pillAlertText: { color: THEME.warn },
   toastWrap: {
     position: 'absolute',
     top: 56,

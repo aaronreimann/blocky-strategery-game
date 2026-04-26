@@ -1,5 +1,7 @@
 import type { City, GameOverState, Player, Unit } from './types';
 
+const HUMAN_PLAYER_IDX = 0;
+
 export const TURN_LIMIT = 60;
 const HUMAN_IDX = 0;
 
@@ -17,6 +19,18 @@ export function checkGameOver(state: Snapshot): GameOverState | null {
 
   if (!humanAlive) {
     return { kind: 'lose', reason: 'Your civilization has fallen.' };
+  }
+
+  // Tech victory: any player who researches Philosophy wins.
+  const philosopher = state.players.find((p) => p.researched.includes('philosophy'));
+  if (philosopher) {
+    if (philosopher.idx === HUMAN_PLAYER_IDX) {
+      return { kind: 'win', reason: 'You discover Philosophy and ascend.' };
+    }
+    return {
+      kind: 'lose',
+      reason: `${philosopher.name} (${philosopher.leader}) discovered Philosophy first.`,
+    };
   }
 
   const enemyPlayers = state.players.filter((p) => !p.isHuman);

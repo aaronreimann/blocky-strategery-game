@@ -1,5 +1,6 @@
 import type { BuildingKind } from '@/src/data/buildings';
 import type { ImprovementKind } from '@/src/data/improvements';
+import type { TechId } from '@/src/data/tech';
 import type { UnitKind } from '@/src/data/units';
 
 export const DIFFICULTIES = ['easy', 'normal', 'hard'] as const;
@@ -28,6 +29,9 @@ export type Player = {
   leader: string; // current leader (best-effort, from Wikidata cache or bundled fallback)
   color: string;
   isHuman: boolean;
+  researched: TechId[];
+  researching: TechId | null;
+  science: number;
 };
 
 export type Unit = {

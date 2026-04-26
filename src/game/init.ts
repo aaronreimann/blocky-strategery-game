@@ -136,6 +136,9 @@ export function buildInitialState(
     leader: leaders[c.qid] ?? c.fallbackLeader,
     color: PLAYER_PALETTE[idx % PLAYER_PALETTE.length],
     isHuman: idx === 0,
+    researched: [],
+    researching: null,
+    science: 0,
   }));
 
   const units: Unit[] = [];

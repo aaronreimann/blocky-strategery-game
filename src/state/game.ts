@@ -8,6 +8,7 @@ import {
   type ImprovementKind,
   type ImprovementMap,
 } from '@/src/data/improvements';
+import { pickCheapestAvailable, prereqsMet, TECH, type TechId } from '@/src/data/tech';
 import { TERRAIN } from '@/src/data/terrain';
 import { UNIT, type UnitKind } from '@/src/data/units';
 import { runAITurn } from '@/src/game/ai';
@@ -64,6 +65,7 @@ type GameState = {
   foundCity: () => void;
   setCityBuild: (cityId: string, target: CityBuildTarget) => void;
   setCityFocus: (cityId: string, focus: CityFocus) => void;
+  setResearch: (tech: TechId) => void;
   startWork: (kind: ImprovementKind) => void;
   cancelWork: () => void;
   endTurn: () => void;
@@ -160,6 +162,12 @@ export const useGame = create<GameState>((set, get) => ({
       workingOn: u.workingOn ?? null,
       workTurnsLeft: u.workTurnsLeft ?? 0,
     }));
+    const normalizedPlayers: Player[] = data.players.map((p) => ({
+      ...p,
+      researched: p.researched ?? [],
+      researching: p.researching ?? null,
+      science: p.science ?? 0,
+    }));
     // Forward-compat: older cities used a string `building` and a numeric
     // `productionPerTurn`. New schema uses a build target object and yields
     // come from worked tiles.
@@ -189,7 +197,7 @@ export const useGame = create<GameState>((set, get) => ({
     );
     set({
       map: data.map,
-      players: data.players,
+      players: normalizedPlayers,
       units: normalizedUnits,
       cities: normalizedCities,
       improvements: data.improvements ?? {},
@@ -414,6 +422,21 @@ export const useGame = create<GameState>((set, get) => ({
     autosave(get());
   },
 
+  setResearch: (tech) => {
+    const { players, gameOver } = get();
+    if (gameOver) return;
+    const human = players.find((p) => p.isHuman);
+    if (!human) return;
+    if (human.researched.includes(tech)) return;
+    if (!prereqsMet(human.researched, tech)) return;
+    set({
+      players: players.map((p) =>
+        p.isHuman ? { ...p, researching: tech } : p,
+      ),
+    });
+    autosave(get());
+  },
+
   startWork: (kind) => {
     const { units, selectedUnitId, improvements, gameOver } = get();
     if (gameOver) return;
@@ -575,8 +598,35 @@ export const useGame = create<GameState>((set, get) => ({
       });
     }
 
+    // Science: aggregate per-player science gain from each city's yields.
+    const scienceByPlayer = new Map<number, number>();
+    for (const c of workingCities) {
+      const y = computeCityYields(c, map);
+      scienceByPlayer.set(c.ownerIdx, (scienceByPlayer.get(c.ownerIdx) ?? 0) + y.science);
+    }
+
+    let workingPlayers: Player[] = players.map((p) => {
+      const gain = scienceByPlayer.get(p.idx) ?? 0;
+      let science = p.science + gain;
+      let researching = p.researching;
+      let researched = p.researched;
+      // Complete research if we have enough.
+      while (researching && science >= TECH[researching].cost) {
+        science -= TECH[researching].cost;
+        researched = [...researched, researching];
+        researching = null;
+        // For non-human players, immediately pick next.
+        if (!p.isHuman) researching = pickCheapestAvailable(researched);
+      }
+      // Non-human players never sit idle.
+      if (!p.isHuman && !researching) {
+        researching = pickCheapestAvailable(researched);
+      }
+      return { ...p, science, researching, researched };
+    });
+
     let lastAIBattle: Battle | null = null;
-    for (const player of players) {
+    for (const player of workingPlayers) {
       if (player.isHuman) continue;
       const result = runAITurn({
         ownerIdx: player.idx,
@@ -595,7 +645,7 @@ export const useGame = create<GameState>((set, get) => ({
     const finished = checkGameOver({
       units: workingUnits,
       cities: workingCities,
-      players,
+      players: workingPlayers,
       turn: newTurn,
     });
 
@@ -603,6 +653,7 @@ export const useGame = create<GameState>((set, get) => ({
       turn: newTurn,
       selectedUnitId: null,
       selectedCityId: null,
+      players: workingPlayers,
       units: workingUnits,
       cities: workingCities,
       improvements: workingImprovements,

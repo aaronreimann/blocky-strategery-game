@@ -298,7 +298,97 @@ export default function MapView({
             strokeWidth={1.2}
           />,
         );
-      } else if (u.kind === 'footman') {
+      } else if (u.kind === 'laborer') {
+        elements.push(<Circle key={`u-${u.id}-f`} cx={cx} cy={cy} r={r} color={color} />);
+        elements.push(
+          <Circle
+            key={`u-${u.id}-s`}
+            cx={cx}
+            cy={cy}
+            r={r}
+            color="#ffffff"
+            style="stroke"
+            strokeWidth={1.2}
+          />,
+        );
+      } else if (u.kind === 'horseman') {
+        // right-pointing triangle
+        const path = `M ${cx - r} ${cy - r} L ${cx + r} ${cy} L ${cx - r} ${cy + r} Z`;
+        elements.push(<Path key={`u-${u.id}-f`} path={path} color={color} />);
+        elements.push(
+          <Path
+            key={`u-${u.id}-s`}
+            path={path}
+            color="#ffffff"
+            style="stroke"
+            strokeWidth={1.2}
+          />,
+        );
+      } else if (u.kind === 'spearman') {
+        // square + spear (white triangle on top)
+        elements.push(
+          <Rect key={`u-${u.id}-f`} x={cx - r} y={cy - r * 0.7} width={r * 2} height={r * 1.7} color={color} />,
+        );
+        elements.push(
+          <Rect
+            key={`u-${u.id}-s`}
+            x={cx - r}
+            y={cy - r * 0.7}
+            width={r * 2}
+            height={r * 1.7}
+            color="#ffffff"
+            style="stroke"
+            strokeWidth={1.2}
+          />,
+        );
+        const spear = `M ${cx} ${cy - r * 1.4} L ${cx - r * 0.4} ${cy - r * 0.7} L ${cx + r * 0.4} ${cy - r * 0.7} Z`;
+        elements.push(<Path key={`u-${u.id}-sp`} path={spear} color="#ffffff" />);
+      } else if (u.kind === 'swordsman') {
+        // bigger square with white X
+        const sr = r * 1.1;
+        elements.push(
+          <Rect key={`u-${u.id}-f`} x={cx - sr} y={cy - sr} width={sr * 2} height={sr * 2} color={color} />,
+        );
+        elements.push(
+          <Rect
+            key={`u-${u.id}-s`}
+            x={cx - sr}
+            y={cy - sr}
+            width={sr * 2}
+            height={sr * 2}
+            color="#ffffff"
+            style="stroke"
+            strokeWidth={1.4}
+          />,
+        );
+        const x1 = `M ${cx - sr * 0.5} ${cy - sr * 0.5} L ${cx + sr * 0.5} ${cy + sr * 0.5}`;
+        const x2 = `M ${cx + sr * 0.5} ${cy - sr * 0.5} L ${cx - sr * 0.5} ${cy + sr * 0.5}`;
+        elements.push(<Path key={`u-${u.id}-x1`} path={x1} color="#ffffff" style="stroke" strokeWidth={1.4} />);
+        elements.push(<Path key={`u-${u.id}-x2`} path={x2} color="#ffffff" style="stroke" strokeWidth={1.4} />);
+      } else if (u.kind === 'catapult') {
+        // wide rectangle (wagon)
+        const w = r * 1.4;
+        const h = r * 0.8;
+        elements.push(
+          <Rect key={`u-${u.id}-f`} x={cx - w} y={cy - h} width={w * 2} height={h * 2} color={color} />,
+        );
+        elements.push(
+          <Rect
+            key={`u-${u.id}-s`}
+            x={cx - w}
+            y={cy - h}
+            width={w * 2}
+            height={h * 2}
+            color="#ffffff"
+            style="stroke"
+            strokeWidth={1.2}
+          />,
+        );
+        // little wheel dots
+        elements.push(<Circle key={`u-${u.id}-w1`} cx={cx - w * 0.6} cy={cy + h * 0.7} r={2} color="#ffffff" />);
+        elements.push(<Circle key={`u-${u.id}-w2`} cx={cx + w * 0.6} cy={cy + h * 0.7} r={2} color="#ffffff" />);
+      } else {
+        // footman — plain square
         elements.push(
           <Rect
             key={`u-${u.id}-f`}
@@ -316,20 +406,6 @@ export default function MapView({
             y={cy - r}
             width={r * 2}
             height={r * 2}
-            color="#ffffff"
-            style="stroke"
-            strokeWidth={1.2}
-          />,
-        );
-      } else {
-        // laborer — circle
-        elements.push(<Circle key={`u-${u.id}-f`} cx={cx} cy={cy} r={r} color={color} />);
-        elements.push(
-          <Circle
-            key={`u-${u.id}-s`}
-            cx={cx}
-            cy={cy}
-            r={r}
             color="#ffffff"
             style="stroke"
             strokeWidth={1.2}
