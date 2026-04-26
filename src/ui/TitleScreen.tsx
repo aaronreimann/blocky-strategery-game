@@ -42,7 +42,7 @@ export default function TitleScreen() {
   return (
     <SafeAreaView style={styles.root}>
       <View style={styles.header}>
-        <Text style={styles.title}>Civ-App</Text>
+        <Text style={styles.title}>Blocky Strategery</Text>
         <Text style={styles.subtitle}>Pick a realm</Text>
       </View>
 
