@@ -24,6 +24,8 @@ import { type UnitKind } from '@/src/data/units';
 import type { GameMap } from '@/src/game/map';
 import type { City, Player, Unit } from '@/src/game/types';
 
+import { pathToTile } from '@/src/game/path';
+
 import { decorateTile } from './decor';
 import MiniMap from './MiniMap';
 
@@ -479,6 +481,62 @@ export default function MapView({
     return out;
   }, [selectedUnitId, units, moveTiles, attackTiles]);
 
+  // Planned-path overlay for the selected unit's destination. Shows the
+  // BFS-computed route the unit will take over the coming turns.
+  const destinationPathLayer = useMemo(() => {
+    if (!selectedUnitId) return null;
+    const sel = units.find((u) => u.id === selectedUnitId);
+    if (!sel || !sel.destination) return null;
+    const blocked = new Set<string>();
+    for (const o of units) {
+      if (o.id !== sel.id) blocked.add(`${o.x},${o.y}`);
+    }
+    for (const c of cities) {
+      if (c.ownerIdx !== sel.ownerIdx) blocked.add(`${c.x},${c.y}`);
+    }
+    const path = pathToTile(
+      { x: sel.x, y: sel.y },
+      sel.destination,
+      blocked,
+      map,
+    );
+    if (!path || path.length < 2) return null;
+    const d = path
+      .map((p, i) => {
+        const cx = p.x * TILE_SIZE + TILE_SIZE / 2;
+        const cy = p.y * TILE_SIZE + TILE_SIZE / 2;
+        return `${i === 0 ? 'M' : 'L'} ${cx} ${cy}`;
+      })
+      .join(' ');
+    return [
+      <Path
+        key="dest-path-shadow"
+        path={d}
+        color="#0a1729"
+        style="stroke"
+        strokeWidth={4}
+        opacity={0.6}
+      />,
+      <Path
+        key="dest-path"
+        path={d}
+        color="#facc15"
+        style="stroke"
+        strokeWidth={2}
+        opacity={0.95}
+      />,
+      ...path.slice(1).map((p, i) => (
+        <Circle
+          key={`dest-dot-${i}`}
+          cx={p.x * TILE_SIZE + TILE_SIZE / 2}
+          cy={p.y * TILE_SIZE + TILE_SIZE / 2}
+          r={2.5}
+          color="#facc15"
+        />
+      )),
+    ];
+  }, [selectedUnitId, units, cities, map]);
+
   // Destination markers (yellow ring on each unit's destination tile).
   const destLayer = useMemo(() => {
     return units
@@ -633,6 +691,7 @@ export default function MapView({
             {resourceLayer}
             {highlightLayer}
             {arrowLayer}
+            {destinationPathLayer}
             {destLayer}
             {cityLayer}
             {unitLayer}

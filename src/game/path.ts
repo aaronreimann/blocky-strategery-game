@@ -3,6 +3,52 @@ import { TERRAIN } from '@/src/data/terrain';
 import type { GameMap } from './map';
 import type { City, Unit } from './types';
 
+// BFS from `start` to a specific `target`. Returns the full path (inclusive
+// of both start and target) or null if unreachable. `blocked` tiles are
+// walls except for the target tile itself.
+export function pathToTile(
+  start: { x: number; y: number },
+  target: { x: number; y: number },
+  blocked: Set<string>,
+  map: GameMap,
+): { x: number; y: number }[] | null {
+  if (start.x === target.x && start.y === target.y) {
+    return [{ x: start.x, y: start.y }];
+  }
+  const targetKey = `${target.x},${target.y}`;
+  type Node = { x: number; y: number; prev: Node | null };
+  const queue: Node[] = [{ x: start.x, y: start.y, prev: null }];
+  const visited = new Set<string>([`${start.x},${start.y}`]);
+  while (queue.length > 0) {
+    const node = queue.shift()!;
+    if (node.x === target.x && node.y === target.y) {
+      const out: { x: number; y: number }[] = [];
+      let cur: Node | null = node;
+      while (cur) {
+        out.unshift({ x: cur.x, y: cur.y });
+        cur = cur.prev;
+      }
+      return out;
+    }
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (dx === 0 && dy === 0) continue;
+        const nx = node.x + dx;
+        const ny = node.y + dy;
+        if (nx < 0 || ny < 0 || nx >= map.width || ny >= map.height) continue;
+        const k = `${nx},${ny}`;
+        if (visited.has(k)) continue;
+        const tile = map.tiles[ny * map.width + nx];
+        if (!TERRAIN[tile.terrain].passable) continue;
+        if (blocked.has(k) && k !== targetKey) continue;
+        visited.add(k);
+        queue.push({ x: nx, y: ny, prev: node });
+      }
+    }
+  }
+  return null;
+}
+
 // BFS from `start` to the nearest tile in `targets`. Returns the first step.
 // Tiles in `blocked` are treated as walls unless they are targets themselves
 // (so a unit can step *onto* its target, but not through other obstacles).
