@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import type { GameMap } from '@/src/game/map';
-import type { City, GameOverState, Player, Unit } from '@/src/game/types';
+import type { City, Difficulty, GameOverState, Player, Unit } from '@/src/game/types';
 
 export const SLOT_COUNT = 3;
 const SAVE_VERSION = 2;
@@ -13,6 +13,7 @@ export type SaveData = {
   version: number;
   seed: number;
   turn: number;
+  difficulty: Difficulty;
   map: GameMap;
   players: Player[];
   units: Unit[];
@@ -29,6 +30,7 @@ export type SlotInfo =
       turn: number;
       cityCount: number;
       unitCount: number;
+      difficulty: Difficulty;
       savedAt: string;
     };
 
@@ -45,9 +47,13 @@ export async function loadSlot(slot: number): Promise<SaveData | null> {
   const raw = await AsyncStorage.getItem(slotKey(slot));
   if (!raw) return null;
   try {
-    const parsed = JSON.parse(raw) as SaveData;
+    const parsed = JSON.parse(raw) as Partial<SaveData> & { version: number };
     if (parsed.version !== SAVE_VERSION) return null;
-    return parsed;
+    // Forward-compat default for saves written before difficulty existed.
+    return {
+      ...(parsed as SaveData),
+      difficulty: parsed.difficulty ?? 'normal',
+    };
   } catch {
     return null;
   }
@@ -70,6 +76,7 @@ export async function listSlots(): Promise<SlotInfo[]> {
         turn: data.turn,
         cityCount: data.cities.length,
         unitCount: data.units.length,
+        difficulty: data.difficulty,
         savedAt: data.savedAt,
       });
     }

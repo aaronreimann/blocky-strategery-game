@@ -8,7 +8,7 @@ import { checkGameOver } from '@/src/game/gameOver';
 import { nextCityId, nextUnitId, parseIdNum, syncIdCounters } from '@/src/game/ids';
 import { buildInitialState } from '@/src/game/init';
 import { chebyshev, type GameMap } from '@/src/game/map';
-import type { City, GameOverState, Player, Unit } from '@/src/game/types';
+import type { City, Difficulty, GameOverState, Player, Unit } from '@/src/game/types';
 
 import { loadSlot, saveSlot } from './saves';
 
@@ -23,13 +23,14 @@ type GameState = {
   cities: City[];
   turn: number;
   seed: number;
+  difficulty: Difficulty;
   currentSlot: number | null;
   selectedUnitId: string | null;
   selectedCityId: string | null;
   lastBattle: Battle | null;
   gameOver: GameOverState | null;
 
-  newGame: (slot: number, seed: number) => void;
+  newGame: (slot: number, seed: number, difficulty: Difficulty) => void;
   loadFromSlot: (slot: number) => Promise<boolean>;
   exitToTitle: () => void;
 
@@ -74,6 +75,7 @@ function autosave(state: GameState): void {
   saveSlot(state.currentSlot, {
     seed: state.seed,
     turn: state.turn,
+    difficulty: state.difficulty,
     map: state.map,
     players: state.players,
     units: state.units,
@@ -89,14 +91,15 @@ export const useGame = create<GameState>((set, get) => ({
   cities: [],
   turn: 1,
   seed: 0,
+  difficulty: 'normal',
   currentSlot: null,
   selectedUnitId: null,
   selectedCityId: null,
   lastBattle: null,
   gameOver: null,
 
-  newGame: (slot, seed) => {
-    const initial = buildInitialState(seed);
+  newGame: (slot, seed, difficulty) => {
+    const initial = buildInitialState(seed, difficulty);
     syncIdCounters(
       Math.max(0, ...initial.units.map((u) => parseIdNum(u.id))),
       Math.max(0, ...initial.cities.map((c) => parseIdNum(c.id))),
@@ -108,6 +111,7 @@ export const useGame = create<GameState>((set, get) => ({
       cities: initial.cities,
       turn: 1,
       seed,
+      difficulty,
       currentSlot: slot,
       selectedUnitId: null,
       selectedCityId: null,
@@ -131,6 +135,7 @@ export const useGame = create<GameState>((set, get) => ({
       cities: data.cities,
       turn: data.turn,
       seed: data.seed,
+      difficulty: data.difficulty,
       currentSlot: slot,
       selectedUnitId: null,
       selectedCityId: null,
@@ -148,6 +153,7 @@ export const useGame = create<GameState>((set, get) => ({
       cities: [],
       turn: 1,
       seed: 0,
+      difficulty: 'normal',
       currentSlot: null,
       selectedUnitId: null,
       selectedCityId: null,

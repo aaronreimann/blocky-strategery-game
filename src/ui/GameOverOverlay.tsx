@@ -22,9 +22,10 @@ export default function GameOverOverlay() {
     : gameOver.kind === 'lose' ? THEME.bad
     : THEME.warn;
 
+  const difficulty = useGame((s) => s.difficulty);
   const onPlayAgain = () => {
     if (currentSlot !== null) {
-      newGame(currentSlot, Date.now() & 0x7fffffff);
+      newGame(currentSlot, Date.now() & 0x7fffffff, difficulty);
     }
   };
 

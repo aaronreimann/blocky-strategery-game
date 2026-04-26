@@ -2,6 +2,12 @@ import { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import {
+  DIFFICULTIES,
+  DIFFICULTY_AI_COUNT,
+  DIFFICULTY_LABELS,
+  type Difficulty,
+} from '@/src/game/types';
 import { useGame } from '@/src/state/game';
 import { deleteSlot, listSlots, type SlotInfo } from '@/src/state/saves';
 
@@ -12,6 +18,7 @@ export default function TitleScreen() {
   const loadFromSlot = useGame((s) => s.loadFromSlot);
 
   const [slots, setSlots] = useState<SlotInfo[]>([]);
+  const [pendingSlot, setPendingSlot] = useState<number | null>(null);
 
   const refresh = useCallback(async () => {
     const list = await listSlots();
@@ -24,14 +31,18 @@ export default function TitleScreen() {
 
   const onSlotPress = async (slot: number, info: SlotInfo) => {
     if (info.empty) {
-      newGame(slot, Date.now() & 0x7fffffff);
+      setPendingSlot(slot);
     } else {
       const ok = await loadFromSlot(slot);
-      if (!ok) {
-        // Save was corrupt — start fresh in that slot.
-        newGame(slot, Date.now() & 0x7fffffff);
-      }
+      if (!ok) setPendingSlot(slot);
     }
+  };
+
+  const onPickDifficulty = (difficulty: Difficulty) => {
+    if (pendingSlot !== null) {
+      newGame(pendingSlot, Date.now() & 0x7fffffff, difficulty);
+    }
+    setPendingSlot(null);
   };
 
   const onDelete = async (slot: number) => {
@@ -58,7 +69,9 @@ export default function TitleScreen() {
                 </>
               ) : (
                 <>
-                  <Text style={styles.slotMeta}>Turn {info.turn}</Text>
+                  <Text style={styles.slotMeta}>
+                    {DIFFICULTY_LABELS[info.difficulty]} · Turn {info.turn}
+                  </Text>
                   <Text style={styles.slotMeta}>
                     {info.cityCount} {info.cityCount === 1 ? 'city' : 'cities'} ·{' '}
                     {info.unitCount} units
@@ -75,6 +88,30 @@ export default function TitleScreen() {
           </View>
         ))}
       </View>
+
+      {pendingSlot !== null && (
+        <View style={styles.modalBg}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Pick a difficulty</Text>
+            <Text style={styles.modalSub}>Realm {pendingSlot + 1}</Text>
+            <View style={styles.modalRow}>
+              {DIFFICULTIES.map((d) => (
+                <Pressable
+                  key={d}
+                  style={styles.diffBtn}
+                  onPress={() => onPickDifficulty(d)}
+                >
+                  <Text style={styles.diffBtnLabel}>{DIFFICULTY_LABELS[d]}</Text>
+                  <Text style={styles.diffBtnCount}>{DIFFICULTY_AI_COUNT[d]} enemies</Text>
+                </Pressable>
+              ))}
+            </View>
+            <Pressable style={styles.modalCancel} onPress={() => setPendingSlot(null)}>
+              <Text style={styles.modalCancelText}>Cancel</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -87,21 +124,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 24,
   },
-  header: {
-    alignItems: 'center',
-    marginBottom: 32,
-  },
-  title: {
-    color: THEME.ink,
-    fontSize: 44,
-    fontWeight: '900',
-    letterSpacing: 2,
-  },
-  subtitle: {
-    color: THEME.inkMuted,
-    fontSize: 14,
-    marginTop: 6,
-  },
+  header: { alignItems: 'center', marginBottom: 32 },
+  title: { color: THEME.ink, fontSize: 44, fontWeight: '900', letterSpacing: 2 },
+  subtitle: { color: THEME.inkMuted, fontSize: 14, marginTop: 6 },
   slotRow: {
     flexDirection: 'row',
     gap: 16,
@@ -109,12 +134,7 @@ const styles = StyleSheet.create({
     maxWidth: 720,
     justifyContent: 'center',
   },
-  slotWrap: {
-    flex: 1,
-    maxWidth: 220,
-    alignItems: 'center',
-    gap: 8,
-  },
+  slotWrap: { flex: 1, maxWidth: 220, alignItems: 'center', gap: 8 },
   slotCard: {
     backgroundColor: THEME.bgElevated,
     borderColor: THEME.border,
@@ -132,22 +152,9 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     marginBottom: 8,
   },
-  slotEmpty: {
-    color: THEME.ink,
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  slotMeta: {
-    color: THEME.ink,
-    fontSize: 14,
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  slotHint: {
-    color: THEME.inkMuted,
-    fontSize: 11,
-    marginTop: 8,
-  },
+  slotEmpty: { color: THEME.ink, fontSize: 18, fontWeight: '700' },
+  slotMeta: { color: THEME.ink, fontSize: 14, fontWeight: '600', marginTop: 2 },
+  slotHint: { color: THEME.inkMuted, fontSize: 11, marginTop: 8 },
   deleteBtn: {
     paddingHorizontal: 12,
     paddingVertical: 6,
@@ -155,9 +162,40 @@ const styles = StyleSheet.create({
     borderColor: THEME.border,
     borderWidth: 1,
   },
-  deleteBtnText: {
-    color: THEME.bad,
-    fontSize: 11,
-    fontWeight: '700',
+  deleteBtnText: { color: THEME.bad, fontSize: 11, fontWeight: '700' },
+
+  modalBg: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(10, 23, 41, 0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
   },
+  modalCard: {
+    backgroundColor: THEME.bgElevated,
+    borderColor: THEME.border,
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 24,
+    minWidth: 360,
+    alignItems: 'center',
+  },
+  modalTitle: { color: THEME.ink, fontSize: 22, fontWeight: '800' },
+  modalSub: { color: THEME.inkMuted, fontSize: 12, marginTop: 4, marginBottom: 18 },
+  modalRow: { flexDirection: 'row', gap: 10 },
+  diffBtn: {
+    backgroundColor: THEME.bg,
+    borderColor: THEME.warn,
+    borderWidth: 1,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    alignItems: 'center',
+    minWidth: 110,
+  },
+  diffBtnLabel: { color: THEME.ink, fontSize: 16, fontWeight: '800' },
+  diffBtnCount: { color: THEME.inkMuted, fontSize: 11, marginTop: 4 },
+  modalCancel: { marginTop: 16, paddingVertical: 8, paddingHorizontal: 16 },
+  modalCancelText: { color: THEME.inkMuted, fontSize: 13, fontWeight: '600' },
 });

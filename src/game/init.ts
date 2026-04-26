@@ -5,7 +5,13 @@ import { PLAYER_PALETTE } from '@/src/ui/palette';
 import { nextUnitId } from './ids';
 import { generateMap } from './mapgen';
 import { chebyshev, type GameMap } from './map';
-import type { City, Player, Unit } from './types';
+import {
+  DIFFICULTY_AI_COUNT,
+  type City,
+  type Difficulty,
+  type Player,
+  type Unit,
+} from './types';
 
 export type InitialState = {
   map: GameMap;
@@ -15,53 +21,71 @@ export type InitialState = {
 };
 
 const PREFERRED_TERRAIN = new Set(['grassland', 'plains']);
-const MIN_PLAYER_DISTANCE = 12;
 
-function findStartTile(
-  map: GameMap,
-  excludeNear: { x: number; y: number; minDist: number } | null = null,
-): { x: number; y: number } {
-  const cx = map.width / 2;
-  const cy = map.height / 2;
-
-  const candidates = map.tiles.filter((t) => {
-    if (!TERRAIN[t.terrain].passable) return false;
-    if (!PREFERRED_TERRAIN.has(t.terrain)) return false;
-    if (excludeNear && chebyshev(t.x, t.y, excludeNear.x, excludeNear.y) < excludeNear.minDist) {
-      return false;
-    }
-    return true;
-  });
-
-  if (candidates.length === 0) {
-    const anyLand = map.tiles.find(
-      (t) =>
-        TERRAIN[t.terrain].passable &&
-        (!excludeNear ||
-          chebyshev(t.x, t.y, excludeNear.x, excludeNear.y) >= excludeNear.minDist),
-    );
-    return anyLand ? { x: anyLand.x, y: anyLand.y } : { x: 0, y: 0 };
-  }
-
-  if (excludeNear) {
-    candidates.sort(
-      (a, b) =>
-        chebyshev(b.x, b.y, excludeNear.x, excludeNear.y) -
-        chebyshev(a.x, a.y, excludeNear.x, excludeNear.y),
-    );
-  } else {
-    candidates.sort(
-      (a, b) => Math.hypot(a.x - cx, a.y - cy) - Math.hypot(b.x - cx, b.y - cy),
-    );
-  }
-  return { x: candidates[0].x, y: candidates[0].y };
-}
+const AI_NAMES = ['Mongols', 'Romans', 'Greeks', 'Norse', 'Persians', 'Aztecs', 'Egyptians'];
 
 function clamp(v: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, v));
 }
 
-function spawnStartingUnits(ownerIdx: number, start: { x: number; y: number }, map: GameMap): Unit[] {
+function minDistanceForPlayerCount(count: number): number {
+  if (count <= 2) return 14;
+  if (count <= 4) return 10;
+  if (count <= 6) return 8;
+  return 6;
+}
+
+function pickSpawnPoints(map: GameMap, count: number): { x: number; y: number }[] {
+  const minDist = minDistanceForPlayerCount(count);
+  const preferred = map.tiles.filter(
+    (t) => TERRAIN[t.terrain].passable && PREFERRED_TERRAIN.has(t.terrain),
+  );
+  const fallback = map.tiles.filter((t) => TERRAIN[t.terrain].passable);
+  const pool = preferred.length > 0 ? preferred : fallback;
+  if (pool.length === 0) return [{ x: 0, y: 0 }];
+
+  const cx = map.width / 2;
+  const cy = map.height / 2;
+
+  const sortedByCenter = [...pool].sort(
+    (a, b) => Math.hypot(a.x - cx, a.y - cy) - Math.hypot(b.x - cx, b.y - cy),
+  );
+
+  const spawns: { x: number; y: number }[] = [{ x: sortedByCenter[0].x, y: sortedByCenter[0].y }];
+
+  for (let n = 1; n < count; n++) {
+    let best: { x: number; y: number } | null = null;
+    let bestScore = -1;
+    let bestRespectingMinDist: { x: number; y: number } | null = null;
+    let bestRespectingScore = -1;
+
+    for (const t of pool) {
+      let minD = Number.POSITIVE_INFINITY;
+      for (const s of spawns) {
+        const d = chebyshev(t.x, t.y, s.x, s.y);
+        if (d < minD) minD = d;
+      }
+      if (minD > bestScore) {
+        bestScore = minD;
+        best = { x: t.x, y: t.y };
+      }
+      if (minD >= minDist && minD > bestRespectingScore) {
+        bestRespectingScore = minD;
+        bestRespectingMinDist = { x: t.x, y: t.y };
+      }
+    }
+
+    spawns.push(bestRespectingMinDist ?? best ?? spawns[0]);
+  }
+
+  return spawns;
+}
+
+function spawnStartingUnits(
+  ownerIdx: number,
+  start: { x: number; y: number },
+  map: GameMap,
+): Unit[] {
   return [
     {
       id: nextUnitId(),
@@ -90,38 +114,28 @@ function spawnStartingUnits(ownerIdx: number, start: { x: number; y: number }, m
   ];
 }
 
-export function buildInitialState(seed: number): InitialState {
+export function buildInitialState(seed: number, difficulty: Difficulty): InitialState {
   const map = generateMap(seed);
+  const aiCount = DIFFICULTY_AI_COUNT[difficulty];
+  const totalPlayers = 1 + aiCount;
+  const spawns = pickSpawnPoints(map, totalPlayers);
 
-  const humanStart = findStartTile(map);
-  const aiStart = findStartTile(map, {
-    x: humanStart.x,
-    y: humanStart.y,
-    minDist: MIN_PLAYER_DISTANCE,
-  });
-
-  const human: Player = {
-    idx: 0,
-    name: 'You',
-    color: PLAYER_PALETTE[0],
-    isHuman: true,
-  };
-  const ai: Player = {
-    idx: 1,
-    name: 'Mongols',
-    color: PLAYER_PALETTE[1],
-    isHuman: false,
-  };
-
-  const units: Unit[] = [
-    ...spawnStartingUnits(0, humanStart, map),
-    ...spawnStartingUnits(1, aiStart, map),
+  const players: Player[] = [
+    { idx: 0, name: 'You', color: PLAYER_PALETTE[0], isHuman: true },
   ];
+  const units: Unit[] = [...spawnStartingUnits(0, spawns[0], map)];
 
-  return {
-    map,
-    players: [human, ai],
-    units,
-    cities: [],
-  };
+  for (let i = 0; i < aiCount; i++) {
+    const idx = i + 1;
+    players.push({
+      idx,
+      name: AI_NAMES[i % AI_NAMES.length],
+      color: PLAYER_PALETTE[idx % PLAYER_PALETTE.length],
+      isHuman: false,
+    });
+    const start = spawns[idx] ?? spawns[0];
+    units.push(...spawnStartingUnits(idx, start, map));
+  }
+
+  return { map, players, units, cities: [] };
 }
