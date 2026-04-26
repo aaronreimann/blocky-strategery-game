@@ -1,5 +1,5 @@
 import { Canvas, Circle, Group, Rect } from '@shopify/react-native-skia';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useDerivedValue, useSharedValue } from 'react-native-reanimated';
@@ -8,9 +8,11 @@ import { RESOURCE } from '@/src/data/resources';
 import { TERRAIN } from '@/src/data/terrain';
 import type { GameMap } from '@/src/game/map';
 
+import { decorateTile } from './decor';
+
 export const TILE_SIZE = 32;
-const MIN_SCALE = 0.4;
-const MAX_SCALE = 4;
+const MIN_SCALE = 0.35;
+const MAX_SCALE = 5;
 
 type Props = { map: GameMap };
 
@@ -20,7 +22,6 @@ export default function MapView({ map }: Props) {
   const mapPxW = map.width * TILE_SIZE;
   const mapPxH = map.height * TILE_SIZE;
 
-  // Default scale: fit the map width into the screen with a little margin.
   const fitScale = Math.min(screenW / mapPxW, screenH / mapPxH) * 0.95;
 
   const tx = useSharedValue(0);
@@ -31,12 +32,10 @@ export default function MapView({ map }: Props) {
   const startTy = useSharedValue(0);
   const startScale = useSharedValue(1);
 
-  // Initialize camera to center the map at fit-scale.
   useEffect(() => {
     scale.value = fitScale;
     tx.value = (screenW - mapPxW * fitScale) / 2;
     ty.value = (screenH - mapPxH * fitScale) / 2;
-    // We intentionally only run this on mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -58,13 +57,9 @@ export default function MapView({ map }: Props) {
     })
     .onUpdate((e) => {
       const next = Math.min(Math.max(startScale.value * e.scale, MIN_SCALE), MAX_SCALE);
-      // Zoom around the gesture focal point so the world point under the
-      // fingers stays put.
-      const focalX = e.focalX;
-      const focalY = e.focalY;
       const ratio = next / startScale.value;
-      tx.value = focalX - (focalX - startTx.value) * ratio;
-      ty.value = focalY - (focalY - startTy.value) * ratio;
+      tx.value = e.focalX - (e.focalX - startTx.value) * ratio;
+      ty.value = e.focalY - (e.focalY - startTy.value) * ratio;
       scale.value = next;
     });
 
@@ -76,32 +71,52 @@ export default function MapView({ map }: Props) {
     { scale: scale.value },
   ]);
 
+  // Memoize each render layer — map data doesn't change after gen, and the
+  // camera transform animates on the Group above, so children stay stable.
+  const baseLayer = useMemo(
+    () =>
+      map.tiles.map((tile) => (
+        <Rect
+          key={`b-${tile.x}-${tile.y}`}
+          x={tile.x * TILE_SIZE}
+          y={tile.y * TILE_SIZE}
+          width={TILE_SIZE}
+          height={TILE_SIZE}
+          color={TERRAIN[tile.terrain].color}
+        />
+      )),
+    [map],
+  );
+
+  const decorLayer = useMemo(
+    () => map.tiles.flatMap((tile) => decorateTile(tile, TILE_SIZE)),
+    [map],
+  );
+
+  const resourceLayer = useMemo(
+    () =>
+      map.tiles
+        .filter((t) => t.resource)
+        .map((tile) => (
+          <Circle
+            key={`r-${tile.x}-${tile.y}`}
+            cx={tile.x * TILE_SIZE + TILE_SIZE / 2}
+            cy={tile.y * TILE_SIZE + TILE_SIZE / 2}
+            r={TILE_SIZE * 0.16}
+            color={RESOURCE[tile.resource!].color}
+          />
+        )),
+    [map],
+  );
+
   return (
     <GestureDetector gesture={gesture}>
       <Animated.View style={{ flex: 1 }}>
         <Canvas style={{ flex: 1 }}>
           <Group transform={transform}>
-            {map.tiles.map((tile) => (
-              <Rect
-                key={`t-${tile.x}-${tile.y}`}
-                x={tile.x * TILE_SIZE}
-                y={tile.y * TILE_SIZE}
-                width={TILE_SIZE}
-                height={TILE_SIZE}
-                color={TERRAIN[tile.terrain].color}
-              />
-            ))}
-            {map.tiles.map((tile) =>
-              tile.resource ? (
-                <Circle
-                  key={`r-${tile.x}-${tile.y}`}
-                  cx={tile.x * TILE_SIZE + TILE_SIZE / 2}
-                  cy={tile.y * TILE_SIZE + TILE_SIZE / 2}
-                  r={TILE_SIZE * 0.18}
-                  color={RESOURCE[tile.resource].color}
-                />
-              ) : null,
-            )}
+            {baseLayer}
+            {decorLayer}
+            {resourceLayer}
           </Group>
         </Canvas>
       </Animated.View>

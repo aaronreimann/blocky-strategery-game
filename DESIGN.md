@@ -17,7 +17,7 @@ A radically simplified Civ 1-style turn-based 4X for mobile. Target session leng
 
 ## Map
 
-- **Size:** 32 columns × 24 rows squares. No wraparound (simpler edge logic).
+- **Size:** 48 columns × 36 rows squares (1,728 tiles). No wraparound (simpler edge logic).
 - **Terrain:** Grassland, Plains, Forest, Hills, Mountains, Desert, Tundra, Coast, Ocean, River.
 - **Resources** (sprinkled at gen): Wheat, Cattle, Fish, Iron, Horses, Gold, Wine, Spices.
 - Map generated with simplex noise → continents → resource pass → starting-position pass (8 evenly spaced spawns).

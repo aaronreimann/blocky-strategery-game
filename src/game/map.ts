@@ -1,8 +1,8 @@
 import type { Resource } from '@/src/data/resources';
 import type { Terrain } from '@/src/data/terrain';
 
-export const MAP_W = 32;
-export const MAP_H = 24;
+export const MAP_W = 48;
+export const MAP_H = 36;
 
 export type Tile = {
   x: number;
