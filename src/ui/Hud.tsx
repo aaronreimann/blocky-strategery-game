@@ -17,6 +17,7 @@ import {
 } from '@/src/game/types';
 import { useGame } from '@/src/state/game';
 
+import DiplomacyScreen from './DiplomacyScreen';
 import { THEME } from './palette';
 import TechScreen from './TechScreen';
 
@@ -37,6 +38,7 @@ function eventStyle(kind: string): { color: string } {
 
 export default function Hud() {
   const [techOpen, setTechOpen] = useState(false);
+  const [diploOpen, setDiploOpen] = useState(false);
   const [cityTab, setCityTab] = useState<'units' | 'buildings' | 'wonders'>('units');
   const turn = useGame((s) => s.turn);
   const map = useGame((s) => s.map);
@@ -160,6 +162,9 @@ export default function Hud() {
           <FontAwesome5 name="coins" size={12} color={THEME.warn} style={styles.pillIcon} />
           <Text style={styles.pillText}>{gold}</Text>
         </View>
+        <Pressable style={styles.pillSquare} onPress={() => setDiploOpen(true)}>
+          <FontAwesome5 name="handshake" size={14} color={THEME.ink} />
+        </Pressable>
       </View>
 
       {lastBattle ? (
@@ -548,6 +553,7 @@ export default function Hud() {
       </View>
 
       {techOpen ? <TechScreen onClose={() => setTechOpen(false)} /> : null}
+      {diploOpen ? <DiplomacyScreen onClose={() => setDiploOpen(false)} /> : null}
 
       {tilePicker ? (() => {
         const u = units.find(

@@ -19,16 +19,18 @@ import { nextCityId, nextUnitId, parseIdNum, syncIdCounters } from '@/src/game/i
 import { buildInitialState } from '@/src/game/init';
 import { chebyshev, type GameMap } from '@/src/game/map';
 import { nextStepToFriendlyCity } from '@/src/game/path';
-import type {
-  City,
-  CityBuildTarget,
-  CityFocus,
-  Difficulty,
-  GameOverState,
-  Player,
-  TurnEvent,
-  Unit,
-  Wonder,
+import {
+  relationKey,
+  type City,
+  type CityBuildTarget,
+  type CityFocus,
+  type Difficulty,
+  type GameOverState,
+  type Player,
+  type RelationsMap,
+  type TurnEvent,
+  type Unit,
+  type Wonder,
 } from '@/src/game/types';
 import { computeCityYields, foodNeededToGrow } from '@/src/game/yields';
 
@@ -50,6 +52,7 @@ type GameState = {
   cities: City[];
   improvements: ImprovementMap;
   wonders: Wonder[];
+  relations: RelationsMap;
   turn: number;
   seed: number;
   difficulty: Difficulty;
@@ -79,6 +82,8 @@ type GameState = {
   clearUnitDestination: (unitId: string) => void;
   toggleWorkerAuto: () => void;
   rushBuild: (cityId: string) => void;
+  proposePeace: (otherIdx: number) => boolean;
+  declareWar: (otherIdx: number) => void;
   openTilePicker: (x: number, y: number) => void;
   closeTilePicker: () => void;
   selectUnitFromPicker: (unitId: string) => void;
@@ -134,6 +139,7 @@ function autosave(state: GameState): void {
     cities: state.cities,
     improvements: state.improvements,
     wonders: state.wonders,
+    relations: state.relations,
     gameOver: state.gameOver,
   }).catch((err) => console.warn('autosave failed', err));
 }
@@ -145,6 +151,7 @@ export const useGame = create<GameState>((set, get) => ({
   cities: [],
   improvements: {},
   wonders: [],
+  relations: {},
   turn: 1,
   seed: 0,
   difficulty: 'normal',
@@ -170,6 +177,7 @@ export const useGame = create<GameState>((set, get) => ({
       cities: initial.cities,
       improvements: {},
       wonders: [],
+      relations: {},
       turn: 1,
       seed,
       difficulty,
@@ -250,6 +258,7 @@ export const useGame = create<GameState>((set, get) => ({
       cities: normalizedCities,
       improvements: data.improvements ?? {},
       wonders: data.wonders ?? [],
+      relations: data.relations ?? {},
       turn: data.turn,
       seed: data.seed,
       difficulty: data.difficulty,
@@ -270,6 +279,7 @@ export const useGame = create<GameState>((set, get) => ({
       cities: [],
       improvements: {},
       wonders: [],
+      relations: {},
       turn: 1,
       seed: 0,
       difficulty: 'normal',
@@ -333,8 +343,16 @@ export const useGame = create<GameState>((set, get) => ({
         return;
       }
 
-      // Attack / capture path.
+      // Attack / capture path. Attacking automatically declares war if we
+      // were at peace with the target.
       if (enemyUnitAtTile || enemyCityAtTile) {
+        const targetOwner = enemyUnitAtTile?.ownerIdx ?? enemyCityAtTile!.ownerIdx;
+        const k = relationKey(HUMAN_IDX, targetOwner);
+        if (state.relations[k] === 'peace') {
+          set({
+            relations: { ...state.relations, [k]: 'war' },
+          });
+        }
         if (selected.movesLeft <= 0) {
           set({ selectedUnitId: null });
           return;
@@ -632,6 +650,56 @@ export const useGame = create<GameState>((set, get) => ({
       cities: cities.map((c) =>
         c.id === city.id ? { ...c, production: cost } : c,
       ),
+    });
+    autosave(get());
+  },
+
+  proposePeace: (otherIdx) => {
+    const { players, cities, units, relations, gameOver } = get();
+    if (gameOver) return false;
+    if (otherIdx === HUMAN_IDX) return false;
+    const them = players[otherIdx];
+    if (!them) return false;
+    // Score-based acceptance: AI accepts if it's behind.
+    const score = (idx: number) =>
+      cities.filter((c) => c.ownerIdx === idx).length * 10 +
+      units.filter((u) => u.ownerIdx === idx).length * 2 +
+      (players[idx]?.researched.length ?? 0) * 5;
+    const myScore = score(HUMAN_IDX);
+    const theirScore = score(otherIdx);
+    const accept = theirScore <= myScore;
+    set({
+      relations: {
+        ...relations,
+        [relationKey(HUMAN_IDX, otherIdx)]: accept ? 'peace' : 'war',
+      },
+      turnEvents: [
+        {
+          kind: 'battle',
+          text: `${them.name} ${accept ? 'accepts peace.' : 'refuses peace.'}`,
+        },
+      ],
+    });
+    autosave(get());
+    return accept;
+  },
+
+  declareWar: (otherIdx) => {
+    const { relations, players, gameOver } = get();
+    if (gameOver) return;
+    if (otherIdx === HUMAN_IDX) return;
+    const them = players[otherIdx];
+    set({
+      relations: {
+        ...relations,
+        [relationKey(HUMAN_IDX, otherIdx)]: 'war',
+      },
+      turnEvents: [
+        {
+          kind: 'battle',
+          text: `War declared on ${them?.name ?? `Player ${otherIdx}`}.`,
+        },
+      ],
     });
     autosave(get());
   },
@@ -984,11 +1052,18 @@ export const useGame = create<GameState>((set, get) => ({
     let lastAIBattle: Battle | null = null;
     for (const player of workingPlayers) {
       if (player.isHuman) continue;
+      const atPeaceWith = new Set<number>();
+      for (const other of workingPlayers) {
+        if (other.idx === player.idx) continue;
+        const k = relationKey(player.idx, other.idx);
+        if (get().relations[k] === 'peace') atPeaceWith.add(other.idx);
+      }
       const result = runAITurn({
         ownerIdx: player.idx,
         map,
         units: workingUnits,
         cities: workingCities,
+        atPeaceWith,
       });
       workingUnits = result.units;
       workingCities = result.cities;

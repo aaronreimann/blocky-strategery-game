@@ -26,6 +26,7 @@ export type AITurnInput = {
   map: GameMap;
   units: Unit[];
   cities: City[];
+  atPeaceWith: Set<number>;
 };
 
 export type AITurnOutput = {
@@ -48,13 +49,19 @@ function tileGoodForCity(map: GameMap, x: number, y: number): boolean {
   return TERRAIN[t.terrain].passable && t.terrain !== 'desert' && t.terrain !== 'tundra';
 }
 
-function findAdjacentEnemy(unit: Unit, units: Unit[]): Unit | null {
+function findAdjacentEnemy(unit: Unit, units: Unit[], atPeaceWith: Set<number>): Unit | null {
   for (let dy = -1; dy <= 1; dy++) {
     for (let dx = -1; dx <= 1; dx++) {
       if (dx === 0 && dy === 0) continue;
       const nx = unit.x + dx;
       const ny = unit.y + dy;
-      const enemy = units.find((u) => u.x === nx && u.y === ny && u.ownerIdx !== unit.ownerIdx);
+      const enemy = units.find(
+        (u) =>
+          u.x === nx &&
+          u.y === ny &&
+          u.ownerIdx !== unit.ownerIdx &&
+          !atPeaceWith.has(u.ownerIdx),
+      );
       if (enemy) return enemy;
     }
   }
@@ -65,13 +72,20 @@ function findAdjacentUndefendedEnemyCity(
   unit: Unit,
   cities: City[],
   units: Unit[],
+  atPeaceWith: Set<number>,
 ): City | null {
   for (let dy = -1; dy <= 1; dy++) {
     for (let dx = -1; dx <= 1; dx++) {
       if (dx === 0 && dy === 0) continue;
       const nx = unit.x + dx;
       const ny = unit.y + dy;
-      const city = cities.find((c) => c.x === nx && c.y === ny && c.ownerIdx !== unit.ownerIdx);
+      const city = cities.find(
+        (c) =>
+          c.x === nx &&
+          c.y === ny &&
+          c.ownerIdx !== unit.ownerIdx &&
+          !atPeaceWith.has(c.ownerIdx),
+      );
       if (!city) continue;
       const defender = units.find((u) => u.x === nx && u.y === ny && u.ownerIdx !== unit.ownerIdx);
       if (!defender) return city;
@@ -138,13 +152,22 @@ function moveTowardTargets(
   );
 }
 
-function findEnemyTargets(unit: Unit, units: Unit[], cities: City[]): Set<string> {
+function findEnemyTargets(
+  unit: Unit,
+  units: Unit[],
+  cities: City[],
+  atPeaceWith: Set<number>,
+): Set<string> {
   const out = new Set<string>();
   for (const u of units) {
-    if (u.ownerIdx !== unit.ownerIdx) out.add(`${u.x},${u.y}`);
+    if (u.ownerIdx !== unit.ownerIdx && !atPeaceWith.has(u.ownerIdx)) {
+      out.add(`${u.x},${u.y}`);
+    }
   }
   for (const c of cities) {
-    if (c.ownerIdx !== unit.ownerIdx) out.add(`${c.x},${c.y}`);
+    if (c.ownerIdx !== unit.ownerIdx && !atPeaceWith.has(c.ownerIdx)) {
+      out.add(`${c.x},${c.y}`);
+    }
   }
   return out;
 }
@@ -231,6 +254,7 @@ export function runAITurn(input: AITurnInput): AITurnOutput {
   const map = input.map;
 
   const myUnitIds = units.filter((u) => u.ownerIdx === myIdx).map((u) => u.id);
+  const atPeaceWith = input.atPeaceWith;
 
   for (const id of myUnitIds) {
     const fresh = units.find((u) => u.id === id);
@@ -274,7 +298,7 @@ export function runAITurn(input: AITurnInput): AITurnOutput {
 
     if (isMilitary(fresh.kind)) {
       // Adjacent enemy unit → attack.
-      const enemy = findAdjacentEnemy(fresh, units);
+      const enemy = findAdjacentEnemy(fresh, units, atPeaceWith);
       if (enemy) {
         const defenderTile = map.tiles[enemy.y * map.width + enemy.x];
         const cityHere = cities.find(
@@ -314,7 +338,7 @@ export function runAITurn(input: AITurnInput): AITurnOutput {
       }
 
       // Adjacent undefended enemy city → walk in and capture.
-      const undefendedCity = findAdjacentUndefendedEnemyCity(fresh, cities, units);
+      const undefendedCity = findAdjacentUndefendedEnemyCity(fresh, cities, units, atPeaceWith);
       if (undefendedCity) {
         units = units.map((u) =>
           u.id === fresh.id
@@ -328,7 +352,7 @@ export function runAITurn(input: AITurnInput): AITurnOutput {
       }
 
       // No adjacent target — march toward the nearest enemy unit/city.
-      const targets = findEnemyTargets(fresh, units, cities);
+      const targets = findEnemyTargets(fresh, units, cities, atPeaceWith);
       const stepped = moveTowardTargets(fresh, units, cities, map, targets);
       if (stepped) {
         units = stepped;

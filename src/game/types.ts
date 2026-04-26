@@ -24,6 +24,15 @@ export type GameOverState = {
   reason: string;
 };
 
+export type Relation = 'war' | 'peace';
+export type RelationsMap = Record<string, Relation>;
+
+// Symmetric relation key (always lower idx first so the same key works
+// regardless of which side asks).
+export function relationKey(a: number, b: number): string {
+  return a < b ? `${a},${b}` : `${b},${a}`;
+}
+
 export type TurnEvent = {
   kind: 'battle' | 'grew' | 'built' | 'research' | 'captured' | 'lost';
   text: string;
