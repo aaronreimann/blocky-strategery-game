@@ -789,6 +789,7 @@ export const useGame = create<GameState>((set, get) => ({
             cities,
             workingUnits,
             owner?.researched ?? [],
+            workingWonders,
           );
         }
         return {
@@ -1019,6 +1020,36 @@ export const useGame = create<GameState>((set, get) => ({
       players: workingPlayers,
       turn: newTurn,
     });
+
+    // AI rush-buy: each AI tries to spend accumulated gold to fast-track
+    // its current build. Sets the city's production to the build cost so
+    // the build completes at the start of next turn (mirrors the player's
+    // rushBuild action).
+    for (let i = 0; i < workingPlayers.length; i++) {
+      const p = workingPlayers[i];
+      if (p.isHuman || p.gold < 50) continue;
+      for (let j = 0; j < workingCities.length; j++) {
+        const c = workingCities[j];
+        if (c.ownerIdx !== p.idx || !c.building) continue;
+        const cost =
+          c.building.kind === 'unit'
+            ? UNIT[c.building.unit].cost
+            : c.building.kind === 'building'
+              ? BUILDING[c.building.building].cost
+              : WONDER[c.building.wonder].cost;
+        const remaining = Math.max(0, cost - c.production);
+        if (remaining === 0) continue;
+        const goldCost = remaining * 2;
+        if (workingPlayers[i].gold >= goldCost) {
+          workingPlayers[i] = {
+            ...workingPlayers[i],
+            gold: workingPlayers[i].gold - goldCost,
+          };
+          workingCities[j] = { ...c, production: cost };
+          break; // one rush per AI per turn
+        }
+      }
+    }
 
     set({
       turn: newTurn,

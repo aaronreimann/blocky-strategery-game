@@ -1,11 +1,12 @@
 import { TERRAIN } from '@/src/data/terrain';
 import { canEnterTerrain, UNIT, type UnitKind } from '@/src/data/units';
+import { WONDER, WONDER_KINDS } from '@/src/data/wonders';
 
 import { resolveCombat, type Battle } from './combat';
 import { nextCityId } from './ids';
 import { chebyshev, type GameMap } from './map';
 import { nextStepToTiles } from './path';
-import type { City, CityBuildTarget, Player, Unit } from './types';
+import type { City, CityBuildTarget, Player, Unit, Wonder } from './types';
 
 const MIN_CITY_SPACING = 3;
 const DEFAULT_PRODUCTION_PER_TURN = 3;
@@ -182,6 +183,7 @@ export function pickAINextBuild(
   cities: City[],
   units: Unit[],
   researched: string[],
+  wonders: Wonder[] = [],
 ): CityBuildTarget {
   const myCities = cities.filter((c) => c.ownerIdx === ownerIdx);
   const myUnits = units.filter((u) => u.ownerIdx === ownerIdx);
@@ -200,9 +202,16 @@ export function pickAINextBuild(
     if (researched.includes('horseback_riding')) choices.push('horseman');
     if (researched.includes('iron_working')) choices.push('swordsman');
     if (researched.includes('mathematics')) choices.push('catapult');
-    // Pick the highest-cost (= most powerful) available.
     choices.sort((a, b) => UNIT[b].cost - UNIT[a].cost);
     return { kind: 'unit', unit: choices[0] };
+  }
+
+  // Well-defended — try to grab an available wonder.
+  for (const wkind of WONDER_KINDS) {
+    if (wonders.some((w) => w.kind === wkind)) continue;
+    const tech = WONDER[wkind].tech;
+    if (tech !== null && !researched.includes(tech)) continue;
+    return { kind: 'wonder', wonder: wkind };
   }
 
   // Otherwise keep building offensive units.
