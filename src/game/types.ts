@@ -43,6 +43,7 @@ export type Unit = {
   movesLeft: number;
   workingOn: ImprovementKind | null;
   workTurnsLeft: number;
+  destination: { x: number; y: number } | null;
 };
 
 export type CityBuildTarget =

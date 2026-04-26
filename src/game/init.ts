@@ -90,6 +90,7 @@ function spawnStartingUnits(
       movesLeft: UNIT.pioneer.move,
       workingOn: null,
       workTurnsLeft: 0,
+      destination: null,
     },
     {
       id: nextUnitId(),
@@ -100,6 +101,7 @@ function spawnStartingUnits(
       movesLeft: UNIT.footman.move,
       workingOn: null,
       workTurnsLeft: 0,
+      destination: null,
     },
     {
       id: nextUnitId(),
@@ -110,6 +112,7 @@ function spawnStartingUnits(
       movesLeft: UNIT.laborer.move,
       workingOn: null,
       workTurnsLeft: 0,
+      destination: null,
     },
   ];
 }

@@ -159,6 +159,7 @@ export function runAITurn(input: AITurnInput): AITurnOutput {
                     movesLeft: 0,
                     workingOn: null,
                     workTurnsLeft: 0,
+                    destination: null,
                   }
                 : u,
             );

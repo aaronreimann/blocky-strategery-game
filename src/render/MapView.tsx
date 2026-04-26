@@ -1,4 +1,12 @@
-import { Canvas, Circle, Group, Path, Rect } from '@shopify/react-native-skia';
+import {
+  Canvas,
+  Circle,
+  Group,
+  matchFont,
+  Path,
+  Rect,
+  Text as SkText,
+} from '@shopify/react-native-skia';
 import { useEffect, useMemo } from 'react';
 import { useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -28,10 +36,14 @@ type Props = {
   improvements: ImprovementMap;
   selectedUnitId: string | null;
   selectedCityId: string | null;
+  autoLaborerOwnerIdxs: Set<number>;
   moveTiles: Set<string>;
   attackTiles: Set<string>;
   onTileTap: (x: number, y: number) => void;
+  onSetDestination: (unitId: string, x: number, y: number) => void;
 };
+
+const BADGE_FONT = matchFont({ fontFamily: 'Helvetica', fontSize: 9, fontWeight: 'bold' });
 
 export default function MapView({
   map,
@@ -41,9 +53,11 @@ export default function MapView({
   improvements,
   selectedUnitId,
   selectedCityId,
+  autoLaborerOwnerIdxs,
   moveTiles,
   attackTiles,
   onTileTap,
+  onSetDestination,
 }: Props) {
   const { width: screenW, height: screenH } = useWindowDimensions();
 
@@ -60,6 +74,37 @@ export default function MapView({
   const startTy = useSharedValue(0);
   const startScale = useSharedValue(1);
 
+  // Drag-from-selected-unit state, synced from React props each render so the
+  // gesture worklets can read it without runOnJS round trips.
+  const selUnitGridX = useSharedValue(-1);
+  const selUnitGridY = useSharedValue(-1);
+  const selUnitId = useSharedValue<string | null>(null);
+  const isDraggingUnit = useSharedValue(false);
+  const dragWorldX = useSharedValue(0);
+  const dragWorldY = useSharedValue(0);
+
+  useEffect(() => {
+    if (selectedUnitId) {
+      const u = units.find((x) => x.id === selectedUnitId);
+      if (u) {
+        selUnitGridX.value = u.x;
+        selUnitGridY.value = u.y;
+        selUnitId.value = u.id;
+        return;
+      }
+    }
+    selUnitGridX.value = -1;
+    selUnitGridY.value = -1;
+    selUnitId.value = null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedUnitId, units]);
+
+  const fireSetDestination = (gx: number, gy: number) => {
+    const id = selUnitId.value;
+    if (!id) return;
+    onSetDestination(id, gx, gy);
+  };
+
   useEffect(() => {
     scale.value = fitScale;
     tx.value = (screenW - mapPxW * fitScale) / 2;
@@ -69,13 +114,46 @@ export default function MapView({
 
   const pan = Gesture.Pan()
     .minDistance(8)
-    .onStart(() => {
+    .onStart((e) => {
+      'worklet';
       startTx.value = tx.value;
       startTy.value = ty.value;
+      // If the gesture began on the selected unit's tile, treat as a
+      // destination drag rather than a camera pan.
+      const wx = (e.x - tx.value) / scale.value;
+      const wy = (e.y - ty.value) / scale.value;
+      const gx = Math.floor(wx / TILE_SIZE);
+      const gy = Math.floor(wy / TILE_SIZE);
+      if (gx === selUnitGridX.value && gy === selUnitGridY.value && selUnitId.value !== null) {
+        isDraggingUnit.value = true;
+        dragWorldX.value = wx;
+        dragWorldY.value = wy;
+      } else {
+        isDraggingUnit.value = false;
+      }
     })
     .onUpdate((e) => {
-      tx.value = startTx.value + e.translationX;
-      ty.value = startTy.value + e.translationY;
+      'worklet';
+      if (isDraggingUnit.value) {
+        const wx = (e.x - tx.value) / scale.value;
+        const wy = (e.y - ty.value) / scale.value;
+        dragWorldX.value = wx;
+        dragWorldY.value = wy;
+      } else {
+        tx.value = startTx.value + e.translationX;
+        ty.value = startTy.value + e.translationY;
+      }
+    })
+    .onEnd((e) => {
+      'worklet';
+      if (isDraggingUnit.value) {
+        const wx = (e.x - tx.value) / scale.value;
+        const wy = (e.y - ty.value) / scale.value;
+        const gx = Math.floor(wx / TILE_SIZE);
+        const gy = Math.floor(wy / TILE_SIZE);
+        runOnJS(fireSetDestination)(gx, gy);
+        isDraggingUnit.value = false;
+      }
     });
 
   const pinch = Gesture.Pinch()
@@ -248,6 +326,81 @@ export default function MapView({
         />
       ));
   }, [units]);
+
+  // A/M badges in the bottom-right of each unit's tile.
+  const badgeLayer = useMemo(() => {
+    const out: React.ReactNode[] = [];
+    for (const u of units) {
+      const hasDest = u.destination !== null;
+      const isAuto = u.kind === 'laborer' && autoLaborerOwnerIdxs.has(u.ownerIdx) && !hasDest;
+      if (!hasDest && !isAuto) continue;
+      const letter = hasDest ? 'M' : 'A';
+      const bx = u.x * TILE_SIZE + TILE_SIZE - 9;
+      const by = u.y * TILE_SIZE + TILE_SIZE - 9;
+      out.push(
+        <Rect
+          key={`bd-${u.id}-bg`}
+          x={bx}
+          y={by}
+          width={8}
+          height={8}
+          color="#0a1729"
+        />,
+      );
+      out.push(
+        <Rect
+          key={`bd-${u.id}-bo`}
+          x={bx}
+          y={by}
+          width={8}
+          height={8}
+          color="#facc15"
+          style="stroke"
+          strokeWidth={1}
+        />,
+      );
+      out.push(
+        <SkText
+          key={`bd-${u.id}-t`}
+          x={bx + 1.5}
+          y={by + 7}
+          text={letter}
+          font={BADGE_FONT}
+          color="#facc15"
+        />,
+      );
+    }
+    return out;
+  }, [units, autoLaborerOwnerIdxs]);
+
+  // Destination markers (yellow ring on each unit's destination tile).
+  const destLayer = useMemo(() => {
+    return units
+      .filter((u) => u.destination !== null && u.ownerIdx === 0)
+      .map((u) => (
+        <Rect
+          key={`dst-${u.id}`}
+          x={u.destination!.x * TILE_SIZE + 2}
+          y={u.destination!.y * TILE_SIZE + 2}
+          width={TILE_SIZE - 4}
+          height={TILE_SIZE - 4}
+          color="#facc15"
+          style="stroke"
+          strokeWidth={1.5}
+        />
+      ));
+  }, [units]);
+
+  // Live drag indicator: line from selected unit center to current drag pos.
+  const dragLinePath = useDerivedValue(() => {
+    if (!isDraggingUnit.value) {
+      return `M 0 0`;
+    }
+    const sx = selUnitGridX.value * TILE_SIZE + TILE_SIZE / 2;
+    const sy = selUnitGridY.value * TILE_SIZE + TILE_SIZE / 2;
+    return `M ${sx} ${sy} L ${dragWorldX.value} ${dragWorldY.value}`;
+  });
+  const dragOpacity = useDerivedValue(() => (isDraggingUnit.value ? 1 : 0));
 
   const cityLayer = useMemo(() => {
     return cities.map((c) => {
@@ -449,10 +602,19 @@ export default function MapView({
             {roadLayer}
             {resourceLayer}
             {highlightLayer}
+            {destLayer}
             {cityLayer}
             {unitLayer}
             {workIndicatorLayer}
+            {badgeLayer}
             {selectionLayer}
+            <Path
+              path={dragLinePath}
+              color="#facc15"
+              style="stroke"
+              strokeWidth={2}
+              opacity={dragOpacity}
+            />
           </Group>
         </Canvas>
       </Animated.View>

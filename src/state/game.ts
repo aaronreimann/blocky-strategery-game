@@ -68,6 +68,8 @@ type GameState = {
   setResearch: (tech: TechId) => void;
   startWork: (kind: ImprovementKind) => void;
   cancelWork: () => void;
+  setUnitDestination: (unitId: string, x: number, y: number) => void;
+  clearUnitDestination: (unitId: string) => void;
   endTurn: () => void;
   dismissBattle: () => void;
 };
@@ -156,11 +158,12 @@ export const useGame = create<GameState>((set, get) => ({
   loadFromSlot: async (slot) => {
     const data = await loadSlot(slot);
     if (!data) return false;
-    // Forward-compat: older saves lacked workingOn / workTurnsLeft on units.
+    // Forward-compat: older saves lacked workingOn / workTurnsLeft / destination on units.
     const normalizedUnits: Unit[] = data.units.map((u) => ({
       ...u,
       workingOn: u.workingOn ?? null,
       workTurnsLeft: u.workTurnsLeft ?? 0,
+      destination: u.destination ?? null,
     }));
     const normalizedPlayers: Player[] = data.players.map((p) => ({
       ...p,
@@ -467,6 +470,39 @@ export const useGame = create<GameState>((set, get) => ({
     autosave(get());
   },
 
+  setUnitDestination: (unitId, x, y) => {
+    const { units, map, gameOver } = get();
+    if (gameOver || !map) return;
+    const u = units.find((u) => u.id === unitId);
+    if (!u || u.ownerIdx !== HUMAN_IDX) return;
+    if (x < 0 || y < 0 || x >= map.width || y >= map.height) return;
+    if (u.x === x && u.y === y) {
+      // Tapping the unit's own tile clears destination.
+      set({
+        units: units.map((v) => (v.id === unitId ? { ...v, destination: null } : v)),
+      });
+      autosave(get());
+      return;
+    }
+    const tile = map.tiles[y * map.width + x];
+    if (!TERRAIN[tile.terrain].passable) return;
+    set({
+      units: units.map((v) =>
+        v.id === unitId ? { ...v, destination: { x, y }, workingOn: null, workTurnsLeft: 0 } : v,
+      ),
+    });
+    autosave(get());
+  },
+
+  clearUnitDestination: (unitId) => {
+    set({
+      units: get().units.map((u) =>
+        u.id === unitId ? { ...u, destination: null } : u,
+      ),
+    });
+    autosave(get());
+  },
+
   endTurn: () => {
     const { units, cities, turn, map, players, improvements, gameOver } = get();
     if (gameOver || !map) return;
@@ -533,6 +569,7 @@ export const useGame = create<GameState>((set, get) => ({
           movesLeft: UNIT[unitKind].move,
           workingOn: null,
           workTurnsLeft: 0,
+          destination: null,
         });
         return {
           ...city,
@@ -564,9 +601,56 @@ export const useGame = create<GameState>((set, get) => ({
       };
     });
 
+    // Auto-move pass: any unit with a destination tries to step toward it.
+    // BFS from current position to destination. If blocked or destination
+    // reached, the destination clears.
+    workingUnits = workingUnits.map((u) => {
+      if (!u.destination) return u;
+      if (u.movesLeft <= 0) return u;
+      if (u.workingOn) return u;
+      if (u.x === u.destination.x && u.y === u.destination.y) {
+        return { ...u, destination: null };
+      }
+      const fakeCityForDest: City = {
+        id: '__dest__',
+        ownerIdx: u.ownerIdx,
+        name: 'dest',
+        x: u.destination.x,
+        y: u.destination.y,
+        population: 0,
+        food: 0,
+        buildings: [],
+        building: null,
+        production: 0,
+        focus: 'balanced',
+      };
+      const next = nextStepToFriendlyCity(
+        u,
+        [...workingCities, fakeCityForDest],
+        workingUnits,
+        map,
+      );
+      if (!next) return { ...u, destination: null };
+      const blockedByFriendly = workingUnits.some(
+        (o) => o.id !== u.id && o.x === next.x && o.y === next.y && o.ownerIdx === u.ownerIdx,
+      );
+      const blockedByEnemy = workingUnits.some(
+        (o) => o.x === next.x && o.y === next.y && o.ownerIdx !== u.ownerIdx,
+      );
+      if (blockedByFriendly || blockedByEnemy) {
+        // Stop short, keep destination so we'll try again next turn.
+        return u;
+      }
+      const moved = { ...u, x: next.x, y: next.y, movesLeft: u.movesLeft - 1 };
+      if (moved.x === moved.destination!.x && moved.y === moved.destination!.y) {
+        moved.destination = null;
+      }
+      return moved;
+    });
+
     // Auto-Laborer pass: any player whose city has focus='roads' gets their
-    // free Laborers either building on the current tile or stepping toward
-    // the closest other friendly city.
+    // free Laborers (no manual destination, not already busy) either building
+    // on the current tile or stepping toward the closest other friendly city.
     const playersWantingRoads = new Set(
       workingCities.filter((c) => c.focus === 'roads').map((c) => c.ownerIdx),
     );
@@ -575,9 +659,9 @@ export const useGame = create<GameState>((set, get) => ({
         if (u.kind !== 'laborer') return u;
         if (!playersWantingRoads.has(u.ownerIdx)) return u;
         if (u.workingOn) return u;
+        if (u.destination) return u; // manual order takes priority
         if (u.movesLeft <= 0) return u;
         const here = tileKey(u.x, u.y);
-        // Don't build on a city tile; it's already valuable enough.
         const onCity = workingCities.some((c) => c.x === u.x && c.y === u.y);
         if (!onCity && !workingImprovements[here]) {
           return {
