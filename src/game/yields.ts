@@ -20,8 +20,13 @@ export type CityYields = {
   prod: number;
   science: number;
   gold: number;
+  happy: number;
+  unhappy: number;
+  disorder: boolean;
   workedTiles: Tile[];
 };
+
+const HAPPY_POP_THRESHOLD = 4;
 
 const FOOD_PER_CITIZEN = 2;
 
@@ -81,5 +86,13 @@ export function computeCityYields(
   let gold = trade;
   if (city.buildings.includes('marketplace')) gold = Math.floor(gold * 1.5);
 
-  return { rawFood, food, prod, science, gold, workedTiles: worked };
+  // Happiness: every citizen past size 4 is unhappy. Each Temple keeps one
+  // citizen happy. If unhappy > happy, the city is in disorder and produces
+  // no production this turn.
+  const happy = city.buildings.includes('temple') ? 1 : 0;
+  const unhappy = Math.max(0, city.population - HAPPY_POP_THRESHOLD);
+  const disorder = unhappy > happy;
+  if (disorder) prod = 0;
+
+  return { rawFood, food, prod, science, gold, happy, unhappy, disorder, workedTiles: worked };
 }

@@ -1,6 +1,6 @@
 import type { TechId } from './tech';
 
-export const BUILDING_KINDS = ['granary', 'walls', 'library', 'marketplace'] as const;
+export const BUILDING_KINDS = ['granary', 'walls', 'library', 'marketplace', 'temple'] as const;
 export type BuildingKind = (typeof BUILDING_KINDS)[number];
 
 export type BuildingSpec = {
@@ -34,5 +34,11 @@ export const BUILDING: Record<BuildingKind, BuildingSpec> = {
     cost: 50,
     description: '+50% gold from this city.',
     tech: 'currency',
+  },
+  temple: {
+    name: 'Temple',
+    cost: 30,
+    description: '+1 happy citizen — keeps a city of 5 from disorder.',
+    tech: null,
   },
 };

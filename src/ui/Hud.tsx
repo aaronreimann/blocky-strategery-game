@@ -336,6 +336,11 @@ export default function Hud() {
                     {yields.prod}/t) · Gold +{yields.gold}/t
                   </Text>
                 ) : null}
+                {yields?.disorder ? (
+                  <Text style={[styles.cardMeta, { color: THEME.bad, fontWeight: '700' }]}>
+                    Disorder · {yields.unhappy} unhappy vs {yields.happy} happy · production halted
+                  </Text>
+                ) : null}
                 <Text style={styles.cardMeta}>Building: {buildTargetLabel}</Text>
                 {selectedCity.building &&
                 selectedCity.production < buildCost ? (() => {
