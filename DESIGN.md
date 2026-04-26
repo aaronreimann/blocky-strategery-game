@@ -4,9 +4,12 @@ A radically simplified Civ 1-style turn-based 4X for mobile. Target session leng
 
 ## Platforms & Tech
 
-- **Targets:** iOS + Android (no web, no desktop).
+- **Targets:** iOS + Android (no web, no desktop). Orientation: **landscape only**.
+- **App identity:** name `Civ-App`, bundle/package `com.aaronr.civapp` (placeholder, easy to rename pre-store).
 - **Stack:** Expo (managed) + React Native + TypeScript.
+- **Navigation:** **Expo Router** (file-based routing).
 - **Renderer:** `@shopify/react-native-skia` for the map, sprites, and animations. Plain RN views for HUD, menus, dialogs.
+- **UI kit:** **None.** Custom HUD components built on RN primitives + Skia. No Tamagui/gluestack — game HUDs don't fit form-oriented kits.
 - **State:** Zustand (small, fast, no Redux ceremony). Game state is one tree, mutated per turn.
 - **Persistence:** AsyncStorage for save slots (3 slots).
 - **Art (placeholder):** Kenney.nl medieval/strategy packs for the prototype. Commission Kingdom-Rush-style replacements later.
@@ -85,6 +88,8 @@ Starting roster: **1 Settler, 1 Warrior, 1 Worker.**
 
 Combat is a single dice roll: `attacker.attack + d6` vs `defender.defense + d6 + terrain bonus`. Loser dies, winner takes 0–1 damage. No HP bars to track — fast.
 
+**Stacking:** **1 unit per tile** (Civ 1 style). Moving onto a friendly-occupied tile is blocked. Moving onto an enemy-occupied tile triggers combat.
+
 ## Buildings (per city)
 
 | Building | Tech | Cost | Effect |
@@ -109,6 +114,7 @@ Wonders (one per game, world-unique): Pyramids, Great Wall, Great Library. That'
 
 ## City Mechanics
 
+- **Minimum spacing:** new cities must be founded at least **3 tiles** (Chebyshev distance) from any existing city, friend or foe. Prevents spam and matches the working radius.
 - City works the 8 surrounding tiles + center (radius 1, not Civ's fat cross — simpler).
 - Each tile produces food / production / trade based on terrain + improvement.
 - **Growth:** city grows when food box fills (10 + size × 5 food).
