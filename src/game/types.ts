@@ -45,6 +45,14 @@ export type CityBuildTarget =
   | { kind: 'unit'; unit: UnitKind }
   | { kind: 'building'; building: BuildingKind };
 
+export const CITY_FOCUSES = ['balanced', 'roads'] as const;
+export type CityFocus = (typeof CITY_FOCUSES)[number];
+
+export const CITY_FOCUS_LABELS: Record<CityFocus, string> = {
+  balanced: 'Balanced',
+  roads: 'Build Roads',
+};
+
 export type City = {
   id: string;
   ownerIdx: number;
@@ -56,4 +64,5 @@ export type City = {
   buildings: BuildingKind[];
   building: CityBuildTarget | null;
   production: number;
+  focus: CityFocus;
 };

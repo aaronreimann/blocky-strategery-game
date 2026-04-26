@@ -16,9 +16,11 @@ import { checkGameOver } from '@/src/game/gameOver';
 import { nextCityId, nextUnitId, parseIdNum, syncIdCounters } from '@/src/game/ids';
 import { buildInitialState } from '@/src/game/init';
 import { chebyshev, type GameMap } from '@/src/game/map';
+import { nextStepToFriendlyCity } from '@/src/game/path';
 import type {
   City,
   CityBuildTarget,
+  CityFocus,
   Difficulty,
   GameOverState,
   Player,
@@ -61,6 +63,7 @@ type GameState = {
   tapTile: (x: number, y: number) => void;
   foundCity: () => void;
   setCityBuild: (cityId: string, target: CityBuildTarget) => void;
+  setCityFocus: (cityId: string, focus: CityFocus) => void;
   startWork: (kind: ImprovementKind) => void;
   cancelWork: () => void;
   endTurn: () => void;
@@ -177,6 +180,7 @@ export const useGame = create<GameState>((set, get) => ({
         food: c.food ?? 0,
         buildings: c.buildings ?? [],
         building,
+        focus: c.focus ?? 'balanced',
       };
     });
     syncIdCounters(
@@ -380,6 +384,7 @@ export const useGame = create<GameState>((set, get) => ({
       buildings: [],
       building: { kind: 'unit', unit: 'footman' },
       production: 0,
+      focus: 'balanced',
     };
 
     set({
@@ -397,6 +402,14 @@ export const useGame = create<GameState>((set, get) => ({
       cities: get().cities.map((c) =>
         c.id === cityId ? { ...c, building: target } : c,
       ),
+    });
+    autosave(get());
+  },
+
+  setCityFocus: (cityId, focus) => {
+    if (get().gameOver) return;
+    set({
+      cities: get().cities.map((c) => (c.id === cityId ? { ...c, focus } : c)),
     });
     autosave(get());
   },
@@ -527,6 +540,40 @@ export const useGame = create<GameState>((set, get) => ({
         building: { kind: 'unit', unit: 'footman' },
       };
     });
+
+    // Auto-Laborer pass: any player whose city has focus='roads' gets their
+    // free Laborers either building on the current tile or stepping toward
+    // the closest other friendly city.
+    const playersWantingRoads = new Set(
+      workingCities.filter((c) => c.focus === 'roads').map((c) => c.ownerIdx),
+    );
+    if (playersWantingRoads.size > 0) {
+      workingUnits = workingUnits.map((u) => {
+        if (u.kind !== 'laborer') return u;
+        if (!playersWantingRoads.has(u.ownerIdx)) return u;
+        if (u.workingOn) return u;
+        if (u.movesLeft <= 0) return u;
+        const here = tileKey(u.x, u.y);
+        // Don't build on a city tile; it's already valuable enough.
+        const onCity = workingCities.some((c) => c.x === u.x && c.y === u.y);
+        if (!onCity && !workingImprovements[here]) {
+          return {
+            ...u,
+            workingOn: 'road' as const,
+            workTurnsLeft: IMPROVEMENT.road.buildTurns,
+            movesLeft: 0,
+          };
+        }
+        const next = nextStepToFriendlyCity(u, workingCities, workingUnits, map);
+        if (!next) return u;
+        const blockedByFriendly = workingUnits.some(
+          (o) =>
+            o.id !== u.id && o.x === next.x && o.y === next.y && o.ownerIdx === u.ownerIdx,
+        );
+        if (blockedByFriendly) return u;
+        return { ...u, x: next.x, y: next.y, movesLeft: u.movesLeft - 1 };
+      });
+    }
 
     let lastAIBattle: Battle | null = null;
     for (const player of players) {

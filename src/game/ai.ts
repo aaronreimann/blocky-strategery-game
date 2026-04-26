@@ -123,6 +123,7 @@ export function runAITurn(input: AITurnInput): AITurnOutput {
           buildings: [],
           building: { kind: 'unit', unit: 'footman' },
           production: 0,
+          focus: 'roads',
         };
         cities = [...cities, newCity];
         units = units.filter((u) => u.id !== fresh.id);

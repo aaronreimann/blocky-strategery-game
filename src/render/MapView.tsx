@@ -178,8 +178,13 @@ export default function MapView({
   }, [moveTiles, attackTiles]);
 
   const roadLayer = useMemo(() => {
-    const out: React.ReactNode[] = [];
+    const base: React.ReactNode[] = [];
+    const top: React.ReactNode[] = [];
     const isRoad = (x: number, y: number) => improvements[`${x},${y}`] === 'road';
+    const ROAD_BASE = '#d4b88a';
+    const ROAD_INK = '#6b4a26';
+    const BASE_W = 6;
+    const INK_W = 3;
     for (const key in improvements) {
       if (improvements[key] !== 'road') continue;
       const [xs, ys] = key.split(',');
@@ -187,7 +192,7 @@ export default function MapView({
       const y = Number(ys);
       const cx = x * TILE_SIZE + TILE_SIZE / 2;
       const cy = y * TILE_SIZE + TILE_SIZE / 2;
-      // Connect to any neighbors that also have a road.
+      // Edges to neighbor road tiles (deduped).
       for (let dy = -1; dy <= 1; dy++) {
         for (let dx = -1; dx <= 1; dx++) {
           if (dx === 0 && dy === 0) continue;
@@ -195,21 +200,39 @@ export default function MapView({
           if (dx > 0 || (dx === 0 && dy > 0)) {
             const nx = (x + dx) * TILE_SIZE + TILE_SIZE / 2;
             const ny = (y + dy) * TILE_SIZE + TILE_SIZE / 2;
-            out.push(
+            const path = `M ${cx} ${cy} L ${nx} ${ny}`;
+            base.push(
               <Path
-                key={`rd-${key}-${dx}${dy}`}
-                path={`M ${cx} ${cy} L ${nx} ${ny}`}
-                color="#5a4326"
+                key={`rd-b-${key}-${dx}${dy}`}
+                path={path}
+                color={ROAD_BASE}
                 style="stroke"
-                strokeWidth={2.5}
+                strokeWidth={BASE_W}
+                strokeCap="round"
+              />,
+            );
+            top.push(
+              <Path
+                key={`rd-t-${key}-${dx}${dy}`}
+                path={path}
+                color={ROAD_INK}
+                style="stroke"
+                strokeWidth={INK_W}
+                strokeCap="round"
               />,
             );
           }
         }
       }
-      out.push(<Circle key={`rd-${key}`} cx={cx} cy={cy} r={3} color="#5a4326" />);
+      // Junction node: a small disc so isolated/branching tiles read.
+      base.push(
+        <Circle key={`rd-jb-${key}`} cx={cx} cy={cy} r={BASE_W / 2} color={ROAD_BASE} />,
+      );
+      top.push(
+        <Circle key={`rd-jt-${key}`} cx={cx} cy={cy} r={INK_W / 2} color={ROAD_INK} />,
+      );
     }
-    return out;
+    return [...base, ...top];
   }, [improvements]);
 
   const workIndicatorLayer = useMemo(() => {

@@ -5,7 +5,11 @@ import { BUILDING, BUILDING_KINDS } from '@/src/data/buildings';
 import { IMPROVEMENT, tileKey } from '@/src/data/improvements';
 import { UNIT, UNIT_KINDS } from '@/src/data/units';
 import { computeCityYields, foodNeededToGrow } from '@/src/game/yields';
-import type { CityBuildTarget } from '@/src/game/types';
+import {
+  CITY_FOCUSES,
+  CITY_FOCUS_LABELS,
+  type CityBuildTarget,
+} from '@/src/game/types';
 import { useGame } from '@/src/state/game';
 
 import { THEME } from './palette';
@@ -24,6 +28,7 @@ export default function Hud() {
   const endTurn = useGame((s) => s.endTurn);
   const foundCity = useGame((s) => s.foundCity);
   const setCityBuild = useGame((s) => s.setCityBuild);
+  const setCityFocus = useGame((s) => s.setCityFocus);
   const startWork = useGame((s) => s.startWork);
   const cancelWork = useGame((s) => s.cancelWork);
   const exitToTitle = useGame((s) => s.exitToTitle);
@@ -152,6 +157,28 @@ export default function Hud() {
                   </Text>
                 ) : null}
                 <Text style={styles.cardMeta}>Building: {buildTargetLabel}</Text>
+                <View style={styles.focusRow}>
+                  <Text style={styles.focusLabel}>Focus:</Text>
+                  {CITY_FOCUSES.map((f) => {
+                    const cur = selectedCity.focus === f;
+                    return (
+                      <Pressable
+                        key={f}
+                        style={[styles.focusBtn, cur && styles.focusBtnActive]}
+                        onPress={() => setCityFocus(selectedCity.id, f)}
+                      >
+                        <Text
+                          style={[
+                            styles.focusBtnText,
+                            cur && styles.focusBtnTextActive,
+                          ]}
+                        >
+                          {CITY_FOCUS_LABELS[f]}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
                 <View style={styles.buildRow}>
                   {UNIT_KINDS.map((kind) => {
                     const target: CityBuildTarget = { kind: 'unit', unit: kind };
@@ -307,7 +334,20 @@ const styles = StyleSheet.create({
   },
   actionMutedText: { color: THEME.inkMuted, fontWeight: '700', fontSize: 12 },
   workRow: { marginTop: 6 },
-  buildRow: { flexDirection: 'row', gap: 6, marginTop: 8 },
+  focusRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
+  focusLabel: { color: THEME.inkMuted, fontSize: 11 },
+  focusBtn: {
+    backgroundColor: THEME.bg,
+    borderColor: THEME.border,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  focusBtnActive: { backgroundColor: THEME.warn, borderColor: THEME.warn },
+  focusBtnText: { color: THEME.ink, fontSize: 11, fontWeight: '700' },
+  focusBtnTextActive: { color: '#0a1729' },
+  buildRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
   buildBtn: {
     backgroundColor: THEME.bg,
     borderColor: THEME.border,
