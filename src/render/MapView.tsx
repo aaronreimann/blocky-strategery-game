@@ -23,6 +23,7 @@ import type { GameMap } from '@/src/game/map';
 import type { City, Player, Unit } from '@/src/game/types';
 
 import { decorateTile } from './decor';
+import MiniMap from './MiniMap';
 
 export const TILE_SIZE = 32;
 const MIN_SCALE = 0.35;
@@ -649,11 +650,17 @@ export default function MapView({
     );
   }, [selectedUnitId, selectedCityId, units, cities]);
 
+  const jumpTo = (worldX: number, worldY: number) => {
+    tx.value = screenW / 2 - worldX * scale.value;
+    ty.value = screenH / 2 - worldY * scale.value;
+  };
+
   return (
-    <GestureDetector gesture={gesture}>
-      <Animated.View style={{ flex: 1 }}>
-        <Canvas style={{ flex: 1 }}>
-          <Group transform={transform}>
+    <Animated.View style={{ flex: 1 }}>
+      <GestureDetector gesture={gesture}>
+        <Animated.View style={{ flex: 1 }}>
+          <Canvas style={{ flex: 1 }}>
+            <Group transform={transform}>
             {baseLayer}
             {decorLayer}
             {roadLayer}
@@ -674,8 +681,21 @@ export default function MapView({
               opacity={dragOpacity}
             />
           </Group>
-        </Canvas>
-      </Animated.View>
-    </GestureDetector>
+          </Canvas>
+        </Animated.View>
+      </GestureDetector>
+      <MiniMap
+        map={map}
+        cities={cities}
+        players={players}
+        cameraTx={tx}
+        cameraTy={ty}
+        cameraScale={scale}
+        screenW={screenW}
+        screenH={screenH}
+        tileSize={TILE_SIZE}
+        onJumpTo={jumpTo}
+      />
+    </Animated.View>
   );
 }
