@@ -66,7 +66,7 @@ export default function TitleScreen() {
       style={{ flex: 1 }} 
       resizeMode="cover"
     >
-      <View style={{ ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' }} />
+      <View style={{ ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.25)' }} />
       <SafeAreaView style={[styles.root, { backgroundColor: 'transparent' }]}>
         <View style={styles.header}>
           <Image source={require('../../assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
