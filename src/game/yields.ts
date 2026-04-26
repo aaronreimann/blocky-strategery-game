@@ -8,6 +8,7 @@ export type CityYields = {
   food: number;
   prod: number;
   science: number;
+  gold: number;
   workedTiles: Tile[];
 };
 
@@ -21,6 +22,7 @@ export function computeCityYields(city: City, map: GameMap): CityYields {
   const center = map.tiles[city.y * map.width + city.x];
   let rawFood = TERRAIN[center.terrain].food;
   let prod = TERRAIN[center.terrain].prod;
+  let trade = TERRAIN[center.terrain].trade;
 
   const outer: Tile[] = [];
   for (let dy = -1; dy <= 1; dy++) {
@@ -44,15 +46,19 @@ export function computeCityYields(city: City, map: GameMap): CityYields {
     const t = outer[i];
     rawFood += TERRAIN[t.terrain].food;
     prod += TERRAIN[t.terrain].prod;
+    trade += TERRAIN[t.terrain].trade;
     worked.push(t);
   }
 
   const food = rawFood - city.population * FOOD_PER_CITIZEN;
 
-  // Science: each citizen contributes 1 science. Library doubles the city's
-  // science output.
+  // Science: each citizen contributes 1 science. Library doubles it.
   let science = city.population;
   if (city.buildings.includes('library')) science *= 2;
 
-  return { rawFood, food, prod, science, workedTiles: worked };
+  // Gold from trade yields. Marketplace adds +50%.
+  let gold = trade;
+  if (city.buildings.includes('marketplace')) gold = Math.floor(gold * 1.5);
+
+  return { rawFood, food, prod, science, gold, workedTiles: worked };
 }

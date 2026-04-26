@@ -103,6 +103,8 @@ export default function Hud() {
   const researched = human?.researched ?? [];
   const researching = human?.researching ?? null;
   const science = human?.science ?? 0;
+  const gold = human?.gold ?? 0;
+  const rushBuild = useGame((s) => s.rushBuild);
 
   return (
     <SafeAreaView style={styles.root} pointerEvents="box-none">
@@ -151,6 +153,10 @@ export default function Hud() {
             </Text>
           )}
         </Pressable>
+        <View style={styles.pill}>
+          <FontAwesome5 name="coins" size={12} color={THEME.warn} style={styles.pillIcon} />
+          <Text style={styles.pillText}>{gold}</Text>
+        </View>
       </View>
 
       {lastBattle ? (
@@ -317,11 +323,32 @@ export default function Hud() {
                   <Text style={styles.cardMeta}>
                     Food {selectedCity.food}/{growthThreshold} (
                     {yields.food >= 0 ? '+' : ''}
-                    {yields.food}/turn) · Prod{' '}
-                    {selectedCity.production}/{buildCost} (+{yields.prod}/turn)
+                    {yields.food}/t) · Prod {selectedCity.production}/{buildCost} (+
+                    {yields.prod}/t) · Gold +{yields.gold}/t
                   </Text>
                 ) : null}
                 <Text style={styles.cardMeta}>Building: {buildTargetLabel}</Text>
+                {selectedCity.building &&
+                selectedCity.production < buildCost ? (() => {
+                  const remaining = buildCost - selectedCity.production;
+                  const rushCost = remaining * 2;
+                  const canAfford = gold >= rushCost;
+                  return (
+                    <Pressable
+                      style={[
+                        styles.actionMuted,
+                        { marginTop: 6 },
+                        !canAfford && { opacity: 0.45 },
+                      ]}
+                      disabled={!canAfford}
+                      onPress={() => rushBuild(selectedCity.id)}
+                    >
+                      <Text style={styles.actionMutedText}>
+                        Rush · {rushCost} gold
+                      </Text>
+                    </Pressable>
+                  );
+                })() : null}
                 <View style={styles.focusRow}>
                   <Text style={styles.focusLabel}>Focus:</Text>
                   {CITY_FOCUSES.map((f) => {

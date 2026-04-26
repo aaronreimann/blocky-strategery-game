@@ -75,6 +75,7 @@ type GameState = {
   setUnitDestination: (unitId: string, x: number, y: number) => void;
   clearUnitDestination: (unitId: string) => void;
   toggleWorkerAuto: () => void;
+  rushBuild: (cityId: string) => void;
   openTilePicker: (x: number, y: number) => void;
   closeTilePicker: () => void;
   selectUnitFromPicker: (unitId: string) => void;
@@ -197,6 +198,7 @@ export const useGame = create<GameState>((set, get) => ({
       researched: p.researched ?? [],
       researching: p.researching ?? null,
       science: p.science ?? 0,
+      gold: p.gold ?? 0,
     }));
     // Forward-compat: older cities used a string `building` and a numeric
     // `productionPerTurn`. New schema uses a build target object and yields
@@ -590,6 +592,34 @@ export const useGame = create<GameState>((set, get) => ({
     autosave(get());
   },
 
+  rushBuild: (cityId) => {
+    const { cities, players, gameOver } = get();
+    if (gameOver) return;
+    const city = cities.find((c) => c.id === cityId);
+    if (!city || city.ownerIdx !== HUMAN_IDX) return;
+    if (!city.building) return;
+    const cost =
+      city.building.kind === 'unit'
+        ? UNIT[city.building.unit].cost
+        : BUILDING[city.building.building].cost;
+    const remaining = Math.max(0, cost - city.production);
+    const goldCost = remaining * 2;
+    const human = players.find((p) => p.isHuman);
+    if (!human || human.gold < goldCost) return;
+
+    // Mark production as exactly cost so the city completes the build at the
+    // start of its next endTurn. Cleaner than mid-turn spawning.
+    set({
+      players: players.map((p) =>
+        p.isHuman ? { ...p, gold: p.gold - goldCost } : p,
+      ),
+      cities: cities.map((c) =>
+        c.id === city.id ? { ...c, production: cost } : c,
+      ),
+    });
+    autosave(get());
+  },
+
   toggleWorkerAuto: () => {
     const { units, selectedUnitId, gameOver } = get();
     if (gameOver) return;
@@ -866,15 +896,18 @@ export const useGame = create<GameState>((set, get) => ({
       });
     }
 
-    // Science: aggregate per-player science gain from each city's yields.
+    // Science + gold: aggregate per-player gain from each city's yields.
     const scienceByPlayer = new Map<number, number>();
+    const goldByPlayer = new Map<number, number>();
     for (const c of workingCities) {
       const y = computeCityYields(c, map);
       scienceByPlayer.set(c.ownerIdx, (scienceByPlayer.get(c.ownerIdx) ?? 0) + y.science);
+      goldByPlayer.set(c.ownerIdx, (goldByPlayer.get(c.ownerIdx) ?? 0) + y.gold);
     }
 
     let workingPlayers: Player[] = players.map((p) => {
       const gain = scienceByPlayer.get(p.idx) ?? 0;
+      const goldGain = goldByPlayer.get(p.idx) ?? 0;
       let science = p.science + gain;
       let researching = p.researching;
       let researched = p.researched;
@@ -895,7 +928,7 @@ export const useGame = create<GameState>((set, get) => ({
       if (!p.isHuman && !researching) {
         researching = pickCheapestAvailable(researched);
       }
-      return { ...p, science, researching, researched };
+      return { ...p, science, researching, researched, gold: p.gold + goldGain };
     });
 
     let lastAIBattle: Battle | null = null;

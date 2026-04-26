@@ -38,6 +38,7 @@ export type Player = {
   researched: TechId[];
   researching: TechId | null;
   science: number;
+  gold: number;
 };
 
 export type Unit = {

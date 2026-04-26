@@ -149,6 +149,7 @@ export function buildInitialState(
     researched: [],
     researching: null,
     science: 0,
+    gold: 0,
   }));
 
   const units: Unit[] = [];
