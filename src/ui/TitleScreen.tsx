@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, ImageBackground, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { buildFallbackLeaders, type LeaderMap } from '@/src/data/countries';
@@ -61,11 +61,17 @@ export default function TitleScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.root}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Blocky Strategery</Text>
-        <Text style={styles.subtitle}>Pick a realm</Text>
-      </View>
+    <ImageBackground 
+      source={require('../../assets/images/title-bg.png')} 
+      style={{ flex: 1 }} 
+      resizeMode="cover"
+    >
+      <View style={{ ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' }} />
+      <SafeAreaView style={[styles.root, { backgroundColor: 'transparent' }]}>
+        <View style={styles.header}>
+          <Image source={require('../../assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
+          <Text style={styles.subtitle}>Pick a realm</Text>
+        </View>
 
       <View style={styles.slotRow}>
         {slots.map((info) => (
@@ -126,7 +132,8 @@ export default function TitleScreen() {
           </View>
         </View>
       )}
-    </SafeAreaView>
+      </SafeAreaView>
+    </ImageBackground>
   );
 }
 
@@ -139,6 +146,15 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   header: { alignItems: 'center', marginBottom: 32 },
+  logo: { 
+    width: 420, 
+    height: 180, 
+    marginBottom: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.6,
+    shadowRadius: 10,
+  },
   title: { color: THEME.ink, fontSize: 44, fontWeight: '900', letterSpacing: 2 },
   subtitle: { color: THEME.inkMuted, fontSize: 14, marginTop: 6 },
   slotRow: {
@@ -150,8 +166,8 @@ const styles = StyleSheet.create({
   },
   slotWrap: { flex: 1, maxWidth: 240, alignItems: 'center', gap: 8 },
   slotCard: {
-    backgroundColor: THEME.bgElevated,
-    borderColor: THEME.border,
+    backgroundColor: 'rgba(28, 22, 18, 0.78)',
+    borderColor: 'rgba(212, 184, 138, 0.45)',
     borderWidth: 1,
     borderRadius: 12,
     padding: 16,
@@ -187,8 +203,8 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   modalCard: {
-    backgroundColor: THEME.bgElevated,
-    borderColor: THEME.border,
+    backgroundColor: 'rgba(28, 22, 18, 0.85)',
+    borderColor: 'rgba(212, 184, 138, 0.45)',
     borderWidth: 1,
     borderRadius: 16,
     padding: 24,
