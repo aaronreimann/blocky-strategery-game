@@ -35,6 +35,14 @@ export default function Hud() {
         <Pressable style={styles.pill} onPress={exitToTitle}>
           <Text style={styles.pillText}>← Title</Text>
         </Pressable>
+        {players[0] ? (
+          <View style={[styles.pill, { borderColor: players[0].color }]}>
+            <Text style={[styles.pillText, { color: players[0].color }]}>
+              {players[0].name}
+              {players[0].leader ? ` · ${players[0].leader}` : ''}
+            </Text>
+          </View>
+        ) : null}
         <View style={styles.pill}>
           <Text style={styles.pillText}>
             Realm {currentSlot !== null ? currentSlot + 1 : '?'} · Turn {turn}
@@ -45,13 +53,6 @@ export default function Hud() {
             Cities {myCitiesCount} · Units {myUnitsCount}
           </Text>
         </View>
-        {players.length > 1 ? (
-          <View style={[styles.pill, { borderColor: players[1].color }]}>
-            <Text style={[styles.pillText, { color: players[1].color }]}>
-              vs {players[1].name}
-            </Text>
-          </View>
-        ) : null}
       </View>
 
       {lastBattle ? (

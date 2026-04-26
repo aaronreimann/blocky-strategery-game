@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { buildFallbackLeaders, type LeaderMap } from '@/src/data/countries';
+import { getCachedLeaders, refreshLeaders } from '@/src/data/leaders';
 import {
   DIFFICULTIES,
   DIFFICULTY_AI_COUNT,
@@ -19,6 +21,7 @@ export default function TitleScreen() {
 
   const [slots, setSlots] = useState<SlotInfo[]>([]);
   const [pendingSlot, setPendingSlot] = useState<number | null>(null);
+  const leadersRef = useRef<LeaderMap>(buildFallbackLeaders());
 
   const refresh = useCallback(async () => {
     const list = await listSlots();
@@ -27,6 +30,13 @@ export default function TitleScreen() {
 
   useEffect(() => {
     refresh();
+    // Read whatever cache we have; then kick off a fresh fetch in the background.
+    getCachedLeaders().then((m) => {
+      leadersRef.current = m;
+    });
+    refreshLeaders().then((m) => {
+      if (m) leadersRef.current = m;
+    });
   }, [refresh]);
 
   const onSlotPress = async (slot: number, info: SlotInfo) => {
@@ -40,7 +50,7 @@ export default function TitleScreen() {
 
   const onPickDifficulty = (difficulty: Difficulty) => {
     if (pendingSlot !== null) {
-      newGame(pendingSlot, Date.now() & 0x7fffffff, difficulty);
+      newGame(pendingSlot, Date.now() & 0x7fffffff, difficulty, leadersRef.current);
     }
     setPendingSlot(null);
   };
@@ -70,9 +80,13 @@ export default function TitleScreen() {
               ) : (
                 <>
                   <Text style={styles.slotMeta}>
+                    {info.humanCiv.name}
+                    {info.humanCiv.leader ? ` · ${info.humanCiv.leader}` : ''}
+                  </Text>
+                  <Text style={styles.slotMetaDim}>
                     {DIFFICULTY_LABELS[info.difficulty]} · Turn {info.turn}
                   </Text>
-                  <Text style={styles.slotMeta}>
+                  <Text style={styles.slotMetaDim}>
                     {info.cityCount} {info.cityCount === 1 ? 'city' : 'cities'} ·{' '}
                     {info.unitCount} units
                   </Text>
@@ -131,10 +145,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 16,
     width: '100%',
-    maxWidth: 720,
+    maxWidth: 760,
     justifyContent: 'center',
   },
-  slotWrap: { flex: 1, maxWidth: 220, alignItems: 'center', gap: 8 },
+  slotWrap: { flex: 1, maxWidth: 240, alignItems: 'center', gap: 8 },
   slotCard: {
     backgroundColor: THEME.bgElevated,
     borderColor: THEME.border,
@@ -142,7 +156,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     width: '100%',
-    minHeight: 140,
+    minHeight: 160,
     justifyContent: 'center',
   },
   slotNumber: {
@@ -153,7 +167,8 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   slotEmpty: { color: THEME.ink, fontSize: 18, fontWeight: '700' },
-  slotMeta: { color: THEME.ink, fontSize: 14, fontWeight: '600', marginTop: 2 },
+  slotMeta: { color: THEME.ink, fontSize: 14, fontWeight: '700', marginTop: 2 },
+  slotMetaDim: { color: THEME.inkMuted, fontSize: 12, marginTop: 2 },
   slotHint: { color: THEME.inkMuted, fontSize: 11, marginTop: 8 },
   deleteBtn: {
     paddingHorizontal: 12,
@@ -163,7 +178,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   deleteBtnText: { color: THEME.bad, fontSize: 11, fontWeight: '700' },
-
   modalBg: {
     position: 'absolute',
     top: 0, left: 0, right: 0, bottom: 0,

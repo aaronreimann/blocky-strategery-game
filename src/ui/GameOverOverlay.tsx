@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { getCachedLeaders } from '@/src/data/leaders';
 import { useGame } from '@/src/state/game';
 
 import { THEME } from './palette';
@@ -23,10 +24,10 @@ export default function GameOverOverlay() {
     : THEME.warn;
 
   const difficulty = useGame((s) => s.difficulty);
-  const onPlayAgain = () => {
-    if (currentSlot !== null) {
-      newGame(currentSlot, Date.now() & 0x7fffffff, difficulty);
-    }
+  const onPlayAgain = async () => {
+    if (currentSlot === null) return;
+    const leaders = await getCachedLeaders();
+    newGame(currentSlot, Date.now() & 0x7fffffff, difficulty, leaders);
   };
 
   return (

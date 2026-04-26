@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 
+import type { LeaderMap } from '@/src/data/countries';
 import { TERRAIN } from '@/src/data/terrain';
 import { UNIT, type UnitKind } from '@/src/data/units';
 import { runAITurn } from '@/src/game/ai';
@@ -30,7 +31,7 @@ type GameState = {
   lastBattle: Battle | null;
   gameOver: GameOverState | null;
 
-  newGame: (slot: number, seed: number, difficulty: Difficulty) => void;
+  newGame: (slot: number, seed: number, difficulty: Difficulty, leaders: LeaderMap) => void;
   loadFromSlot: (slot: number) => Promise<boolean>;
   exitToTitle: () => void;
 
@@ -98,8 +99,8 @@ export const useGame = create<GameState>((set, get) => ({
   lastBattle: null,
   gameOver: null,
 
-  newGame: (slot, seed, difficulty) => {
-    const initial = buildInitialState(seed, difficulty);
+  newGame: (slot, seed, difficulty, leaders) => {
+    const initial = buildInitialState(seed, difficulty, leaders);
     syncIdCounters(
       Math.max(0, ...initial.units.map((u) => parseIdNum(u.id))),
       Math.max(0, ...initial.cities.map((c) => parseIdNum(c.id))),

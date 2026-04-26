@@ -22,7 +22,8 @@ export type GameOverState = {
 
 export type Player = {
   idx: number;
-  name: string;
+  name: string;   // country name
+  leader: string; // current leader (best-effort, from Wikidata cache or bundled fallback)
   color: string;
   isHuman: boolean;
 };

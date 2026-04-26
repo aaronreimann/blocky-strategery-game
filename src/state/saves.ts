@@ -31,6 +31,7 @@ export type SlotInfo =
       cityCount: number;
       unitCount: number;
       difficulty: Difficulty;
+      humanCiv: { name: string; leader: string };
       savedAt: string;
     };
 
@@ -70,6 +71,7 @@ export async function listSlots(): Promise<SlotInfo[]> {
     if (!data) {
       out.push({ slot: i, empty: true });
     } else {
+      const human = data.players.find((p) => p.isHuman);
       out.push({
         slot: i,
         empty: false,
@@ -77,6 +79,10 @@ export async function listSlots(): Promise<SlotInfo[]> {
         cityCount: data.cities.length,
         unitCount: data.units.length,
         difficulty: data.difficulty,
+        humanCiv: {
+          name: human?.name ?? 'You',
+          leader: human?.leader ?? '',
+        },
         savedAt: data.savedAt,
       });
     }

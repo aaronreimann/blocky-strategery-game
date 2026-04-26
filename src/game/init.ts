@@ -1,3 +1,4 @@
+import { COUNTRIES, type Country, type LeaderMap } from '@/src/data/countries';
 import { TERRAIN } from '@/src/data/terrain';
 import { UNIT } from '@/src/data/units';
 import { PLAYER_PALETTE } from '@/src/ui/palette';
@@ -22,8 +23,6 @@ export type InitialState = {
 
 const PREFERRED_TERRAIN = new Set(['grassland', 'plains']);
 
-const AI_NAMES = ['Mongols', 'Romans', 'Greeks', 'Norse', 'Persians', 'Aztecs', 'Egyptians'];
-
 function clamp(v: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, v));
 }
@@ -46,19 +45,16 @@ function pickSpawnPoints(map: GameMap, count: number): { x: number; y: number }[
 
   const cx = map.width / 2;
   const cy = map.height / 2;
-
   const sortedByCenter = [...pool].sort(
     (a, b) => Math.hypot(a.x - cx, a.y - cy) - Math.hypot(b.x - cx, b.y - cy),
   );
-
   const spawns: { x: number; y: number }[] = [{ x: sortedByCenter[0].x, y: sortedByCenter[0].y }];
 
   for (let n = 1; n < count; n++) {
     let best: { x: number; y: number } | null = null;
     let bestScore = -1;
-    let bestRespectingMinDist: { x: number; y: number } | null = null;
+    let bestRespecting: { x: number; y: number } | null = null;
     let bestRespectingScore = -1;
-
     for (const t of pool) {
       let minD = Number.POSITIVE_INFINITY;
       for (const s of spawns) {
@@ -71,13 +67,11 @@ function pickSpawnPoints(map: GameMap, count: number): { x: number; y: number }[
       }
       if (minD >= minDist && minD > bestRespectingScore) {
         bestRespectingScore = minD;
-        bestRespectingMinDist = { x: t.x, y: t.y };
+        bestRespecting = { x: t.x, y: t.y };
       }
     }
-
-    spawns.push(bestRespectingMinDist ?? best ?? spawns[0]);
+    spawns.push(bestRespecting ?? best ?? spawns[0]);
   }
-
   return spawns;
 }
 
@@ -114,27 +108,33 @@ function spawnStartingUnits(
   ];
 }
 
-export function buildInitialState(seed: number, difficulty: Difficulty): InitialState {
+function pickRandomCountries(count: number): Country[] {
+  const shuffled = [...COUNTRIES].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, count);
+}
+
+export function buildInitialState(
+  seed: number,
+  difficulty: Difficulty,
+  leaders: LeaderMap,
+): InitialState {
   const map = generateMap(seed);
   const aiCount = DIFFICULTY_AI_COUNT[difficulty];
   const totalPlayers = 1 + aiCount;
+  const civs = pickRandomCountries(totalPlayers);
   const spawns = pickSpawnPoints(map, totalPlayers);
 
-  const players: Player[] = [
-    { idx: 0, name: 'You', color: PLAYER_PALETTE[0], isHuman: true },
-  ];
-  const units: Unit[] = [...spawnStartingUnits(0, spawns[0], map)];
+  const players: Player[] = civs.map((c, idx) => ({
+    idx,
+    name: c.name,
+    leader: leaders[c.qid] ?? c.fallbackLeader,
+    color: PLAYER_PALETTE[idx % PLAYER_PALETTE.length],
+    isHuman: idx === 0,
+  }));
 
-  for (let i = 0; i < aiCount; i++) {
-    const idx = i + 1;
-    players.push({
-      idx,
-      name: AI_NAMES[i % AI_NAMES.length],
-      color: PLAYER_PALETTE[idx % PLAYER_PALETTE.length],
-      isHuman: false,
-    });
-    const start = spawns[idx] ?? spawns[0];
-    units.push(...spawnStartingUnits(idx, start, map));
+  const units: Unit[] = [];
+  for (let i = 0; i < totalPlayers; i++) {
+    units.push(...spawnStartingUnits(i, spawns[i] ?? spawns[0], map));
   }
 
   return { map, players, units, cities: [] };
