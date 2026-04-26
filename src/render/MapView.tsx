@@ -31,7 +31,7 @@ import MiniMap from './MiniMap';
 const UNIT_GLYPH: Record<UnitKind, string> = {
   pioneer:   '', // person-walking
   laborer:   '', // hammer
-  footman:   '', // fist-raised
+  footman:   '', // gavel (mallet)
   spearman:  '', // shield-alt
   horseman:  '', // horse
   swordsman: '', // skull-crossbones

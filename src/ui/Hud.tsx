@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BUILDING, BUILDING_KINDS } from '@/src/data/buildings';
@@ -68,6 +68,23 @@ export default function Hud() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCityId]);
 
+  // Auto-dismiss the end-of-turn summary after a few seconds with a fade.
+  const eventsOpacity = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    if (turnEvents.length === 0) return;
+    eventsOpacity.setValue(1);
+    const fadeTimeout = setTimeout(() => {
+      Animated.timing(eventsOpacity, {
+        toValue: 0,
+        duration: 400,
+        useNativeDriver: true,
+      }).start(({ finished }) => {
+        if (finished) dismissTurnEvents();
+      });
+    }, 3500);
+    return () => clearTimeout(fadeTimeout);
+  }, [turnEvents, eventsOpacity, dismissTurnEvents]);
+
   // Friendly = human player only for HUD context.
   const myUnitsCount = units.filter((u) => u.ownerIdx === 0).length;
   const myCitiesCount = cities.filter((c) => c.ownerIdx === 0).length;
@@ -128,13 +145,18 @@ export default function Hud() {
       ) : null}
 
       {turnEvents.length > 0 ? (
-        <View style={styles.eventsWrap} pointerEvents="box-none">
-          <View style={styles.eventsCard} pointerEvents="auto">
+        <Animated.View
+          style={[styles.eventsWrap, { opacity: eventsOpacity }]}
+          pointerEvents="box-none"
+        >
+          <Pressable
+            onPress={dismissTurnEvents}
+            style={styles.eventsCard}
+            pointerEvents="auto"
+          >
             <View style={styles.eventsHeader}>
               <Text style={styles.eventsTitle}>Last turn</Text>
-              <Pressable onPress={dismissTurnEvents} style={styles.eventsClose}>
-                <Text style={styles.eventsCloseText}>Dismiss</Text>
-              </Pressable>
+              <Text style={styles.eventsCloseText}>tap to dismiss</Text>
             </View>
             {turnEvents.slice(0, 8).map((ev, i) => (
               <Text
@@ -150,8 +172,8 @@ export default function Hud() {
                 +{turnEvents.length - 8} more
               </Text>
             ) : null}
-          </View>
-        </View>
+          </Pressable>
+        </Animated.View>
       ) : null}
 
       <View style={styles.bottomRow} pointerEvents="box-none">
