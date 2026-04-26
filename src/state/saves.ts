@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import type { ImprovementMap } from '@/src/data/improvements';
 import type { GameMap } from '@/src/game/map';
-import type { City, Difficulty, GameOverState, Player, Unit } from '@/src/game/types';
+import type { City, Difficulty, GameOverState, Player, Unit, Wonder } from '@/src/game/types';
 
 export const SLOT_COUNT = 3;
 const SAVE_VERSION = 2;
@@ -20,6 +20,7 @@ export type SaveData = {
   units: Unit[];
   cities: City[];
   improvements: ImprovementMap;
+  wonders: Wonder[];
   gameOver: GameOverState | null;
   savedAt: string;
 };

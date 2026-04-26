@@ -2,6 +2,7 @@ import type { BuildingKind } from '@/src/data/buildings';
 import type { ImprovementKind } from '@/src/data/improvements';
 import type { TechId } from '@/src/data/tech';
 import type { UnitKind } from '@/src/data/units';
+import type { WonderKind } from '@/src/data/wonders';
 
 export const DIFFICULTIES = ['easy', 'normal', 'hard'] as const;
 export type Difficulty = (typeof DIFFICULTIES)[number];
@@ -57,7 +58,14 @@ export type Unit = {
 
 export type CityBuildTarget =
   | { kind: 'unit'; unit: UnitKind }
-  | { kind: 'building'; building: BuildingKind };
+  | { kind: 'building'; building: BuildingKind }
+  | { kind: 'wonder'; wonder: WonderKind };
+
+export type Wonder = {
+  kind: WonderKind;
+  ownerIdx: number;
+  cityId: string;
+};
 
 export const CITY_FOCUSES = ['balanced', 'roads'] as const;
 export type CityFocus = (typeof CITY_FOCUSES)[number];

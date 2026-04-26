@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 
 import { BUILDING, type BuildingKind } from '@/src/data/buildings';
+import { WONDER, type WonderKind } from '@/src/data/wonders';
 import type { LeaderMap } from '@/src/data/countries';
 import {
   IMPROVEMENT,
@@ -27,6 +28,7 @@ import type {
   Player,
   TurnEvent,
   Unit,
+  Wonder,
 } from '@/src/game/types';
 import { computeCityYields, foodNeededToGrow } from '@/src/game/yields';
 
@@ -36,9 +38,9 @@ const MIN_CITY_SPACING = 3;
 const HUMAN_IDX = 0;
 
 function buildCost(target: CityBuildTarget): number {
-  return target.kind === 'unit'
-    ? UNIT[target.unit].cost
-    : BUILDING[target.building].cost;
+  if (target.kind === 'unit') return UNIT[target.unit].cost;
+  if (target.kind === 'building') return BUILDING[target.building].cost;
+  return WONDER[target.wonder].cost;
 }
 
 type GameState = {
@@ -47,6 +49,7 @@ type GameState = {
   units: Unit[];
   cities: City[];
   improvements: ImprovementMap;
+  wonders: Wonder[];
   turn: number;
   seed: number;
   difficulty: Difficulty;
@@ -125,6 +128,7 @@ function autosave(state: GameState): void {
     units: state.units,
     cities: state.cities,
     improvements: state.improvements,
+    wonders: state.wonders,
     gameOver: state.gameOver,
   }).catch((err) => console.warn('autosave failed', err));
 }
@@ -135,6 +139,7 @@ export const useGame = create<GameState>((set, get) => ({
   units: [],
   cities: [],
   improvements: {},
+  wonders: [],
   turn: 1,
   seed: 0,
   difficulty: 'normal',
@@ -159,6 +164,7 @@ export const useGame = create<GameState>((set, get) => ({
       units: initial.units,
       cities: initial.cities,
       improvements: {},
+      wonders: [],
       turn: 1,
       seed,
       difficulty,
@@ -238,6 +244,7 @@ export const useGame = create<GameState>((set, get) => ({
       units: normalizedUnits,
       cities: normalizedCities,
       improvements: data.improvements ?? {},
+      wonders: data.wonders ?? [],
       turn: data.turn,
       seed: data.seed,
       difficulty: data.difficulty,
@@ -257,6 +264,7 @@ export const useGame = create<GameState>((set, get) => ({
       units: [],
       cities: [],
       improvements: {},
+      wonders: [],
       turn: 1,
       seed: 0,
       difficulty: 'normal',
@@ -342,7 +350,13 @@ export const useGame = create<GameState>((set, get) => ({
           const cityHere = cities.find(
             (c) => c.x === x && c.y === y && c.ownerIdx === enemyUnitAtTile.ownerIdx,
           );
-          const wallsBonus = cityHere?.buildings.includes('walls') ? 1 : 0;
+          const wallsBonus =
+            (cityHere?.buildings.includes('walls') ? 1 : 0) +
+            (cityHere && get().wonders.some(
+              (w) => w.kind === 'great_wall' && w.ownerIdx === cityHere.ownerIdx,
+            )
+              ? 1
+              : 0);
           battle = resolveCombat(selected, enemyUnitAtTile, defenderTile, wallsBonus);
           if (!battle.attackerWon) {
             nextUnits = nextUnits.filter((u) => u.id !== selected.id);
@@ -598,10 +612,7 @@ export const useGame = create<GameState>((set, get) => ({
     const city = cities.find((c) => c.id === cityId);
     if (!city || city.ownerIdx !== HUMAN_IDX) return;
     if (!city.building) return;
-    const cost =
-      city.building.kind === 'unit'
-        ? UNIT[city.building.unit].cost
-        : BUILDING[city.building.building].cost;
+    const cost = buildCost(city.building);
     const remaining = Math.max(0, cost - city.production);
     const goldCost = remaining * 2;
     const human = players.find((p) => p.isHuman);
@@ -682,8 +693,9 @@ export const useGame = create<GameState>((set, get) => ({
   cancelSetDestination: () => set({ awaitingDestinationFor: null }),
 
   endTurn: () => {
-    const { units, cities, turn, map, players, improvements, gameOver } = get();
+    const { units, cities, turn, map, players, improvements, wonders, gameOver } = get();
     if (gameOver || !map) return;
+    let workingWonders = wonders;
 
     const events: TurnEvent[] = [];
     const playerName = (idx: number) => players[idx]?.name ?? `Player ${idx}`;
@@ -711,7 +723,7 @@ export const useGame = create<GameState>((set, get) => ({
     });
 
     let workingCities: City[] = cities.map((city) => {
-      const yields = computeCityYields(city, map);
+      const yields = computeCityYields(city, map, wonders);
 
       // Food growth: surplus food goes into the city's larder; on overflow,
       // grow a citizen. Granary keeps half of the larder on growth.
@@ -783,10 +795,42 @@ export const useGame = create<GameState>((set, get) => ({
         };
       }
 
-      // Building completed: add to buildings, default back to footman.
+      // Building or wonder completed.
+      if (city.building.kind === 'wonder') {
+        const wonderKind = city.building.wonder;
+        // If someone (anyone!) already built this wonder, refund nothing and
+        // revert to footman.
+        if (workingWonders.some((w) => w.kind === wonderKind)) {
+          return {
+            ...city,
+            population: nextPop,
+            food: nextFood,
+            production: 0,
+            building: { kind: 'unit', unit: 'footman' },
+          };
+        }
+        workingWonders = [
+          ...workingWonders,
+          { kind: wonderKind, ownerIdx: city.ownerIdx, cityId: city.id },
+        ];
+        if (city.ownerIdx === HUMAN_IDX) {
+          events.push({
+            kind: 'built',
+            text: `${city.name} completed the ${WONDER[wonderKind].name}!`,
+          });
+        }
+        return {
+          ...city,
+          population: nextPop,
+          food: nextFood,
+          production: 0,
+          building: { kind: 'unit', unit: 'footman' },
+        };
+      }
+
+      // Regular building completed: add to buildings, default back to footman.
       const kind = city.building.building;
       if (city.buildings.includes(kind)) {
-        // Already owned — drop the prod and revert to footman.
         return {
           ...city,
           population: nextPop,
@@ -900,7 +944,7 @@ export const useGame = create<GameState>((set, get) => ({
     const scienceByPlayer = new Map<number, number>();
     const goldByPlayer = new Map<number, number>();
     for (const c of workingCities) {
-      const y = computeCityYields(c, map);
+      const y = computeCityYields(c, map, workingWonders);
       scienceByPlayer.set(c.ownerIdx, (scienceByPlayer.get(c.ownerIdx) ?? 0) + y.science);
       goldByPlayer.set(c.ownerIdx, (goldByPlayer.get(c.ownerIdx) ?? 0) + y.gold);
     }
@@ -979,6 +1023,7 @@ export const useGame = create<GameState>((set, get) => ({
       units: workingUnits,
       cities: workingCities,
       improvements: workingImprovements,
+      wonders: workingWonders,
       lastBattle: lastAIBattle,
       turnEvents: events,
       gameOver: finished,

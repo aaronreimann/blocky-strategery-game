@@ -1,7 +1,7 @@
 import { TERRAIN } from '@/src/data/terrain';
 
 import type { GameMap, Tile } from './map';
-import type { City } from './types';
+import type { City, Wonder } from './types';
 
 export type CityYields = {
   rawFood: number;
@@ -18,9 +18,16 @@ export function foodNeededToGrow(population: number): number {
   return 5 + population * 5;
 }
 
-export function computeCityYields(city: City, map: GameMap): CityYields {
+export function computeCityYields(
+  city: City,
+  map: GameMap,
+  wonders: Wonder[] = [],
+): CityYields {
+  const ownerWonders = wonders.filter((w) => w.ownerIdx === city.ownerIdx);
+  const hasPyramids = ownerWonders.some((w) => w.kind === 'pyramids');
+  const hasGreatLibrary = ownerWonders.some((w) => w.kind === 'great_library');
   const center = map.tiles[city.y * map.width + city.x];
-  let rawFood = TERRAIN[center.terrain].food;
+  let rawFood = TERRAIN[center.terrain].food + (hasPyramids ? 1 : 0);
   let prod = TERRAIN[center.terrain].prod;
   let trade = TERRAIN[center.terrain].trade;
 
@@ -52,9 +59,11 @@ export function computeCityYields(city: City, map: GameMap): CityYields {
 
   const food = rawFood - city.population * FOOD_PER_CITIZEN;
 
-  // Science: each citizen contributes 1 science. Library doubles it.
+  // Science: each citizen contributes 1 science. Library doubles it. Great
+  // Library is a flat +50% on top.
   let science = city.population;
   if (city.buildings.includes('library')) science *= 2;
+  if (hasGreatLibrary) science = Math.floor(science * 1.5);
 
   // Gold from trade yields. Marketplace adds +50%.
   let gold = trade;

@@ -8,6 +8,7 @@ import { flagEmoji } from '@/src/data/countries';
 import { IMPROVEMENT, tileKey } from '@/src/data/improvements';
 import { TECH } from '@/src/data/tech';
 import { UNIT, UNIT_KINDS } from '@/src/data/units';
+import { WONDER, WONDER_KINDS } from '@/src/data/wonders';
 import { computeCityYields, foodNeededToGrow } from '@/src/game/yields';
 import {
   CITY_FOCUSES,
@@ -36,12 +37,13 @@ function eventStyle(kind: string): { color: string } {
 
 export default function Hud() {
   const [techOpen, setTechOpen] = useState(false);
-  const [cityTab, setCityTab] = useState<'units' | 'buildings'>('units');
+  const [cityTab, setCityTab] = useState<'units' | 'buildings' | 'wonders'>('units');
   const turn = useGame((s) => s.turn);
   const map = useGame((s) => s.map);
   const units = useGame((s) => s.units);
   const cities = useGame((s) => s.cities);
   const improvements = useGame((s) => s.improvements);
+  const wonders = useGame((s) => s.wonders);
   const players = useGame((s) => s.players);
   const currentSlot = useGame((s) => s.currentSlot);
   const selectedUnitId = useGame((s) => s.selectedUnitId);
@@ -75,7 +77,8 @@ export default function Hud() {
   // the city is currently building.
   useEffect(() => {
     if (!selectedCity) return;
-    setCityTab(selectedCity.building?.kind === 'building' ? 'buildings' : 'units');
+    const k = selectedCity.building?.kind;
+    setCityTab(k === 'building' ? 'buildings' : k === 'wonder' ? 'wonders' : 'units');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCityId]);
 
@@ -290,30 +293,36 @@ export default function Hud() {
           </View>
         ) : selectedCity ? (
           (() => {
-            const yields = map ? computeCityYields(selectedCity, map) : null;
+            const yields = map ? computeCityYields(selectedCity, map, wonders) : null;
             const growthThreshold = foodNeededToGrow(selectedCity.population);
             const buildTargetLabel = (() => {
-              if (!selectedCity.building) return 'Idle';
-              if (selectedCity.building.kind === 'unit') {
-                return UNIT[selectedCity.building.unit].name;
-              }
-              return BUILDING[selectedCity.building.building].name;
+              const b = selectedCity.building;
+              if (!b) return 'Idle';
+              if (b.kind === 'unit') return UNIT[b.unit].name;
+              if (b.kind === 'building') return BUILDING[b.building].name;
+              return WONDER[b.wonder].name;
             })();
             const buildCost = (() => {
-              if (!selectedCity.building) return 0;
-              return selectedCity.building.kind === 'unit'
-                ? UNIT[selectedCity.building.unit].cost
-                : BUILDING[selectedCity.building.building].cost;
+              const b = selectedCity.building;
+              if (!b) return 0;
+              if (b.kind === 'unit') return UNIT[b.unit].cost;
+              if (b.kind === 'building') return BUILDING[b.building].cost;
+              return WONDER[b.wonder].cost;
             })();
             const isCurrentTarget = (t: CityBuildTarget) => {
               const cur = selectedCity.building;
               if (!cur) return false;
               if (cur.kind !== t.kind) return false;
-              return cur.kind === 'unit'
-                ? cur.unit === (t as { unit: string }).unit
-                : cur.building === (t as { building: string }).building;
+              if (cur.kind === 'unit' && t.kind === 'unit') return cur.unit === t.unit;
+              if (cur.kind === 'building' && t.kind === 'building')
+                return cur.building === t.building;
+              if (cur.kind === 'wonder' && t.kind === 'wonder')
+                return cur.wonder === t.wonder;
+              return false;
             };
             const owns = (b: string) => selectedCity.buildings.includes(b as never);
+            const wonderTaken = (w: string) =>
+              wonders.some((x) => x.kind === w);
             return (
               <View style={styles.card} pointerEvents="auto">
                 <Text style={styles.cardTitle}>
@@ -372,11 +381,14 @@ export default function Hud() {
                   })}
                 </View>
                 <View style={styles.tabsRow}>
-                  {(['units', 'buildings'] as const).map((t) => {
+                  {(['units', 'buildings', 'wonders'] as const).map((t) => {
                     const cur = cityTab === t;
                     const isCurrentBuildHere =
                       (t === 'units' && selectedCity.building?.kind === 'unit') ||
-                      (t === 'buildings' && selectedCity.building?.kind === 'building');
+                      (t === 'buildings' && selectedCity.building?.kind === 'building') ||
+                      (t === 'wonders' && selectedCity.building?.kind === 'wonder');
+                    const label =
+                      t === 'units' ? 'Units' : t === 'buildings' ? 'Buildings' : 'Wonders';
                     return (
                       <Pressable
                         key={t}
@@ -384,7 +396,7 @@ export default function Hud() {
                         onPress={() => setCityTab(t)}
                       >
                         <Text style={[styles.tabText, cur && styles.tabTextActive]}>
-                          {t === 'units' ? 'Units' : 'Buildings'}
+                          {label}
                           {isCurrentBuildHere ? ' ●' : ''}
                         </Text>
                       </Pressable>
@@ -392,7 +404,47 @@ export default function Hud() {
                   })}
                 </View>
                 <View style={styles.buildRow}>
-                  {cityTab === 'units'
+                  {cityTab === 'wonders'
+                    ? WONDER_KINDS.filter(
+                        (k) => WONDER[k].tech === null || researched.includes(WONDER[k].tech!),
+                      ).map((kind) => {
+                        const target: CityBuildTarget = { kind: 'wonder', wonder: kind };
+                        const cur = isCurrentTarget(target);
+                        const taken = wonderTaken(kind);
+                        return (
+                          <Pressable
+                            key={`w-${kind}`}
+                            style={[
+                              styles.buildBtn,
+                              styles.buildBtnBuilding,
+                              cur && styles.buildBtnActive,
+                              taken && styles.buildBtnOwned,
+                            ]}
+                            disabled={taken}
+                            onPress={() => setCityBuild(selectedCity.id, target)}
+                          >
+                            <Text
+                              style={[
+                                styles.buildBtnText,
+                                cur && styles.buildBtnTextActive,
+                                taken && styles.buildBtnOwnedText,
+                              ]}
+                            >
+                              {WONDER[kind].name}
+                            </Text>
+                            <Text
+                              style={[
+                                styles.buildBtnCost,
+                                cur && styles.buildBtnTextActive,
+                                taken && styles.buildBtnOwnedText,
+                              ]}
+                            >
+                              {taken ? 'taken' : WONDER[kind].cost}
+                            </Text>
+                          </Pressable>
+                        );
+                      })
+                    : cityTab === 'units'
                     ? UNIT_KINDS.filter(
                         (k) => UNIT[k].tech === null || researched.includes(UNIT[k].tech!),
                       ).map((kind) => {
