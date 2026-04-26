@@ -59,6 +59,10 @@ export default function Hud() {
   const setCityFocus = useGame((s) => s.setCityFocus);
   const startWork = useGame((s) => s.startWork);
   const cancelWork = useGame((s) => s.cancelWork);
+  const armSetDestination = useGame((s) => s.armSetDestination);
+  const cancelSetDestination = useGame((s) => s.cancelSetDestination);
+  const awaitingDestinationFor = useGame((s) => s.awaitingDestinationFor);
+  const clearUnitDestination = useGame((s) => s.clearUnitDestination);
   const exitToTitle = useGame((s) => s.exitToTitle);
   const dismissBattle = useGame((s) => s.dismissBattle);
 
@@ -216,6 +220,25 @@ export default function Hud() {
                 <Text style={styles.actionText}>Found City</Text>
               </Pressable>
             ) : null}
+            <View style={styles.unitActionsRow}>
+              {awaitingDestinationFor === selectedUnit.id ? (
+                <Pressable style={styles.actionMuted} onPress={cancelSetDestination}>
+                  <Text style={styles.actionMutedText}>Cancel — tap a tile to send, or here to abort</Text>
+                </Pressable>
+              ) : (
+                <Pressable style={styles.actionMuted} onPress={armSetDestination}>
+                  <Text style={styles.actionMutedText}>Set destination…</Text>
+                </Pressable>
+              )}
+              {selectedUnit.destination ? (
+                <Pressable
+                  style={styles.actionMuted}
+                  onPress={() => clearUnitDestination(selectedUnit.id)}
+                >
+                  <Text style={styles.actionMutedText}>Cancel destination</Text>
+                </Pressable>
+              ) : null}
+            </View>
             {selectedUnit.kind === 'laborer' ? (
               selectedUnit.workingOn ? (
                 <View style={styles.workRow}>
@@ -580,6 +603,7 @@ const styles = StyleSheet.create({
   },
   actionMutedText: { color: THEME.inkMuted, fontWeight: '700', fontSize: 12 },
   workRow: { marginTop: 6 },
+  unitActionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 },
   focusRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
   focusLabel: { color: THEME.inkMuted, fontSize: 11 },
   focusBtn: {

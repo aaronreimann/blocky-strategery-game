@@ -56,6 +56,7 @@ type GameState = {
   lastBattle: Battle | null;
   turnEvents: TurnEvent[];
   tilePicker: { x: number; y: number } | null;
+  awaitingDestinationFor: string | null;
   gameOver: GameOverState | null;
 
   newGame: (slot: number, seed: number, difficulty: Difficulty, leaders: LeaderMap) => void;
@@ -77,6 +78,8 @@ type GameState = {
   closeTilePicker: () => void;
   selectUnitFromPicker: (unitId: string) => void;
   selectCityFromPicker: (cityId: string) => void;
+  armSetDestination: () => void;
+  cancelSetDestination: () => void;
   endTurn: () => void;
   dismissBattle: () => void;
   dismissTurnEvents: () => void;
@@ -139,6 +142,7 @@ export const useGame = create<GameState>((set, get) => ({
   lastBattle: null,
   turnEvents: [],
   tilePicker: null,
+  awaitingDestinationFor: null,
   gameOver: null,
 
   newGame: (slot, seed, difficulty, leaders) => {
@@ -252,8 +256,27 @@ export const useGame = create<GameState>((set, get) => ({
   tapTile: (x, y) => {
     const state = get();
     if (state.gameOver) return;
-    const { units, cities, selectedUnitId, selectedCityId, map, players, turn } = state;
+    const {
+      units,
+      cities,
+      selectedUnitId,
+      selectedCityId,
+      map,
+      players,
+      turn,
+      awaitingDestinationFor,
+    } = state;
     if (!map) return;
+
+    // If destination-mode is armed, consume the tap as the destination.
+    if (awaitingDestinationFor) {
+      const armed = units.find((u) => u.id === awaitingDestinationFor);
+      set({ awaitingDestinationFor: null });
+      if (armed && armed.ownerIdx === HUMAN_IDX) {
+        get().setUnitDestination(armed.id, x, y);
+      }
+      return;
+    }
 
     const friendlyUnitAtTile = units.find(
       (u) => u.x === x && u.y === y && u.ownerIdx === HUMAN_IDX,
@@ -539,14 +562,44 @@ export const useGame = create<GameState>((set, get) => ({
   },
 
   openTilePicker: (x, y) => {
-    const { units, cities } = get();
-    const hasUnit = units.some((u) => u.x === x && u.y === y && u.ownerIdx === HUMAN_IDX);
-    const hasCity = cities.some((c) => c.x === x && c.y === y && c.ownerIdx === HUMAN_IDX);
-    if (!hasUnit && !hasCity) return;
+    const { units, cities, selectedUnitId } = get();
+    const unitHere = units.find(
+      (u) => u.x === x && u.y === y && u.ownerIdx === HUMAN_IDX,
+    );
+    const cityHere = cities.find(
+      (c) => c.x === x && c.y === y && c.ownerIdx === HUMAN_IDX,
+    );
+
+    // Long-press on the currently-selected unit's own tile = arm "set
+    // destination" mode (next tap is the destination).
+    if (unitHere && unitHere.id === selectedUnitId) {
+      set({ awaitingDestinationFor: unitHere.id });
+      return;
+    }
+
+    // Only one thing here? Just select it directly — no need for a popup.
+    if (unitHere && !cityHere) {
+      set({ selectedUnitId: unitHere.id, selectedCityId: null });
+      return;
+    }
+    if (cityHere && !unitHere) {
+      set({ selectedCityId: cityHere.id, selectedUnitId: null });
+      return;
+    }
+    if (!unitHere && !cityHere) return;
+
+    // Both exist — show the picker.
     set({ tilePicker: { x, y } });
   },
 
   closeTilePicker: () => set({ tilePicker: null }),
+
+  armSetDestination: () => {
+    const { selectedUnitId } = get();
+    if (!selectedUnitId) return;
+    set({ awaitingDestinationFor: selectedUnitId });
+  },
+  cancelSetDestination: () => set({ awaitingDestinationFor: null }),
 
   endTurn: () => {
     const { units, cities, turn, map, players, improvements, gameOver } = get();
