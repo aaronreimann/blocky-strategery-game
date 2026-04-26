@@ -10,11 +10,13 @@ export default function Hud() {
   const turn = useGame((s) => s.turn);
   const units = useGame((s) => s.units);
   const cities = useGame((s) => s.cities);
+  const currentSlot = useGame((s) => s.currentSlot);
   const selectedUnitId = useGame((s) => s.selectedUnitId);
   const selectedCityId = useGame((s) => s.selectedCityId);
   const endTurn = useGame((s) => s.endTurn);
   const foundCity = useGame((s) => s.foundCity);
   const setCityBuild = useGame((s) => s.setCityBuild);
+  const exitToTitle = useGame((s) => s.exitToTitle);
 
   const selectedUnit = selectedUnitId ? units.find((u) => u.id === selectedUnitId) : null;
   const unitSpec = selectedUnit ? UNIT[selectedUnit.kind] : null;
@@ -24,8 +26,13 @@ export default function Hud() {
   return (
     <SafeAreaView style={styles.root} pointerEvents="box-none">
       <View style={styles.topRow} pointerEvents="box-none">
+        <Pressable style={styles.pill} onPress={exitToTitle}>
+          <Text style={styles.pillText}>← Title</Text>
+        </Pressable>
         <View style={styles.pill}>
-          <Text style={styles.pillText}>Turn {turn}</Text>
+          <Text style={styles.pillText}>
+            Slot {currentSlot !== null ? currentSlot + 1 : '?'} · Turn {turn}
+          </Text>
         </View>
         <View style={styles.pill}>
           <Text style={styles.pillText}>Cities {cities.length}</Text>

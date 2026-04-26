@@ -9,3 +9,14 @@ export function nextCityId(): string {
   cityCounter += 1;
   return `c${cityCounter}`;
 }
+
+// On load, sync counters past the highest existing id so new ids don't collide.
+export function syncIdCounters(maxUnitId: number, maxCityId: number): void {
+  unitCounter = Math.max(unitCounter, maxUnitId);
+  cityCounter = Math.max(cityCounter, maxCityId);
+}
+
+export function parseIdNum(id: string): number {
+  const n = parseInt(id.slice(1), 10);
+  return Number.isFinite(n) ? n : 0;
+}

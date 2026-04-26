@@ -2,10 +2,12 @@ import { create } from 'zustand';
 
 import { TERRAIN } from '@/src/data/terrain';
 import { UNIT, type UnitKind } from '@/src/data/units';
-import { nextCityId, nextUnitId } from '@/src/game/ids';
+import { nextCityId, nextUnitId, parseIdNum, syncIdCounters } from '@/src/game/ids';
 import { buildInitialState } from '@/src/game/init';
 import { chebyshev, type GameMap } from '@/src/game/map';
 import type { City, Player, Unit } from '@/src/game/types';
+
+import { loadSlot, saveSlot } from './saves';
 
 const MIN_CITY_SPACING = 3;
 const DEFAULT_PRODUCTION_PER_TURN = 3;
@@ -16,10 +18,15 @@ type GameState = {
   units: Unit[];
   cities: City[];
   turn: number;
+  seed: number;
+  currentSlot: number | null;
   selectedUnitId: string | null;
   selectedCityId: string | null;
 
-  init: (seed: number) => void;
+  newGame: (slot: number, seed: number) => void;
+  loadFromSlot: (slot: number) => Promise<boolean>;
+  exitToTitle: () => void;
+
   selectUnit: (id: string | null) => void;
   selectCity: (id: string | null) => void;
   tapTile: (x: number, y: number) => void;
@@ -38,7 +45,6 @@ function findSpawnTile(
   units: Unit[],
   map: GameMap,
 ): { x: number; y: number } | null {
-  // Try city tile first, then 8 neighbors in deterministic order.
   const candidates: { x: number; y: number }[] = [{ x: city.x, y: city.y }];
   for (let dy = -1; dy <= 1; dy++) {
     for (let dx = -1; dx <= 1; dx++) {
@@ -56,23 +62,79 @@ function findSpawnTile(
   return null;
 }
 
+function autosave(state: GameState): void {
+  if (state.currentSlot === null || !state.map) return;
+  saveSlot(state.currentSlot, {
+    seed: state.seed,
+    turn: state.turn,
+    map: state.map,
+    players: state.players,
+    units: state.units,
+    cities: state.cities,
+  }).catch((err) => console.warn('autosave failed', err));
+}
+
 export const useGame = create<GameState>((set, get) => ({
   map: null,
   players: [],
   units: [],
   cities: [],
   turn: 1,
+  seed: 0,
+  currentSlot: null,
   selectedUnitId: null,
   selectedCityId: null,
 
-  init: (seed) => {
+  newGame: (slot, seed) => {
     const initial = buildInitialState(seed);
+    syncIdCounters(
+      Math.max(0, ...initial.units.map((u) => parseIdNum(u.id))),
+      Math.max(0, ...initial.cities.map((c) => parseIdNum(c.id))),
+    );
     set({
       map: initial.map,
       players: initial.players,
       units: initial.units,
       cities: initial.cities,
       turn: 1,
+      seed,
+      currentSlot: slot,
+      selectedUnitId: null,
+      selectedCityId: null,
+    });
+    autosave(get());
+  },
+
+  loadFromSlot: async (slot) => {
+    const data = await loadSlot(slot);
+    if (!data) return false;
+    syncIdCounters(
+      Math.max(0, ...data.units.map((u) => parseIdNum(u.id))),
+      Math.max(0, ...data.cities.map((c) => parseIdNum(c.id))),
+    );
+    set({
+      map: data.map,
+      players: data.players,
+      units: data.units,
+      cities: data.cities,
+      turn: data.turn,
+      seed: data.seed,
+      currentSlot: slot,
+      selectedUnitId: null,
+      selectedCityId: null,
+    });
+    return true;
+  },
+
+  exitToTitle: () => {
+    set({
+      map: null,
+      players: [],
+      units: [],
+      cities: [],
+      turn: 1,
+      seed: 0,
+      currentSlot: null,
       selectedUnitId: null,
       selectedCityId: null,
     });
@@ -89,7 +151,6 @@ export const useGame = create<GameState>((set, get) => ({
     const friendlyCityAtTile = cities.find((c) => c.x === x && c.y === y && c.ownerIdx === 0);
     const selected = units.find((u) => u.id === selectedUnitId) ?? null;
 
-    // Unit currently selected → handle switch / deselect / move.
     if (selected) {
       if (unitAtTile && unitAtTile.id !== selected.id) {
         set({ selectedUnitId: unitAtTile.id, selectedCityId: null });
@@ -112,10 +173,10 @@ export const useGame = create<GameState>((set, get) => ({
           u.id === selected.id ? { ...u, x, y, movesLeft: u.movesLeft - dist } : u,
         ),
       });
+      autosave(get());
       return;
     }
 
-    // Nothing selected → prefer unit, then city, then nothing.
     if (unitAtTile) {
       set({ selectedUnitId: unitAtTile.id, selectedCityId: null });
       return;
@@ -164,12 +225,14 @@ export const useGame = create<GameState>((set, get) => ({
       selectedUnitId: null,
       selectedCityId: newCity.id,
     });
+    autosave(get());
   },
 
   setCityBuild: (cityId, kind) => {
     set({
       cities: get().cities.map((c) => (c.id === cityId ? { ...c, building: kind } : c)),
     });
+    autosave(get());
   },
 
   endTurn: () => {
@@ -192,7 +255,6 @@ export const useGame = create<GameState>((set, get) => ({
       }
       const spawnPos = findSpawnTile(city, refreshedUnits, map);
       if (!spawnPos) {
-        // No room — hold production until next turn.
         return { ...city, production: accrued };
       }
       refreshedUnits.push({
@@ -213,5 +275,6 @@ export const useGame = create<GameState>((set, get) => ({
       units: refreshedUnits,
       cities: newCities,
     });
+    autosave(get());
   },
 }));
