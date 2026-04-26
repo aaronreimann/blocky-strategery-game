@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { UNIT } from '@/src/data/units';
+import { UNIT, UNIT_KINDS, type UnitKind } from '@/src/data/units';
 import { useGame } from '@/src/state/game';
 
 import { THEME } from './palette';
@@ -11,15 +11,18 @@ export default function Hud() {
   const units = useGame((s) => s.units);
   const cities = useGame((s) => s.cities);
   const selectedUnitId = useGame((s) => s.selectedUnitId);
+  const selectedCityId = useGame((s) => s.selectedCityId);
   const endTurn = useGame((s) => s.endTurn);
   const foundCity = useGame((s) => s.foundCity);
+  const setCityBuild = useGame((s) => s.setCityBuild);
 
-  const selected = selectedUnitId ? units.find((u) => u.id === selectedUnitId) : null;
-  const spec = selected ? UNIT[selected.kind] : null;
+  const selectedUnit = selectedUnitId ? units.find((u) => u.id === selectedUnitId) : null;
+  const unitSpec = selectedUnit ? UNIT[selectedUnit.kind] : null;
+
+  const selectedCity = selectedCityId ? cities.find((c) => c.id === selectedCityId) : null;
 
   return (
     <SafeAreaView style={styles.root} pointerEvents="box-none">
-      {/* Top bar */}
       <View style={styles.topRow} pointerEvents="box-none">
         <View style={styles.pill}>
           <Text style={styles.pillText}>Turn {turn}</Text>
@@ -32,23 +35,56 @@ export default function Hud() {
         </View>
       </View>
 
-      {/* Bottom bar */}
       <View style={styles.bottomRow} pointerEvents="box-none">
-        {selected && spec ? (
-          <View style={styles.unitCard} pointerEvents="auto">
-            <Text style={styles.unitName}>{spec.name}</Text>
-            <Text style={styles.unitMeta}>
-              Moves {selected.movesLeft}/{spec.move} · ATK {spec.attack} · DEF {spec.defense}
+        {selectedUnit && unitSpec ? (
+          <View style={styles.card} pointerEvents="auto">
+            <Text style={styles.cardTitle}>{unitSpec.name}</Text>
+            <Text style={styles.cardMeta}>
+              Moves {selectedUnit.movesLeft}/{unitSpec.move} · ATK {unitSpec.attack} · DEF {unitSpec.defense}
             </Text>
-            {selected.kind === 'pioneer' ? (
+            {selectedUnit.kind === 'pioneer' ? (
               <Pressable style={styles.action} onPress={foundCity}>
                 <Text style={styles.actionText}>Found City</Text>
               </Pressable>
             ) : null}
           </View>
+        ) : selectedCity ? (
+          <View style={styles.card} pointerEvents="auto">
+            <Text style={styles.cardTitle}>{selectedCity.name}</Text>
+            <Text style={styles.cardMeta}>
+              Pop {selectedCity.population} · +{selectedCity.productionPerTurn}/turn
+            </Text>
+            {selectedCity.building ? (
+              <Text style={styles.cardMeta}>
+                Building: {UNIT[selectedCity.building].name} ({selectedCity.production}/
+                {UNIT[selectedCity.building].cost})
+              </Text>
+            ) : (
+              <Text style={styles.cardMeta}>Idle — pick something to build</Text>
+            )}
+            <View style={styles.buildRow}>
+              {UNIT_KINDS.map((kind) => {
+                const isCurrent = selectedCity.building === kind;
+                return (
+                  <Pressable
+                    key={kind}
+                    style={[styles.buildBtn, isCurrent && styles.buildBtnActive]}
+                    onPress={() => setCityBuild(selectedCity.id, kind as UnitKind)}
+                  >
+                    <Text style={[styles.buildBtnText, isCurrent && styles.buildBtnTextActive]}>
+                      {UNIT[kind].name}
+                    </Text>
+                    <Text style={[styles.buildBtnCost, isCurrent && styles.buildBtnTextActive]}>
+                      {UNIT[kind].cost}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
         ) : (
           <View style={styles.hint} pointerEvents="none">
-            <Text style={styles.hintText}>Tap a unit to select · drag to pan · pinch to zoom</Text>
+            <Text style={styles.hintText}>Tap a unit or city · drag to pan · pinch to zoom</Text>
           </View>
         )}
 
@@ -61,16 +97,8 @@ export default function Hud() {
 }
 
 const styles = StyleSheet.create({
-  root: {
-    position: 'absolute',
-    top: 0, left: 0, right: 0, bottom: 0,
-    justifyContent: 'space-between',
-  },
-  topRow: {
-    flexDirection: 'row',
-    gap: 8,
-    padding: 12,
-  },
+  root: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'space-between' },
+  topRow: { flexDirection: 'row', gap: 8, padding: 12 },
   pill: {
     backgroundColor: THEME.bgElevated,
     borderColor: THEME.border,
@@ -79,11 +107,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 999,
   },
-  pillText: {
-    color: THEME.ink,
-    fontSize: 12,
-    fontWeight: '600',
-  },
+  pillText: { color: THEME.ink, fontSize: 12, fontWeight: '600' },
   bottomRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
@@ -91,24 +115,17 @@ const styles = StyleSheet.create({
     padding: 12,
     gap: 12,
   },
-  unitCard: {
+  card: {
     backgroundColor: THEME.bgElevated,
     borderColor: THEME.border,
     borderWidth: 1,
     borderRadius: 10,
     padding: 10,
-    minWidth: 200,
+    minWidth: 240,
+    maxWidth: 360,
   },
-  unitName: {
-    color: THEME.ink,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  unitMeta: {
-    color: THEME.inkMuted,
-    fontSize: 11,
-    marginTop: 2,
-  },
+  cardTitle: { color: THEME.ink, fontSize: 14, fontWeight: '700' },
+  cardMeta: { color: THEME.inkMuted, fontSize: 11, marginTop: 2 },
   action: {
     marginTop: 8,
     backgroundColor: THEME.good,
@@ -117,29 +134,29 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     alignSelf: 'flex-start',
   },
-  actionText: {
-    color: '#0a1729',
-    fontWeight: '700',
-    fontSize: 13,
+  actionText: { color: '#0a1729', fontWeight: '700', fontSize: 13 },
+  buildRow: { flexDirection: 'row', gap: 6, marginTop: 8 },
+  buildBtn: {
+    backgroundColor: THEME.bg,
+    borderColor: THEME.border,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    alignItems: 'center',
+    minWidth: 60,
   },
-  hint: {
-    flex: 1,
-    alignSelf: 'center',
-  },
-  hintText: {
-    color: THEME.inkMuted,
-    fontSize: 11,
-    textAlign: 'center',
-  },
+  buildBtnActive: { backgroundColor: THEME.good, borderColor: THEME.good },
+  buildBtnText: { color: THEME.ink, fontSize: 12, fontWeight: '700' },
+  buildBtnTextActive: { color: '#0a1729' },
+  buildBtnCost: { color: THEME.inkMuted, fontSize: 10 },
+  hint: { flex: 1, alignSelf: 'center' },
+  hintText: { color: THEME.inkMuted, fontSize: 11, textAlign: 'center' },
   endTurn: {
     backgroundColor: THEME.warn,
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 10,
   },
-  endTurnText: {
-    color: '#0a1729',
-    fontWeight: '800',
-    fontSize: 14,
-  },
+  endTurnText: { color: '#0a1729', fontWeight: '800', fontSize: 14 },
 });

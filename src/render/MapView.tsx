@@ -25,6 +25,7 @@ type Props = {
   units: Unit[];
   cities: City[];
   selectedUnitId: string | null;
+  selectedCityId: string | null;
   highlightTiles: Set<string>;
   onTileTap: (x: number, y: number) => void;
 };
@@ -35,6 +36,7 @@ export default function MapView({
   units,
   cities,
   selectedUnitId,
+  selectedCityId,
   highlightTiles,
   onTileTap,
 }: Props) {
@@ -251,13 +253,19 @@ export default function MapView({
   }, [units, players]);
 
   const selectionLayer = useMemo(() => {
-    if (!selectedUnitId) return null;
-    const u = units.find((x) => x.id === selectedUnitId);
-    if (!u) return null;
+    let coord: { x: number; y: number } | null = null;
+    if (selectedUnitId) {
+      const u = units.find((x) => x.id === selectedUnitId);
+      if (u) coord = { x: u.x, y: u.y };
+    } else if (selectedCityId) {
+      const c = cities.find((x) => x.id === selectedCityId);
+      if (c) coord = { x: c.x, y: c.y };
+    }
+    if (!coord) return null;
     return (
       <Rect
-        x={u.x * TILE_SIZE + 1}
-        y={u.y * TILE_SIZE + 1}
+        x={coord.x * TILE_SIZE + 1}
+        y={coord.y * TILE_SIZE + 1}
         width={TILE_SIZE - 2}
         height={TILE_SIZE - 2}
         color="#ffd84a"
@@ -265,7 +273,7 @@ export default function MapView({
         strokeWidth={2}
       />
     );
-  }, [selectedUnitId, units]);
+  }, [selectedUnitId, selectedCityId, units, cities]);
 
   return (
     <GestureDetector gesture={gesture}>

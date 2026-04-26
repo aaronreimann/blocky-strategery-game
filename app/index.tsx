@@ -16,6 +16,7 @@ export default function Home() {
   const units = useGame((s) => s.units);
   const cities = useGame((s) => s.cities);
   const selectedUnitId = useGame((s) => s.selectedUnitId);
+  const selectedCityId = useGame((s) => s.selectedCityId);
   const init = useGame((s) => s.init);
   const tapTile = useGame((s) => s.tapTile);
 
@@ -55,6 +56,7 @@ export default function Home() {
         units={units}
         cities={cities}
         selectedUnitId={selectedUnitId}
+        selectedCityId={selectedCityId}
         highlightTiles={highlightTiles}
         onTileTap={tapTile}
       />

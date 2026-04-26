@@ -2,6 +2,7 @@ import { TERRAIN } from '@/src/data/terrain';
 import { UNIT } from '@/src/data/units';
 import { PLAYER_PALETTE } from '@/src/ui/palette';
 
+import { nextUnitId } from './ids';
 import { generateMap } from './mapgen';
 import type { City, Player, Unit } from './types';
 import type { GameMap } from './map';
@@ -27,12 +28,6 @@ function findStartTile(map: GameMap): { x: number; y: number } {
   // Fallback: any passable tile.
   const anyLand = map.tiles.find((t) => TERRAIN[t.terrain].passable);
   return anyLand ? { x: anyLand.x, y: anyLand.y } : { x: 0, y: 0 };
-}
-
-let unitCounter = 0;
-function nextUnitId(): string {
-  unitCounter += 1;
-  return `u${unitCounter}`;
 }
 
 export function buildInitialState(seed: number): InitialState {

@@ -23,4 +23,7 @@ export type City = {
   x: number;
   y: number;
   population: number;
+  building: UnitKind | null;
+  production: number;
+  productionPerTurn: number;
 };
