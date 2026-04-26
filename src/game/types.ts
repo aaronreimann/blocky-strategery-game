@@ -31,6 +31,7 @@ export type TurnEvent = {
 export type Player = {
   idx: number;
   name: string;   // country name
+  iso: string;    // ISO 3166-1 alpha-2; empty if unknown
   leader: string; // current leader (best-effort, from Wikidata cache or bundled fallback)
   color: string;
   isHuman: boolean;

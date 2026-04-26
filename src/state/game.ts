@@ -178,6 +178,7 @@ export const useGame = create<GameState>((set, get) => ({
     }));
     const normalizedPlayers: Player[] = data.players.map((p) => ({
       ...p,
+      iso: p.iso ?? '',
       researched: p.researched ?? [],
       researching: p.researching ?? null,
       science: p.science ?? 0,

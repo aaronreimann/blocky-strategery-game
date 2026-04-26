@@ -4,6 +4,7 @@ import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BUILDING, BUILDING_KINDS } from '@/src/data/buildings';
+import { flagEmoji } from '@/src/data/countries';
 import { IMPROVEMENT, tileKey } from '@/src/data/improvements';
 import { TECH } from '@/src/data/tech';
 import { UNIT, UNIT_KINDS } from '@/src/data/units';
@@ -107,14 +108,12 @@ export default function Hud() {
         {players[0] ? (
           <View style={[styles.pill, { borderColor: players[0].color }]}>
             <Text style={[styles.pillText, { color: players[0].color }]}>
-              {players[0].name}
+              {flagEmoji(players[0].iso)} {players[0].name}
             </Text>
           </View>
         ) : null}
         <View style={styles.pill}>
-          <Text style={styles.pillText}>
-            Realm {currentSlot !== null ? currentSlot + 1 : '?'} · Turn {turn}
-          </Text>
+          <Text style={styles.pillText}>Turn {turn}</Text>
         </View>
         <View style={styles.pill}>
           <FontAwesome5 name="chess-rook" size={12} color={THEME.ink} style={styles.pillIcon} />
