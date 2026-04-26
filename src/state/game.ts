@@ -11,7 +11,7 @@ import {
 import { pickCheapestAvailable, prereqsMet, TECH, type TechId } from '@/src/data/tech';
 import { TERRAIN } from '@/src/data/terrain';
 import { UNIT, type UnitKind } from '@/src/data/units';
-import { runAITurn } from '@/src/game/ai';
+import { pickAINextBuild, runAITurn } from '@/src/game/ai';
 import { resolveCombat, type Battle } from '@/src/game/combat';
 import { checkGameOver } from '@/src/game/gameOver';
 import { nextCityId, nextUnitId, parseIdNum, syncIdCounters } from '@/src/game/ids';
@@ -589,11 +589,23 @@ export const useGame = create<GameState>((set, get) => ({
             text: `${city.name} built a ${UNIT[unitKind].name}.`,
           });
         }
+        // For AI cities, pick the next build dynamically based on need.
+        let nextBuilding: CityBuildTarget = city.building;
+        if (city.ownerIdx !== HUMAN_IDX) {
+          const owner = players.find((p) => p.idx === city.ownerIdx);
+          nextBuilding = pickAINextBuild(
+            city.ownerIdx,
+            cities,
+            workingUnits,
+            owner?.researched ?? [],
+          );
+        }
         return {
           ...city,
           population: nextPop,
           food: nextFood,
           production: accrued - cost,
+          building: nextBuilding,
         };
       }
 
