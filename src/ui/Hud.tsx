@@ -27,6 +27,19 @@ import ScoreScreen from './ScoreScreen';
 import TechScreen from './TechScreen';
 import TutorialOverlay from './TutorialOverlay';
 
+const HUMAN_IDX_HUD = 0;
+
+const UNIT_ICON_NAME: Record<string, string> = {
+  pioneer: 'wood_axe',
+  worker: 'stone_axe',
+  footman: 'visored_helm',
+  spearman: 'spear_hook',
+  horseman: 'horse_head',
+  swordsman: 'broadsword',
+  catapult: 'catapult',
+  galley: 'caravel',
+};
+
 function eventStyle(kind: string): { color: string } {
   switch (kind) {
     case 'battle':
@@ -114,6 +127,23 @@ export default function Hud() {
     setTutorialOpen(false);
     markTutorialSeen().catch(() => {});
   };
+
+  // Auto-dismiss the battle banner after ~5s with a fade.
+  const battleOpacity = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    if (!lastBattle) return;
+    battleOpacity.setValue(1);
+    const fadeTimeout = setTimeout(() => {
+      Animated.timing(battleOpacity, {
+        toValue: 0,
+        duration: 400,
+        useNativeDriver: true,
+      }).start(({ finished }) => {
+        if (finished) dismissBattle();
+      });
+    }, 5000);
+    return () => clearTimeout(fadeTimeout);
+  }, [lastBattle, battleOpacity, dismissBattle]);
 
   // Auto-dismiss the end-of-turn summary after a few seconds with a fade.
   const eventsOpacity = useRef(new Animated.Value(1)).current;
@@ -210,18 +240,68 @@ export default function Hud() {
         ) : null}
       </View>
 
-      {lastBattle ? (
-        <View style={styles.toastWrap} pointerEvents="box-none">
-          <Pressable style={styles.toast} onPress={dismissBattle}>
-            <Text style={styles.toastText}>
-              {UNIT[lastBattle.attackerKind].name} {lastBattle.attackerWon ? 'beat' : 'lost to'}{' '}
-              {UNIT[lastBattle.defenderKind].name} ({lastBattle.attackerRoll} vs{' '}
-              {lastBattle.defenderRoll})
-            </Text>
-            <Text style={styles.toastDismiss}>tap to dismiss</Text>
-          </Pressable>
-        </View>
-      ) : null}
+      {lastBattle ? (() => {
+        const att = lastBattle;
+        const humanInvolved =
+          att.attackerOwnerIdx === HUMAN_IDX_HUD ||
+          att.defenderOwnerIdx === HUMAN_IDX_HUD;
+        const humanWon =
+          (att.attackerOwnerIdx === HUMAN_IDX_HUD && att.attackerWon) ||
+          (att.defenderOwnerIdx === HUMAN_IDX_HUD && !att.attackerWon);
+        const banner = !humanInvolved
+          ? { text: 'BATTLE', color: THEME.warn }
+          : humanWon
+            ? { text: 'VICTORY', color: THEME.good }
+            : { text: 'DEFEAT', color: THEME.bad };
+        const attackerColor = players[att.attackerOwnerIdx]?.color ?? '#888';
+        const defenderColor = players[att.defenderOwnerIdx]?.color ?? '#888';
+        const attackerLost = !att.attackerWon;
+        const defenderLost = att.attackerWon;
+        const attackerIcon =
+          (UNIT_ICON_NAME[att.attackerKind] ?? 'visored_helm') as never;
+        const defenderIcon =
+          (UNIT_ICON_NAME[att.defenderKind] ?? 'visored_helm') as never;
+        return (
+          <Animated.View
+            style={[styles.battleWrap, { opacity: battleOpacity }]}
+            pointerEvents="box-none"
+          >
+            <Pressable style={styles.battleCard} onPress={dismissBattle}>
+              <Text style={[styles.battleBanner, { color: banner.color }]}>
+                {banner.text}
+              </Text>
+              <View style={styles.battleRow}>
+                <View style={[styles.battleSide, attackerLost && styles.battleSideLost]}>
+                  <View style={[styles.battleChip, { backgroundColor: attackerColor }]}>
+                    <GameIcon name={attackerIcon} size={20} color="#0a1729" />
+                    {att.attackerStackSize > 1 ? (
+                      <Text style={styles.battleStack}>×{att.attackerStackSize}</Text>
+                    ) : null}
+                  </View>
+                  <Text style={styles.battleName}>{UNIT[att.attackerKind].name}</Text>
+                  <Text style={[styles.battleRoll, attackerLost && styles.battleRollLost]}>
+                    {att.attackerRoll}
+                  </Text>
+                </View>
+                <Text style={styles.battleVs}>vs</Text>
+                <View style={[styles.battleSide, defenderLost && styles.battleSideLost]}>
+                  <View style={[styles.battleChip, { backgroundColor: defenderColor }]}>
+                    <GameIcon name={defenderIcon} size={20} color="#0a1729" />
+                    {att.defenderStackSize > 1 ? (
+                      <Text style={styles.battleStack}>×{att.defenderStackSize}</Text>
+                    ) : null}
+                  </View>
+                  <Text style={styles.battleName}>{UNIT[att.defenderKind].name}</Text>
+                  <Text style={[styles.battleRoll, defenderLost && styles.battleRollLost]}>
+                    {att.defenderRoll}
+                  </Text>
+                </View>
+              </View>
+              <Text style={styles.battleDismiss}>tap to dismiss</Text>
+            </Pressable>
+          </Animated.View>
+        );
+      })() : null}
 
       {turnEvents.length > 0 ? (
         <Animated.View
@@ -753,24 +833,66 @@ const styles = StyleSheet.create({
   pillText: { color: THEME.ink, fontSize: 12, fontWeight: '600' },
   pillAlert: { borderColor: THEME.warn },
   pillAlertText: { color: THEME.warn },
-  toastWrap: {
+  battleWrap: {
     position: 'absolute',
     top: 56,
     left: 0,
     right: 0,
     alignItems: 'center',
   },
-  toast: {
+  battleCard: {
     backgroundColor: THEME.bgElevated,
     borderColor: THEME.warn,
     borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
     alignItems: 'center',
+    minWidth: 280,
   },
-  toastText: { color: THEME.ink, fontSize: 13, fontWeight: '700' },
-  toastDismiss: { color: THEME.inkMuted, fontSize: 10, marginTop: 2 },
+  battleBanner: {
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 2,
+    marginBottom: 6,
+  },
+  battleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  battleSide: {
+    alignItems: 'center',
+    minWidth: 80,
+  },
+  battleSideLost: {
+    opacity: 0.45,
+  },
+  battleChip: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 4,
+    flexDirection: 'row',
+  },
+  battleStack: {
+    color: '#0a1729',
+    fontSize: 10,
+    fontWeight: '900',
+    marginLeft: 2,
+  },
+  battleName: { color: THEME.ink, fontSize: 11, fontWeight: '700' },
+  battleRoll: {
+    color: THEME.warn,
+    fontSize: 22,
+    fontWeight: '900',
+    marginTop: 2,
+  },
+  battleRollLost: { color: THEME.bad },
+  battleVs: { color: THEME.inkMuted, fontSize: 11, fontWeight: '700' },
+  battleDismiss: { color: THEME.inkMuted, fontSize: 10, marginTop: 6 },
   eventsWrap: {
     position: 'absolute',
     top: 56,
