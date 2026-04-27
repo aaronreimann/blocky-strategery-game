@@ -71,6 +71,18 @@ const RESOURCE_ICON_SIZE = 14;
 // Pixel size each icon renders at on the map (camera then scales further).
 const ICON_SIZE = 26;
 
+// Multiply each RGB channel of a #rrggbb color by `factor` (0–1) to get a
+// darker shade. Used to derive the medallion border color from the owner.
+function darken(hex: string, factor: number): string {
+  const h = hex.startsWith('#') ? hex.slice(1) : hex;
+  if (h.length !== 6) return hex;
+  const r = Math.max(0, Math.round(parseInt(h.slice(0, 2), 16) * factor));
+  const g = Math.max(0, Math.round(parseInt(h.slice(2, 4), 16) * factor));
+  const b = Math.max(0, Math.round(parseInt(h.slice(4, 6), 16) * factor));
+  const hex2 = (n: number) => n.toString(16).padStart(2, '0');
+  return `#${hex2(r)}${hex2(g)}${hex2(b)}`;
+}
+
 // Cache parsed Skia paths so we only convert each SVG string once.
 const PATH_CACHE = new Map<GameIconName, SkPath | null>();
 function iconPath(name: GameIconName): SkPath | null {
@@ -946,11 +958,15 @@ export default function MapView({
       else if (u.kind === 'galley') img = galleyImg;
 
       if (img) {
-        const PAINTED_SIZE = Math.round(TILE_SIZE * 1.35);
+        // Disc fills (almost) the whole tile. Painted icon is sized to fit
+        // inside the disc — character canvas ≈ 0.85× tile so the figure
+        // (which fills ~80% of its own canvas) sits comfortably inside the
+        // owner-color medallion.
+        const DISC_R = TILE_SIZE * 0.5;
+        const PAINTED_SIZE = Math.round(TILE_SIZE * 0.85);
         const pox = cx - PAINTED_SIZE / 2;
         const poy = cy - PAINTED_SIZE / 2;
-        // Owner-color medallion sized to comfortably contain the character.
-        const DISC_R = PAINTED_SIZE * 0.42;
+        const borderColor = darken(color, 0.55);
         elements.push(
           <Circle key={`u-${u.id}-bg`} cx={cx} cy={cy} r={DISC_R} color={color} />,
         );
@@ -960,7 +976,7 @@ export default function MapView({
             cx={cx}
             cy={cy}
             r={DISC_R}
-            color="#0a1729"
+            color={borderColor}
             style="stroke"
             strokeWidth={1.5}
           />,
@@ -970,7 +986,7 @@ export default function MapView({
             key={`u-${u.id}`}
             image={img}
             x={pox}
-            y={poy - 4}
+            y={poy}
             width={PAINTED_SIZE}
             height={PAINTED_SIZE}
           />,
