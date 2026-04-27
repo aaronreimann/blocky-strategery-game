@@ -511,8 +511,19 @@ export default function MapView({
     const isRoad = (x: number, y: number) => improvements[`${x},${y}`] === 'road';
     const ROAD_BASE = '#d4b88a';
     const ROAD_INK = '#6b4a26';
-    const BASE_W = 6;
-    const INK_W = 3;
+    const BASE_W = 5;
+    const INK_W = 2;
+    // Deterministic per-segment wiggle. Two control points, each offset
+    // perpendicular to the segment by a small amount derived from a hash so
+    // the road meanders the same way every render but differently per tile.
+    const hash01 = (x: number, y: number, dx: number, dy: number, salt: number) => {
+      let h = (x * 73856093) ^ (y * 19349663) ^ ((dx + 2) * 83492791) ^ ((dy + 2) * 2971215073) ^ (salt * 1376312589);
+      h = (h ^ (h >>> 13)) >>> 0;
+      h = ((h * 1597334677) ^ (h >>> 16)) >>> 0;
+      return (h & 0xffff) / 0xffff;
+    };
+    const wander = (x: number, y: number, dx: number, dy: number, salt: number) =>
+      (hash01(x, y, dx, dy, salt) * 2 - 1) * 4; // ±4px
     for (const key in improvements) {
       if (improvements[key] !== 'road') continue;
       const [xs, ys] = key.split(',');
@@ -528,7 +539,26 @@ export default function MapView({
           if (dx > 0 || (dx === 0 && dy > 0)) {
             const nx = (x + dx) * TILE_SIZE + TILE_SIZE / 2;
             const ny = (y + dy) * TILE_SIZE + TILE_SIZE / 2;
-            const path = `M ${cx} ${cy} L ${nx} ${ny}`;
+            // Perpendicular unit vector (rotate the segment 90°).
+            const sx = nx - cx;
+            const sy = ny - cy;
+            const len = Math.hypot(sx, sy) || 1;
+            const px = -sy / len;
+            const py = sx / len;
+            // Two control points at 1/3 and 2/3 along the segment, each
+            // pushed perpendicular by an independent random amount. This
+            // produces a gentle S-curve rather than a stiff line.
+            const ax = cx + sx / 3;
+            const ay = cy + sy / 3;
+            const bx = cx + (sx * 2) / 3;
+            const by = cy + (sy * 2) / 3;
+            const o1 = wander(x, y, dx, dy, 1);
+            const o2 = wander(x, y, dx, dy, 2);
+            const c1x = ax + px * o1;
+            const c1y = ay + py * o1;
+            const c2x = bx + px * o2;
+            const c2y = by + py * o2;
+            const path = `M ${cx} ${cy} C ${c1x} ${c1y} ${c2x} ${c2y} ${nx} ${ny}`;
             base.push(
               <Path
                 key={`rd-b-${key}-${dx}${dy}`}
@@ -547,8 +577,33 @@ export default function MapView({
                 style="stroke"
                 strokeWidth={INK_W}
                 strokeCap="round"
+                strokeJoin="round"
               />,
             );
+            // Dashed-look: dot every ~8 units along the curve to suggest
+            // worn cobbles. Cheap to draw a few small circles per segment.
+            for (let t = 0.2; t < 1; t += 0.2) {
+              const it = 1 - t;
+              const bxx =
+                it * it * it * cx +
+                3 * it * it * t * c1x +
+                3 * it * t * t * c2x +
+                t * t * t * nx;
+              const byy =
+                it * it * it * cy +
+                3 * it * it * t * c1y +
+                3 * it * t * t * c2y +
+                t * t * t * ny;
+              top.push(
+                <Circle
+                  key={`rd-d-${key}-${dx}${dy}-${t}`}
+                  cx={bxx}
+                  cy={byy}
+                  r={0.7}
+                  color={ROAD_INK}
+                />,
+              );
+            }
           }
         }
       }
