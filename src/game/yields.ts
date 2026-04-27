@@ -59,6 +59,10 @@ export function computeCityYields(
   const ownerWonders = wonders.filter((w) => w.ownerIdx === city.ownerIdx);
   const hasPyramids = ownerWonders.some((w) => w.kind === 'pyramids');
   const hasGreatLibrary = ownerWonders.some((w) => w.kind === 'great_library');
+  const hasHangingGardens = ownerWonders.some((w) => w.kind === 'hanging_gardens');
+  const hasColossusHere = ownerWonders.some(
+    (w) => w.kind === 'colossus' && w.cityId === city.id,
+  );
 
   const center = map.tiles[city.y * map.width + city.x];
   const centerImp = impAt(improvements, center.x, center.y);
@@ -103,10 +107,12 @@ export function computeCityYields(
 
   let gold = trade;
   if (city.buildings.includes('marketplace')) gold = Math.floor(gold * 1.5);
+  if (hasColossusHere) gold = Math.floor(gold * 1.5);
 
   const templeHappy = city.buildings.includes('temple') ? 1 : 0;
   const courthouseHappy = city.buildings.includes('courthouse') ? 1 : 0;
-  const happy = templeHappy + courthouseHappy;
+  const wonderHappy = hasHangingGardens ? 1 : 0;
+  const happy = templeHappy + courthouseHappy + wonderHappy;
   const unhappy = Math.max(0, city.population - HAPPY_POP_THRESHOLD);
   const disorder = unhappy > happy;
   if (disorder) prod = 0;

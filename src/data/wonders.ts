@@ -1,6 +1,13 @@
 import type { TechId } from './tech';
 
-export const WONDER_KINDS = ['pyramids', 'great_library', 'great_wall'] as const;
+export const WONDER_KINDS = [
+  'pyramids',
+  'great_library',
+  'great_wall',
+  'hanging_gardens',
+  'lighthouse',
+  'colossus',
+] as const;
 export type WonderKind = (typeof WONDER_KINDS)[number];
 
 export type WonderSpec = {
@@ -28,5 +35,23 @@ export const WONDER: Record<WonderKind, WonderSpec> = {
     cost: 200,
     description: '+1 defense for units in any of your cities.',
     tech: 'bronze_working',
+  },
+  hanging_gardens: {
+    name: 'Hanging Gardens',
+    cost: 200,
+    description: '+1 happy citizen in each of your cities.',
+    tech: null,
+  },
+  lighthouse: {
+    name: 'Lighthouse',
+    cost: 200,
+    description: 'All your sea units gain +1 movement.',
+    tech: 'sailing',
+  },
+  colossus: {
+    name: 'Colossus',
+    cost: 200,
+    description: '+50% gold in the city that built it.',
+    tech: 'currency',
   },
 };

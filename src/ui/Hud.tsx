@@ -22,6 +22,7 @@ import KingdomMenu from './KingdomMenu';
 import { GameIcon } from './GameIcon';
 import LegendScreen from './LegendScreen';
 import { THEME } from './palette';
+import ScoreScreen from './ScoreScreen';
 import TechScreen from './TechScreen';
 
 function eventStyle(kind: string): { color: string } {
@@ -46,6 +47,7 @@ export default function Hud() {
   const [diploOpen, setDiploOpen] = useState(false);
   const [kingdomOpen, setKingdomOpen] = useState(false);
   const [legendOpen, setLegendOpen] = useState(false);
+  const [scoreOpen, setScoreOpen] = useState(false);
   const [cityTab, setCityTab] = useState<'units' | 'buildings' | 'wonders'>('units');
   const turn = useGame((s) => s.turn);
   const map = useGame((s) => s.map);
@@ -167,6 +169,9 @@ export default function Hud() {
         </Pressable>
         <Pressable style={styles.pillSquare} onPress={() => setLegendOpen(true)}>
           <FontAwesome5 name="question" size={14} color={THEME.ink} />
+        </Pressable>
+        <Pressable style={styles.pillSquare} onPress={() => setScoreOpen(true)}>
+          <FontAwesome5 name="trophy" size={14} color={THEME.ink} />
         </Pressable>
         <View style={{ flex: 1 }} />
         {players[0] ? (
@@ -618,6 +623,7 @@ export default function Hud() {
         />
       ) : null}
       {legendOpen ? <LegendScreen onClose={() => setLegendOpen(false)} /> : null}
+      {scoreOpen ? <ScoreScreen onClose={() => setScoreOpen(false)} /> : null}
 
       {tilePicker ? (() => {
         const u = units.find(

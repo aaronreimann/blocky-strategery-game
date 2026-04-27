@@ -796,10 +796,15 @@ export const useGame = create<GameState>((set, get) => ({
     const playerName = (idx: number) => players[idx]?.name ?? `Player ${idx}`;
 
     // Refresh moves; +1 movement bonus when starting on a road tile.
+    // Lighthouse wonder: owner's sea units get +1 movement permanently.
     let workingUnits: Unit[] = units.map((u) => {
       const baseMove = UNIT[u.kind].move;
-      const bonus = improvements[tileKey(u.x, u.y)] === 'road' ? 1 : 0;
-      return { ...u, movesLeft: baseMove + bonus };
+      const roadBonus = improvements[tileKey(u.x, u.y)] === 'road' ? 1 : 0;
+      const hasLighthouse =
+        UNIT[u.kind].domain === 'sea' &&
+        wonders.some((w) => w.kind === 'lighthouse' && w.ownerIdx === u.ownerIdx);
+      const seaBonus = hasLighthouse ? 1 : 0;
+      return { ...u, movesLeft: baseMove + roadBonus + seaBonus };
     });
 
     // Advance any in-progress work; complete improvements when done.
@@ -822,15 +827,22 @@ export const useGame = create<GameState>((set, get) => ({
 
       // Food growth: surplus food goes into the city's larder; on overflow,
       // grow a citizen. Granary keeps half of the larder on growth.
+      // Aqueduct is required to grow past size 6.
       let nextPop = city.population;
       let nextFood = Math.max(0, city.food + yields.food);
       const threshold = foodNeededToGrow(nextPop);
       if (nextFood >= threshold) {
-        nextPop += 1;
-        const hasGranary = city.buildings.includes('granary');
-        nextFood = hasGranary ? Math.floor(threshold / 2) : 0;
-        if (city.ownerIdx === HUMAN_IDX) {
-          events.push({ kind: 'grew', text: `${city.name} grew to size ${nextPop}.` });
+        const hasAqueduct = city.buildings.includes('aqueduct');
+        if (nextPop < 6 || hasAqueduct) {
+          nextPop += 1;
+          const hasGranary = city.buildings.includes('granary');
+          nextFood = hasGranary ? Math.floor(threshold / 2) : 0;
+          if (city.ownerIdx === HUMAN_IDX) {
+            events.push({ kind: 'grew', text: `${city.name} grew to size ${nextPop}.` });
+          }
+        } else {
+          // Cap larder so the player still sees food=threshold-1 while waiting.
+          nextFood = threshold - 1;
         }
       }
 
