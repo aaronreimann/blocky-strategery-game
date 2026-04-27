@@ -38,7 +38,7 @@ import {
   type Wonder,
 } from '@/src/game/types';
 import { cityRadius, computeCityYields, foodNeededToGrow } from '@/src/game/yields';
-import { computeCurrentVisibility, mergeExplored, nextStepToExplore } from '@/src/game/visibility';
+import { computeCurrentVisibility, mergeExplored, pickExploreTarget } from '@/src/game/visibility';
 
 import { appendHistory, loadSlot, saveSlot } from './saves';
 
@@ -1496,39 +1496,65 @@ export const useGame = create<GameState>((set, get) => ({
       });
     }
 
-    // Explore-mode pass. For each human unit with exploreMode on, BFS to the
-    // nearest tile not yet in humanVisibility and step toward it. Skips on
-    // combat (handled by the unit picker — exploreMode units can't attack
-    // automatically, they stop adjacent to enemies).
-    const exploredSet = new Set(get().humanVisibility);
-    workingUnits = workingUnits.map((u) => {
-      if (!u.exploreMode) return u;
-      if (u.ownerIdx !== HUMAN_IDX) return u;
-      if (u.workingOn || u.destination) return u;
-      if (u.movesLeft <= 0) return u;
-      const blocked = new Set<string>();
-      for (const o of workingUnits) {
-        if (o.id !== u.id) blocked.add(`${o.x},${o.y}`);
-      }
-      for (const c of workingCities) {
-        if (c.ownerIdx !== u.ownerIdx) blocked.add(`${c.x},${c.y}`);
-      }
-      const next = nextStepToExplore(
-        { x: u.x, y: u.y },
-        exploredSet,
-        blocked,
-        map,
-        (x, y) => {
-          const t = map.tiles[y * map.width + x];
-          return canEnterTerrain(u.kind, t.terrain);
-        },
+    // Explore-mode pass. Two phases so multiple explorers fan out instead of
+    // converging on the same closest-frontier tile:
+    //   1. Each explorer picks a target unexplored tile, with the crowding
+    //      penalty pushing it away from targets already chosen this turn.
+    //   2. Each explorer takes one step toward its chosen target.
+    {
+      const exploredSet = new Set(get().humanVisibility);
+      const explorers = workingUnits.filter(
+        (u) =>
+          u.exploreMode &&
+          u.ownerIdx === HUMAN_IDX &&
+          !u.workingOn &&
+          !u.destination &&
+          u.movesLeft > 0,
       );
-      if (!next) return u;
-      // Add the new tile to exploredSet so the next explorer doesn't pick the
-      // same target this turn.
-      exploredSet.add(`${next.x},${next.y}`);
-      return { ...u, x: next.x, y: next.y, movesLeft: u.movesLeft - 1 };
-    });
+      const targetByUnit = new Map<string, { x: number; y: number }>();
+      const claimedTargets: { x: number; y: number }[] = [];
+      for (const u of explorers) {
+        const blocked = new Set<string>();
+        for (const o of workingUnits) {
+          if (o.id !== u.id) blocked.add(`${o.x},${o.y}`);
+        }
+        for (const c of workingCities) {
+          if (c.ownerIdx !== u.ownerIdx) blocked.add(`${c.x},${c.y}`);
+        }
+        const target = pickExploreTarget(
+          { x: u.x, y: u.y },
+          exploredSet,
+          blocked,
+          map,
+          (x, y) => canEnterTerrain(u.kind, map.tiles[y * map.width + x].terrain),
+          claimedTargets,
+        );
+        if (target) {
+          targetByUnit.set(u.id, target);
+          claimedTargets.push(target);
+        }
+      }
+      workingUnits = workingUnits.map((u) => {
+        const target = targetByUnit.get(u.id);
+        if (!target) return u;
+        const blocked = new Set<string>();
+        for (const o of workingUnits) {
+          if (o.id !== u.id) blocked.add(`${o.x},${o.y}`);
+        }
+        for (const c of workingCities) {
+          if (c.ownerIdx !== u.ownerIdx) blocked.add(`${c.x},${c.y}`);
+        }
+        const next = nextStepToTiles(
+          { x: u.x, y: u.y },
+          new Set([`${target.x},${target.y}`]),
+          blocked,
+          map,
+          u.kind,
+        );
+        if (!next) return u;
+        return { ...u, x: next.x, y: next.y, movesLeft: u.movesLeft - 1 };
+      });
+    }
 
     // Science + gold: aggregate per-player gain from each city's yields.
     const scienceByPlayer = new Map<number, number>();
