@@ -1,6 +1,6 @@
 import type { TechId } from './tech';
 
-export const BUILDING_KINDS = ['granary', 'walls', 'library', 'marketplace', 'temple'] as const;
+export const BUILDING_KINDS = ['granary', 'walls', 'library', 'marketplace', 'temple', 'courthouse', 'barracks'] as const;
 export type BuildingKind = (typeof BUILDING_KINDS)[number];
 
 export type BuildingSpec = {
@@ -40,5 +40,17 @@ export const BUILDING: Record<BuildingKind, BuildingSpec> = {
     cost: 30,
     description: '+1 happy citizen — keeps a city of 5 from disorder.',
     tech: null,
+  },
+  courthouse: {
+    name: 'Courthouse',
+    cost: 50,
+    description: '+1 happy citizen — works on top of Temple for big cities.',
+    tech: null,
+  },
+  barracks: {
+    name: 'Barracks',
+    cost: 30,
+    description: 'Units built here are veterans (+1 attack).',
+    tech: 'bronze_working',
   },
 };

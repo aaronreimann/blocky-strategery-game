@@ -93,6 +93,7 @@ function spawnStartingUnits(
       destination: null,
       stack: ['pioneer'],
       autoMode: false,
+      veteran: false,
     },
     {
       id: nextUnitId(),
@@ -106,6 +107,7 @@ function spawnStartingUnits(
       destination: null,
       stack: ['footman'],
       autoMode: false,
+      veteran: false,
     },
     {
       id: nextUnitId(),
@@ -119,6 +121,7 @@ function spawnStartingUnits(
       destination: null,
       stack: ['worker'],
       autoMode: false,
+      veteran: false,
     },
   ];
 }

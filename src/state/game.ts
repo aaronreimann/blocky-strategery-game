@@ -198,7 +198,7 @@ export const useGame = create<GameState>((set, get) => ({
     const data = await loadSlot(slot);
     if (!data) return false;
     // Forward-compat: older saves lacked workingOn / workTurnsLeft / destination
-    // / stack / autoMode. We also rename 'laborer' to 'worker'.
+    // / stack / autoMode / veteran. We also rename 'laborer' to 'worker'.
     const migrateKind = (k: string): UnitKind =>
       (k === 'laborer' ? 'worker' : k) as UnitKind;
     const normalizedUnits: Unit[] = data.units.map((u) => {
@@ -213,6 +213,7 @@ export const useGame = create<GameState>((set, get) => ({
         workTurnsLeft: u.workTurnsLeft ?? 0,
         destination: u.destination ?? null,
         autoMode: u.autoMode ?? false,
+        veteran: u.veteran ?? false,
       };
     });
     const normalizedPlayers: Player[] = data.players.map((p) => ({
@@ -817,7 +818,7 @@ export const useGame = create<GameState>((set, get) => ({
     });
 
     let workingCities: City[] = cities.map((city) => {
-      const yields = computeCityYields(city, map, wonders);
+      const yields = computeCityYields(city, map, wonders, improvements);
 
       // Food growth: surplus food goes into the city's larder; on overflow,
       // grow a citizen. Granary keeps half of the larder on growth.
@@ -862,6 +863,7 @@ export const useGame = create<GameState>((set, get) => ({
           destination: null,
           stack: [unitKind],
           autoMode: false,
+          veteran: city.buildings.includes('barracks'),
         });
         if (city.ownerIdx === HUMAN_IDX) {
           events.push({
@@ -874,7 +876,7 @@ export const useGame = create<GameState>((set, get) => ({
         if (city.ownerIdx !== HUMAN_IDX) {
           const owner = players.find((p) => p.idx === city.ownerIdx);
           nextBuilding = pickAINextBuild(
-            city.ownerIdx,
+            city,
             cities,
             workingUnits,
             owner?.researched ?? [],
@@ -1054,7 +1056,7 @@ export const useGame = create<GameState>((set, get) => ({
     const scienceByPlayer = new Map<number, number>();
     const goldByPlayer = new Map<number, number>();
     for (const c of workingCities) {
-      const y = computeCityYields(c, map, workingWonders);
+      const y = computeCityYields(c, map, workingWonders, workingImprovements);
       scienceByPlayer.set(c.ownerIdx, (scienceByPlayer.get(c.ownerIdx) ?? 0) + y.science);
       goldByPlayer.set(c.ownerIdx, (goldByPlayer.get(c.ownerIdx) ?? 0) + y.gold);
     }
@@ -1131,6 +1133,35 @@ export const useGame = create<GameState>((set, get) => ({
       players: workingPlayers,
       turn: newTurn,
     });
+
+    // Random events: 5% chance each per turn.
+    if (Math.random() < 0.05) {
+      const humanIdx = workingPlayers.findIndex((p) => p.isHuman);
+      if (humanIdx >= 0) {
+        workingPlayers[humanIdx] = {
+          ...workingPlayers[humanIdx],
+          gold: workingPlayers[humanIdx].gold + 30,
+        };
+        events.push({ kind: 'event', text: 'A friendly caravan brought 30 gold!' });
+      }
+    }
+    if (Math.random() < 0.05) {
+      const myCities = workingCities.filter(
+        (c) => c.ownerIdx === HUMAN_IDX && c.population > 1,
+      );
+      if (myCities.length > 0) {
+        const largest = myCities.reduce((a, b) =>
+          a.population > b.population ? a : b,
+        );
+        workingCities = workingCities.map((c) =>
+          c.id === largest.id ? { ...c, population: c.population - 1 } : c,
+        );
+        events.push({
+          kind: 'event',
+          text: `Plague struck ${largest.name} — population −1.`,
+        });
+      }
+    }
 
     // AI rush-buy: each AI tries to spend accumulated gold to fast-track
     // its current build. Sets the city's production to the build cost so

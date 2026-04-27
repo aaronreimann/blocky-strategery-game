@@ -34,9 +34,11 @@ export function resolveCombat(
   defenderTile: Tile,
   defenderWallsBonus = 0,
 ): Battle {
-  const attackerRoll = unitAttack(attacker) + d6();
+  const attackerRoll =
+    unitAttack(attacker) + (attacker.veteran ? 1 : 0) + d6();
   const defenderRoll =
     unitDefense(defender)
+    + (defender.veteran ? 1 : 0)
     + TERRAIN[defenderTile.terrain].defenseBonus
     + defenderWallsBonus
     + d6();

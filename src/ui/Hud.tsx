@@ -34,6 +34,8 @@ function eventStyle(kind: string): { color: string } {
       return { color: '#facc15' };
     case 'research':
       return { color: '#06b6d4' };
+    case 'event':
+      return { color: '#a855f7' };
     default:
       return { color: '#f5f1e8' };
   }
@@ -302,15 +304,58 @@ export default function Hud() {
                   {IMPROVEMENT[improvements[tileKey(selectedUnit.x, selectedUnit.y)]].name})
                 </Text>
               ) : (
-                <Pressable style={styles.action} onPress={() => startWork('road')}>
-                  <Text style={styles.actionText}>Build Road (2 turns)</Text>
-                </Pressable>
+                (() => {
+                  if (!map) return null;
+                  const tile = map.tiles[selectedUnit.y * map.width + selectedUnit.x];
+                  const t = tile.terrain;
+                  type ImpKind = 'road' | 'farm' | 'mine' | 'irrigation';
+                  const opts: { kind: ImpKind; label: string }[] = [];
+                  if (t !== 'ocean' && t !== 'mountains') {
+                    opts.push({ kind: 'road', label: 'Road' });
+                  }
+                  if (t === 'grassland' || t === 'plains' || t === 'desert') {
+                    opts.push({ kind: 'farm', label: 'Farm' });
+                  }
+                  if (t === 'hills' || t === 'mountains') {
+                    opts.push({ kind: 'mine', label: 'Mine' });
+                  }
+                  if (t === 'grassland' || t === 'plains' || t === 'desert') {
+                    let waterAdj = false;
+                    for (let dy = -1; dy <= 1 && !waterAdj; dy++) {
+                      for (let dx = -1; dx <= 1 && !waterAdj; dx++) {
+                        if (dx === 0 && dy === 0) continue;
+                        const nx = selectedUnit.x + dx;
+                        const ny = selectedUnit.y + dy;
+                        if (nx < 0 || ny < 0 || nx >= map.width || ny >= map.height) continue;
+                        const nt = map.tiles[ny * map.width + nx].terrain;
+                        if (nt === 'coast' || nt === 'ocean') waterAdj = true;
+                      }
+                    }
+                    if (waterAdj) opts.push({ kind: 'irrigation', label: 'Irrigation' });
+                  }
+                  if (opts.length === 0) {
+                    return <Text style={styles.cardMeta}>Nothing to build on this tile.</Text>;
+                  }
+                  return (
+                    <View style={styles.unitActionsRow}>
+                      {opts.map((o) => (
+                        <Pressable
+                          key={o.kind}
+                          style={styles.actionMuted}
+                          onPress={() => startWork(o.kind)}
+                        >
+                          <Text style={styles.actionMutedText}>Build {o.label}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  );
+                })()
               )
             ) : null}
           </View>
         ) : selectedCity ? (
           (() => {
-            const yields = map ? computeCityYields(selectedCity, map, wonders) : null;
+            const yields = map ? computeCityYields(selectedCity, map, wonders, improvements) : null;
             const growthThreshold = foodNeededToGrow(selectedCity.population);
             const buildTargetLabel = (() => {
               const b = selectedCity.building;

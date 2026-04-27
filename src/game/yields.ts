@@ -1,18 +1,9 @@
+import type { ImprovementKind, ImprovementMap } from '@/src/data/improvements';
 import { RESOURCE } from '@/src/data/resources';
 import { TERRAIN } from '@/src/data/terrain';
 
 import type { GameMap, Tile } from './map';
 import type { City, Wonder } from './types';
-
-function tileFood(t: Tile): number {
-  return TERRAIN[t.terrain].food + (t.resource ? RESOURCE[t.resource].food : 0);
-}
-function tileProd(t: Tile): number {
-  return TERRAIN[t.terrain].prod + (t.resource ? RESOURCE[t.resource].prod : 0);
-}
-function tileTrade(t: Tile): number {
-  return TERRAIN[t.terrain].trade + (t.resource ? RESOURCE[t.resource].trade : 0);
-}
 
 export type CityYields = {
   rawFood: number;
@@ -26,9 +17,34 @@ export type CityYields = {
   workedTiles: Tile[];
 };
 
+const FOOD_PER_CITIZEN = 2;
 const HAPPY_POP_THRESHOLD = 4;
 
-const FOOD_PER_CITIZEN = 2;
+function impAt(
+  improvements: ImprovementMap,
+  x: number,
+  y: number,
+): ImprovementKind | undefined {
+  return improvements[`${x},${y}`];
+}
+
+function tileFood(t: Tile, imp: ImprovementKind | undefined): number {
+  let f = TERRAIN[t.terrain].food + (t.resource ? RESOURCE[t.resource].food : 0);
+  if (imp === 'farm' || imp === 'irrigation') f += 1;
+  return f;
+}
+
+function tileProd(t: Tile, imp: ImprovementKind | undefined): number {
+  let p = TERRAIN[t.terrain].prod + (t.resource ? RESOURCE[t.resource].prod : 0);
+  if (imp === 'mine') p += 1;
+  return p;
+}
+
+function tileTrade(t: Tile, imp: ImprovementKind | undefined): number {
+  let g = TERRAIN[t.terrain].trade + (t.resource ? RESOURCE[t.resource].trade : 0);
+  if (imp === 'road') g += 1;
+  return g;
+}
 
 export function foodNeededToGrow(population: number): number {
   return 5 + population * 5;
@@ -38,14 +54,17 @@ export function computeCityYields(
   city: City,
   map: GameMap,
   wonders: Wonder[] = [],
+  improvements: ImprovementMap = {},
 ): CityYields {
   const ownerWonders = wonders.filter((w) => w.ownerIdx === city.ownerIdx);
   const hasPyramids = ownerWonders.some((w) => w.kind === 'pyramids');
   const hasGreatLibrary = ownerWonders.some((w) => w.kind === 'great_library');
+
   const center = map.tiles[city.y * map.width + city.x];
-  let rawFood = tileFood(center) + (hasPyramids ? 1 : 0);
-  let prod = tileProd(center);
-  let trade = tileTrade(center);
+  const centerImp = impAt(improvements, center.x, center.y);
+  let rawFood = tileFood(center, centerImp) + (hasPyramids ? 1 : 0);
+  let prod = tileProd(center, centerImp);
+  let trade = tileTrade(center, centerImp);
 
   const outer: Tile[] = [];
   for (let dy = -1; dy <= 1; dy++) {
@@ -57,10 +76,11 @@ export function computeCityYields(
       outer.push(map.tiles[y * map.width + x]);
     }
   }
-  // Pick the tiles with highest combined yield first (now resource-aware).
   outer.sort((a, b) => {
-    const av = tileFood(a) + tileProd(a) + tileTrade(a);
-    const bv = tileFood(b) + tileProd(b) + tileTrade(b);
+    const ai = impAt(improvements, a.x, a.y);
+    const bi = impAt(improvements, b.x, b.y);
+    const av = tileFood(a, ai) + tileProd(a, ai) + tileTrade(a, ai);
+    const bv = tileFood(b, bi) + tileProd(b, bi) + tileTrade(b, bi);
     return bv - av;
   });
 
@@ -68,31 +88,38 @@ export function computeCityYields(
   const worked: Tile[] = [center];
   for (let i = 0; i < workersAvailable; i++) {
     const t = outer[i];
-    rawFood += tileFood(t);
-    prod += tileProd(t);
-    trade += tileTrade(t);
+    const imp = impAt(improvements, t.x, t.y);
+    rawFood += tileFood(t, imp);
+    prod += tileProd(t, imp);
+    trade += tileTrade(t, imp);
     worked.push(t);
   }
 
   const food = rawFood - city.population * FOOD_PER_CITIZEN;
 
-  // Science: each citizen contributes 1 science. Library doubles it. Great
-  // Library is a flat +50% on top.
   let science = city.population;
   if (city.buildings.includes('library')) science *= 2;
   if (hasGreatLibrary) science = Math.floor(science * 1.5);
 
-  // Gold from trade yields. Marketplace adds +50%.
   let gold = trade;
   if (city.buildings.includes('marketplace')) gold = Math.floor(gold * 1.5);
 
-  // Happiness: every citizen past size 4 is unhappy. Each Temple keeps one
-  // citizen happy. If unhappy > happy, the city is in disorder and produces
-  // no production this turn.
-  const happy = city.buildings.includes('temple') ? 1 : 0;
+  const templeHappy = city.buildings.includes('temple') ? 1 : 0;
+  const courthouseHappy = city.buildings.includes('courthouse') ? 1 : 0;
+  const happy = templeHappy + courthouseHappy;
   const unhappy = Math.max(0, city.population - HAPPY_POP_THRESHOLD);
   const disorder = unhappy > happy;
   if (disorder) prod = 0;
 
-  return { rawFood, food, prod, science, gold, happy, unhappy, disorder, workedTiles: worked };
+  return {
+    rawFood,
+    food,
+    prod,
+    science,
+    gold,
+    happy,
+    unhappy,
+    disorder,
+    workedTiles: worked,
+  };
 }

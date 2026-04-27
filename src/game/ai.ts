@@ -1,3 +1,4 @@
+import { BUILDING, type BuildingKind } from '@/src/data/buildings';
 import { TERRAIN } from '@/src/data/terrain';
 import { canEnterTerrain, UNIT, type UnitKind } from '@/src/data/units';
 import { WONDER, WONDER_KINDS } from '@/src/data/wonders';
@@ -202,12 +203,13 @@ function findEmptyExpansionTargets(
 }
 
 export function pickAINextBuild(
-  ownerIdx: number,
+  city: City,
   cities: City[],
   units: Unit[],
   researched: string[],
   wonders: Wonder[] = [],
 ): CityBuildTarget {
+  const ownerIdx = city.ownerIdx;
   const myCities = cities.filter((c) => c.ownerIdx === ownerIdx);
   const myUnits = units.filter((u) => u.ownerIdx === ownerIdx);
   const myPioneers = myUnits.filter((u) => u.kind === 'pioneer').length;
@@ -229,7 +231,20 @@ export function pickAINextBuild(
     return { kind: 'unit', unit: choices[0] };
   }
 
-  // Well-defended — try to grab an available wonder.
+  // Build infrastructure that THIS city is missing.
+  const buildingPriority: BuildingKind[] = [
+    'granary', 'library', 'marketplace', 'walls', 'barracks', 'temple', 'courthouse',
+  ];
+  for (const b of buildingPriority) {
+    if (city.buildings.includes(b)) continue;
+    const tech = BUILDING[b].tech;
+    if (tech !== null && !researched.includes(tech)) continue;
+    if (b === 'temple' && city.population < 3) continue;
+    if (b === 'courthouse' && city.population < 5) continue;
+    return { kind: 'building', building: b };
+  }
+
+  // Well-defended + infrastructure built — grab an available wonder.
   for (const wkind of WONDER_KINDS) {
     if (wonders.some((w) => w.kind === wkind)) continue;
     const tech = WONDER[wkind].tech;
@@ -237,7 +252,7 @@ export function pickAINextBuild(
     return { kind: 'wonder', wonder: wkind };
   }
 
-  // Otherwise keep building offensive units.
+  // Default: more offensive units.
   const offensive: UnitKind[] = ['footman'];
   if (researched.includes('horseback_riding')) offensive.push('horseman');
   if (researched.includes('iron_working')) offensive.push('swordsman');
