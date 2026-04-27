@@ -210,9 +210,30 @@ export default function Hud() {
   return (
     <SafeAreaView style={styles.root} pointerEvents="box-none">
       <View style={styles.topRow} pointerEvents="box-none">
-        <Pressable style={styles.pillSquare} onPress={exitToTitle}>
-          <FontAwesome5 name="home" size={14} color={THEME.ink} />
-        </Pressable>
+        {(() => {
+          // "Idle" = no human action pending. Mirrors the Next/EndTurn logic:
+          // every unit handled, no city sitting idle, every player has either
+          // a research target or has researched everything.
+          const unmovedCount = units.filter(
+            (u) =>
+              u.ownerIdx === 0 &&
+              u.movesLeft > 0 &&
+              !u.destination &&
+              !u.workingOn &&
+              !u.autoMode &&
+              !u.exploreMode,
+          ).length;
+          const idleCities = cities.filter(
+            (c) => c.ownerIdx === 0 && c.building === null,
+          ).length;
+          const allIdle = unmovedCount === 0 && idleCities === 0;
+          return (
+            <Pressable style={styles.pillSquare} onPress={exitToTitle}>
+              <FontAwesome5 name="home" size={14} color={THEME.ink} />
+              {allIdle ? <View style={styles.idleDot} /> : null}
+            </Pressable>
+          );
+        })()}
         {(() => {
           const turnsLeft = turnLimit > 0 ? turnLimit - turn + 1 : Infinity;
           const warn = turnsLeft <= 5;
@@ -1013,6 +1034,18 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
+    position: 'relative',
+  },
+  idleDot: {
+    position: 'absolute',
+    top: 3,
+    right: 3,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: THEME.good,
+    borderColor: 'rgba(10, 23, 41, 0.85)',
+    borderWidth: 1,
   },
   pillIcon: { marginRight: 5 },
   pillText: { color: THEME.ink, fontSize: 12, fontWeight: '600' },

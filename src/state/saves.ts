@@ -136,6 +136,16 @@ export async function resetTutorial(): Promise<void> {
   await AsyncStorage.removeItem(TUTORIAL_KEY);
 }
 
+// Wipe everything this app has stored: every save slot, the history log,
+// the tutorial-seen flag, and the cached leaders blob if any. Used by the
+// Settings screen for a "start over completely" reset.
+export async function wipeAllAppData(): Promise<void> {
+  const keys: string[] = [];
+  for (let i = 0; i < SLOT_COUNT; i++) keys.push(slotKey(i));
+  keys.push(HISTORY_KEY, TUTORIAL_KEY, 'civ_leaders_cache_v1');
+  await AsyncStorage.multiRemove(keys);
+}
+
 export async function listSlots(): Promise<SlotInfo[]> {
   const out: SlotInfo[] = [];
   for (let i = 0; i < SLOT_COUNT; i++) {

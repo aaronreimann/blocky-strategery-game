@@ -21,6 +21,7 @@ import {
 
 import { THEME } from './palette';
 import ScenarioScreen from './ScenarioScreen';
+import SettingsScreen from './SettingsScreen';
 
 const RESULT_LABEL: Record<'win' | 'lose' | 'draw', string> = {
   win: 'Victory',
@@ -41,6 +42,7 @@ export default function TitleScreen() {
   const [pendingSlot, setPendingSlot] = useState<number | null>(null);
   const [pendingDelete, setPendingDelete] = useState<number | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const leadersRef = useRef<LeaderMap>(buildFallbackLeaders());
 
@@ -169,11 +171,16 @@ export default function TitleScreen() {
         })}
       </View>
 
-      <Pressable style={styles.historyBtn} onPress={() => setHistoryOpen(true)}>
-        <Text style={styles.historyBtnText}>
-          History {history.length > 0 ? `(${history.length})` : ''}
-        </Text>
-      </Pressable>
+      <View style={styles.bottomBtnRow}>
+        <Pressable style={styles.historyBtn} onPress={() => setHistoryOpen(true)}>
+          <Text style={styles.historyBtnText}>
+            History {history.length > 0 ? `(${history.length})` : ''}
+          </Text>
+        </Pressable>
+        <Pressable style={styles.historyBtn} onPress={() => setSettingsOpen(true)}>
+          <Text style={styles.historyBtnText}>Settings</Text>
+        </Pressable>
+      </View>
       </View>
 
       {pendingDelete !== null && (() => {
@@ -283,6 +290,16 @@ export default function TitleScreen() {
           </Pressable>
         </Pressable>
       )}
+
+      {settingsOpen && (
+        <SettingsScreen
+          onClose={() => setSettingsOpen(false)}
+          onAfterReset={() => {
+            setSettingsOpen(false);
+            refresh();
+          }}
+        />
+      )}
       </SafeAreaView>
     </ImageBackground>
   );
@@ -357,8 +374,12 @@ const styles = StyleSheet.create({
   deleteBtnText: { color: THEME.bad, fontSize: 11, fontWeight: '700' },
   deleteBtnStrong: { backgroundColor: THEME.bad, borderColor: THEME.bad },
   deleteBtnTextStrong: { color: '#0a1729', fontWeight: '800' },
-  historyBtn: {
+  bottomBtnRow: {
+    flexDirection: 'row',
+    gap: 8,
     marginTop: 18,
+  },
+  historyBtn: {
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 8,

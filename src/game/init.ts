@@ -223,7 +223,7 @@ export function buildInitialState(
       name: c.name,
       iso: c.iso,
       leader: leaders[c.qid] ?? c.fallbackLeader,
-      color: PLAYER_PALETTE[idx % PLAYER_PALETTE.length],
+      color: flavor?.color ?? PLAYER_PALETTE[idx % PLAYER_PALETTE.length],
       isHuman: idx === 0,
       researched: [...startingResearched],
       researching: pickCheapestAvailable(startingResearched),
