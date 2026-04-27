@@ -24,6 +24,7 @@ import {
   type City,
   type CityBuildTarget,
   type CityFocus,
+  BARBARIAN_OWNER_IDX,
   DEFAULT_VICTORIES,
   type Difficulty,
   type GameOverState,
@@ -1671,6 +1672,154 @@ export const useGame = create<GameState>((set, get) => ({
       }
       if (result.battles.length > 0) {
         lastAIBattle = result.battles[result.battles.length - 1];
+      }
+    }
+
+    // Barbarian pass — spawn-and-raid. Barbarians own units but aren't
+    // in workingPlayers, so they don't show up in Diplomacy / Score and
+    // don't count toward conquest victory. They roam toward the nearest
+    // non-barb unit or city and attack if adjacent.
+    {
+      const BARB_CAP = 5;
+      const BARB_SPAWN_PROB = 0.08;
+      const BARB_MIN_DIST_FROM_CITY = 8;
+      let barbCount = workingUnits.filter((u) => u.ownerIdx === BARBARIAN_OWNER_IDX).length;
+      // Spawn step
+      if (barbCount < BARB_CAP && Math.random() < BARB_SPAWN_PROB) {
+        for (let attempt = 0; attempt < 30; attempt++) {
+          const x = Math.floor(Math.random() * map.width);
+          const y = Math.floor(Math.random() * map.height);
+          const tile = map.tiles[y * map.width + x];
+          if (!TERRAIN[tile.terrain].passable) continue;
+          if (workingUnits.some((u) => u.x === x && u.y === y)) continue;
+          if (
+            workingCities.some(
+              (c) => Math.max(Math.abs(c.x - x), Math.abs(c.y - y)) < BARB_MIN_DIST_FROM_CITY,
+            )
+          ) {
+            continue;
+          }
+          workingUnits = [
+            ...workingUnits,
+            {
+              id: nextUnitId(),
+              kind: 'footman',
+              ownerIdx: BARBARIAN_OWNER_IDX,
+              x,
+              y,
+              movesLeft: 0,
+              workingOn: null,
+              workTurnsLeft: 0,
+              destination: null,
+              stack: ['footman'],
+              autoMode: false,
+              exploreMode: false,
+              veteran: false,
+            },
+          ];
+          barbCount++;
+          if (workingUnits[workingUnits.length - 1].ownerIdx === BARBARIAN_OWNER_IDX) {
+            // Surface to the human only if the spawn lands on an explored tile.
+            const k = `${x},${y}`;
+            if (get().humanVisibility.includes(k)) {
+              events.push({
+                kind: 'event',
+                text: 'Raiders sighted on the frontier.',
+              });
+            }
+          }
+          break;
+        }
+      }
+
+      // Movement step — reset barbarian moves, then for each barb find the
+      // nearest non-barb target and step toward it (or attack if adjacent).
+      workingUnits = workingUnits.map((u) =>
+        u.ownerIdx === BARBARIAN_OWNER_IDX
+          ? { ...u, movesLeft: UNIT.footman.move }
+          : u,
+      );
+      const barbIds = workingUnits
+        .filter((u) => u.ownerIdx === BARBARIAN_OWNER_IDX)
+        .map((u) => u.id);
+      for (const id of barbIds) {
+        const me = workingUnits.find((u) => u.id === id);
+        if (!me || me.movesLeft <= 0) continue;
+        // Find nearest non-barb target (unit or city).
+        type Target =
+          | { x: number; y: number; kind: 'unit'; unit: Unit }
+          | { x: number; y: number; kind: 'city'; city: City };
+        let target: Target | null = null;
+        let bestDist = Infinity;
+        for (const u of workingUnits) {
+          if (u.ownerIdx === BARBARIAN_OWNER_IDX) continue;
+          const d = chebyshev(me.x, me.y, u.x, u.y);
+          if (d < bestDist) {
+            bestDist = d;
+            target = { x: u.x, y: u.y, kind: 'unit', unit: u };
+          }
+        }
+        for (const c of workingCities) {
+          const d = chebyshev(me.x, me.y, c.x, c.y);
+          if (d < bestDist) {
+            bestDist = d;
+            target = { x: c.x, y: c.y, kind: 'city', city: c };
+          }
+        }
+        if (!target) continue;
+
+        if (bestDist === 1 && target.kind === 'unit') {
+          // Attack adjacent unit.
+          const defenderTile = map.tiles[target.y * map.width + target.x];
+          const cityHere = workingCities.find(
+            (c) => c.x === target!.x && c.y === target!.y && c.ownerIdx === target!.unit.ownerIdx,
+          );
+          const wallsBonus = cityHere?.buildings.includes('walls') ? 1 : 0;
+          const battle = resolveCombat(me, target.unit, defenderTile, wallsBonus, workingPlayers);
+          if (battle.attackerWon) {
+            workingUnits = workingUnits.filter((u) => u.id !== target!.unit.id);
+            if (target.unit.ownerIdx === HUMAN_IDX) {
+              events.push({
+                kind: 'lost',
+                text: `Raiders cut down a ${UNIT[target.unit.kind].name}.`,
+              });
+              lastAIBattle = battle;
+            }
+          } else {
+            workingUnits = workingUnits.filter((u) => u.id !== me.id);
+            if (target.unit.ownerIdx === HUMAN_IDX) {
+              events.push({
+                kind: 'battle',
+                text: 'Repelled raiders at your gate.',
+              });
+              lastAIBattle = battle;
+            }
+          }
+          continue;
+        }
+        // Otherwise, step one tile toward the target.
+        const blocked = new Set<string>();
+        for (const o of workingUnits) {
+          if (o.id !== me.id) blocked.add(`${o.x},${o.y}`);
+        }
+        for (const c of workingCities) {
+          blocked.add(`${c.x},${c.y}`); // can't walk onto a city
+        }
+        blocked.delete(`${target.x},${target.y}`); // allow walking onto target
+        const next = nextStepToTiles(
+          { x: me.x, y: me.y },
+          new Set([`${target.x},${target.y}`]),
+          blocked,
+          map,
+          me.kind,
+        );
+        if (next) {
+          workingUnits = workingUnits.map((u) =>
+            u.id === me.id
+              ? { ...u, x: next.x, y: next.y, movesLeft: u.movesLeft - 1 }
+              : u,
+          );
+        }
       }
     }
 

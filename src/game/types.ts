@@ -50,6 +50,13 @@ export const DEFAULT_VICTORIES: VictoryConditions = {
   time: true,
 };
 
+// Barbarians are a "shadow" player — they own units (Unit.ownerIdx) but are
+// NOT in the players[] array. They have no tribe, no cities, no tech, no
+// diplomacy. A high sentinel idx is used so any `players[idx]` lookup returns
+// undefined (and UI falls back gracefully).
+export const BARBARIAN_OWNER_IDX = 999;
+export const BARBARIAN_COLOR = '#7c2d12'; // blood-rust red
+
 export type ScenarioOptions = {
   difficulty: Difficulty;
   mapSize: MapSize;

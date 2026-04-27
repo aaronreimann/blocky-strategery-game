@@ -32,7 +32,7 @@ import { RESOURCE, type Resource } from '@/src/data/resources';
 import { TERRAIN } from '@/src/data/terrain';
 import { type UnitKind } from '@/src/data/units';
 import type { GameMap } from '@/src/game/map';
-import type { City, Hut, Player, Unit } from '@/src/game/types';
+import { BARBARIAN_COLOR, BARBARIAN_OWNER_IDX, type City, type Hut, type Player, type Unit } from '@/src/game/types';
 import { cityRadius, computeTradeRoutes } from '@/src/game/yields';
 
 import { pathToTile } from '@/src/game/path';
@@ -1024,8 +1024,10 @@ export default function MapView({
       // unit's location would be misleading).
       if (u.ownerIdx !== 0 && !currentlyVisible.has(`${u.x},${u.y}`)) continue;
       const owner = players[u.ownerIdx];
-      const color = owner?.color ?? '#ffffff';
-      
+      const color =
+        owner?.color
+        ?? (u.ownerIdx === BARBARIAN_OWNER_IDX ? BARBARIAN_COLOR : '#ffffff');
+
       const cx = u.x * TILE_SIZE + TILE_SIZE / 2;
       const cy = u.y * TILE_SIZE + TILE_SIZE / 2;
       
