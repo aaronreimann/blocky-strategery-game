@@ -9,11 +9,12 @@
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "ios": {
-      "bundleIdentifier": "com.aaronr.civapp",
+      "bundleIdentifier": "com.aaronr.blockystrategery",
       "supportsTablet": true
     },
     "android": {
-      "package": "com.aaronr.civapp",
+      "package": "com.aaronr.blockystrategery",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#0a1729",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
