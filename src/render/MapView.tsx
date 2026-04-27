@@ -943,10 +943,11 @@ export default function MapView({
         const PAINTED_SIZE = Math.round(TILE_SIZE * 1.25);
         const pox = cx - PAINTED_SIZE / 2;
         const poy = cy - PAINTED_SIZE / 2;
-        // The bundled PNGs sit inside generous transparent padding, so the
-        // baked black ring lands closer to the center than the icon edge.
-        const ringR = PAINTED_SIZE * 0.305;
-        const ringW = PAINTED_SIZE * 0.055;
+        // The bundled PNGs put the black ring right at the canvas perimeter
+        // (verified by reading icon_footman.png). Center radius ≈ 48% of
+        // canvas, ring thickness ≈ 5%. Match those numbers in world units.
+        const ringR = PAINTED_SIZE * 0.48;
+        const ringW = PAINTED_SIZE * 0.07;
         elements.push(
           <Group key={`u-${u.id}`}>
             <SkiaImage
