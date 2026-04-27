@@ -253,17 +253,31 @@ export default function MapView({
       }
     });
 
+  // Anchor for the pinch — captured at onStart so a buggy focalX/focalY
+  // during onUpdate (Android-Pinch on new arch sometimes reports 0,0) can't
+  // yank the zoom toward the top-left corner. Falls back to screen center
+  // if onStart's focal is also 0.
+  const pinchFocalX = useSharedValue(0);
+  const pinchFocalY = useSharedValue(0);
   const pinch = Gesture.Pinch()
-    .onStart(() => {
+    .onStart((e) => {
+      'worklet';
       startScale.value = scale.value;
       startTx.value = tx.value;
       startTy.value = ty.value;
+      const fx = e.focalX || screenW / 2;
+      const fy = e.focalY || screenH / 2;
+      pinchFocalX.value = fx;
+      pinchFocalY.value = fy;
     })
     .onUpdate((e) => {
+      'worklet';
       const next = Math.min(Math.max(startScale.value * e.scale, MIN_SCALE), MAX_SCALE);
       const ratio = next / startScale.value;
-      tx.value = e.focalX - (e.focalX - startTx.value) * ratio;
-      ty.value = e.focalY - (e.focalY - startTy.value) * ratio;
+      const fx = pinchFocalX.value;
+      const fy = pinchFocalY.value;
+      tx.value = fx - (fx - startTx.value) * ratio;
+      ty.value = fy - (fy - startTy.value) * ratio;
       scale.value = next;
     });
 
