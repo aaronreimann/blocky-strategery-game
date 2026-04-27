@@ -47,6 +47,9 @@ export default function GameScreen() {
     if (!map || !selectedUnitId) return { moveTiles: move, attackTiles: attack };
     const sel = units.find((u) => u.id === selectedUnitId);
     if (!sel || sel.movesLeft <= 0) return { moveTiles: move, attackTiles: attack };
+    // Auto/Explore units are locked from manual movement, so don't even
+    // suggest tiles — keeps the map clean and matches the rule.
+    if (sel.autoMode || sel.exploreMode) return { moveTiles: move, attackTiles: attack };
 
     for (let dy = -sel.movesLeft; dy <= sel.movesLeft; dy++) {
       for (let dx = -sel.movesLeft; dx <= sel.movesLeft; dx++) {

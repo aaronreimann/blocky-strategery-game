@@ -824,7 +824,8 @@ export default function Hud() {
               u.movesLeft > 0 &&
               !u.destination &&
               !u.workingOn &&
-              !u.autoMode,
+              !u.autoMode &&
+              !u.exploreMode,
           ).length;
           if (unmoved === 0) {
             return (

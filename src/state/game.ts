@@ -523,7 +523,8 @@ export const useGame = create<GameState>((set, get) => ({
         u.movesLeft > 0 &&
         !u.destination &&
         !u.workingOn &&
-        !u.autoMode,
+        !u.autoMode &&
+        !u.exploreMode,
     );
     if (candidates.length === 0) return;
     const currentIdx = selectedUnitId
