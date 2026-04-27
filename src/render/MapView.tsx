@@ -936,30 +936,22 @@ export default function MapView({
       else if (u.kind === 'footman') img = footmanImg;
 
       if (img) {
-        // Painted icons render larger than the SVG glyphs and skip the owner-
-        // colored disc; ownership reads from a thin colored ring around the
-        // icon instead so the artwork stays the focal point.
-        const PAINTED_SIZE = TILE_SIZE - 2;
+        // Painted icons have their own black-circle composition; we scale them
+        // up so that black ring lands just past the tile edge (effectively
+        // cropped) while the character inside fills the tile. Ownership is
+        // already legible from the territory tint — no extra ring needed.
+        const PAINTED_SIZE = Math.round(TILE_SIZE * 1.25);
         const pox = cx - PAINTED_SIZE / 2;
         const poy = cy - PAINTED_SIZE / 2;
         elements.push(
-          <Group key={`u-${u.id}`}>
-            <SkiaImage
-              image={img}
-              x={pox}
-              y={poy}
-              width={PAINTED_SIZE}
-              height={PAINTED_SIZE}
-            />
-            <Circle
-              cx={cx}
-              cy={cy}
-              r={PAINTED_SIZE / 2 - 0.5}
-              color={color}
-              style="stroke"
-              strokeWidth={1.5}
-            />
-          </Group>,
+          <SkiaImage
+            key={`u-${u.id}`}
+            image={img}
+            x={pox}
+            y={poy}
+            width={PAINTED_SIZE}
+            height={PAINTED_SIZE}
+          />,
         );
       } else {
         const path = iconPath(UNIT_ICON[u.kind]);
