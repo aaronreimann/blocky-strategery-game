@@ -126,7 +126,6 @@ export default function TitleScreen() {
                 style={[styles.slotCard, ended && { borderColor: RESULT_COLOR[ended.kind] }]}
                 onPress={() => onSlotPress(info.slot, info)}
               >
-                <Text style={styles.slotNumber}>Realm {info.slot + 1}</Text>
                 {info.empty ? (
                   <>
                     <Text style={styles.slotEmpty}>Empty</Text>
@@ -296,13 +295,6 @@ const styles = StyleSheet.create({
     width: '100%',
     minHeight: 160,
     justifyContent: 'center',
-  },
-  slotNumber: {
-    color: THEME.warn,
-    fontSize: 14,
-    fontWeight: '800',
-    letterSpacing: 1,
-    marginBottom: 8,
   },
   slotEmpty: { color: THEME.ink, fontSize: 18, fontWeight: '700' },
   slotMeta: { color: THEME.ink, fontSize: 14, fontWeight: '700', marginTop: 2 },
