@@ -308,17 +308,17 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: THEME.bg,
-    justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 24,
     paddingTop: 24,
-    paddingBottom: 24,
   },
-  header: { alignItems: 'center', marginTop: 120 },
+  header: { alignItems: 'center', marginTop: 40 },
   bottomGroup: {
-    width: '100%',
+    position: 'absolute',
+    left: 24,
+    right: 24,
+    bottom: 24,
     alignItems: 'center',
-    paddingBottom: 60,
   },
   logo: {
     width: 600,
