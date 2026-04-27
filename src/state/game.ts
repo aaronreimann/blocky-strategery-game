@@ -34,7 +34,7 @@ import {
 } from '@/src/game/types';
 import { computeCityYields, foodNeededToGrow } from '@/src/game/yields';
 
-import { loadSlot, saveSlot } from './saves';
+import { appendHistory, loadSlot, saveSlot } from './saves';
 
 const MIN_CITY_SPACING = 3;
 const HUMAN_IDX = 0;
@@ -128,6 +128,27 @@ function findSpawnTile(
     return c;
   }
   return null;
+}
+
+function recordGameOver(
+  prev: GameOverState | null,
+  next: GameOverState | null,
+  state: { turn: number; difficulty: Difficulty; players: Player[]; cities: City[]; units: Unit[] },
+): void {
+  if (prev || !next) return;
+  const human = state.players.find((p) => p.isHuman);
+  appendHistory({
+    at: new Date().toISOString(),
+    kind: next.kind,
+    reason: next.reason,
+    turn: state.turn,
+    difficulty: state.difficulty,
+    country: human?.name ?? 'You',
+    leader: human?.leader ?? '',
+    iso: human?.iso ?? '',
+    cityCount: state.cities.filter((c) => c.ownerIdx === (human?.idx ?? 0)).length,
+    unitCount: state.units.filter((u) => u.ownerIdx === (human?.idx ?? 0)).length,
+  }).catch((err) => console.warn('history append failed', err));
 }
 
 function autosave(state: GameState): void {
@@ -394,11 +415,19 @@ export const useGame = create<GameState>((set, get) => ({
               players,
               turn,
             });
+            const prevOver = get().gameOver;
             set({
               units: nextUnits,
               selectedUnitId: null,
               lastBattle: battle,
               gameOver: finished,
+            });
+            recordGameOver(prevOver, finished, {
+              turn,
+              difficulty: get().difficulty,
+              players,
+              cities: nextCities,
+              units: nextUnits,
             });
             autosave(get());
             return;
@@ -424,11 +453,19 @@ export const useGame = create<GameState>((set, get) => ({
           players,
           turn,
         });
+        const prevOver = get().gameOver;
         set({
           units: nextUnits,
           cities: nextCities,
           lastBattle: battle,
           gameOver: finished,
+        });
+        recordGameOver(prevOver, finished, {
+          turn,
+          difficulty: get().difficulty,
+          players,
+          cities: nextCities,
+          units: nextUnits,
         });
         autosave(get());
         return;
@@ -1238,6 +1275,7 @@ export const useGame = create<GameState>((set, get) => ({
       }
     }
 
+    const prevOver = get().gameOver;
     set({
       turn: newTurn,
       selectedUnitId: null,
@@ -1251,6 +1289,13 @@ export const useGame = create<GameState>((set, get) => ({
       lastBattle: lastAIBattle,
       turnEvents: events,
       gameOver: finished,
+    });
+    recordGameOver(prevOver, finished, {
+      turn: newTurn,
+      difficulty: get().difficulty,
+      players: workingPlayers,
+      cities: workingCities,
+      units: workingUnits,
     });
     autosave(get());
   },

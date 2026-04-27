@@ -43,9 +43,26 @@ export type SlotInfo =
       cityCount: number;
       unitCount: number;
       difficulty: Difficulty;
-      humanRealm: { name: string; leader: string };
+      humanRealm: { name: string; leader: string; iso: string };
+      gameOver: GameOverState | null;
       savedAt: string;
     };
+
+export type HistoryEntry = {
+  at: string;          // ISO timestamp when game ended
+  kind: 'win' | 'lose' | 'draw';
+  reason: string;
+  turn: number;
+  difficulty: Difficulty;
+  country: string;
+  leader: string;
+  iso: string;
+  cityCount: number;
+  unitCount: number;
+};
+
+const HISTORY_KEY = 'civ_history';
+const HISTORY_MAX = 50;
 
 export async function saveSlot(slot: number, data: Omit<SaveData, 'version' | 'savedAt'>): Promise<void> {
   const payload: SaveData = {
@@ -76,6 +93,28 @@ export async function deleteSlot(slot: number): Promise<void> {
   await AsyncStorage.removeItem(slotKey(slot));
 }
 
+export async function loadHistory(): Promise<HistoryEntry[]> {
+  const raw = await AsyncStorage.getItem(HISTORY_KEY);
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as HistoryEntry[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function appendHistory(entry: HistoryEntry): Promise<void> {
+  const list = await loadHistory();
+  list.unshift(entry);
+  if (list.length > HISTORY_MAX) list.length = HISTORY_MAX;
+  await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(list));
+}
+
+export async function clearHistory(): Promise<void> {
+  await AsyncStorage.removeItem(HISTORY_KEY);
+}
+
 export async function listSlots(): Promise<SlotInfo[]> {
   const out: SlotInfo[] = [];
   for (let i = 0; i < SLOT_COUNT; i++) {
@@ -94,7 +133,9 @@ export async function listSlots(): Promise<SlotInfo[]> {
         humanRealm: {
           name: human?.name ?? 'You',
           leader: human?.leader ?? '',
+          iso: human?.iso ?? '',
         },
+        gameOver: data.gameOver ?? null,
         savedAt: data.savedAt,
       });
     }

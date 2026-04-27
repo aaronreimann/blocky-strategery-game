@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View, ImageBackground, Image } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View, ImageBackground, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { buildFallbackLeaders, type LeaderMap } from '@/src/data/countries';
+import { buildFallbackLeaders, flagEmoji, type LeaderMap } from '@/src/data/countries';
 import { getCachedLeaders, refreshLeaders } from '@/src/data/leaders';
 import {
   DIFFICULTIES,
@@ -11,9 +11,28 @@ import {
   type Difficulty,
 } from '@/src/game/types';
 import { useGame } from '@/src/state/game';
-import { deleteSlot, listSlots, type SlotInfo } from '@/src/state/saves';
+import {
+  appendHistory,
+  clearHistory,
+  deleteSlot,
+  listSlots,
+  loadHistory,
+  type HistoryEntry,
+  type SlotInfo,
+} from '@/src/state/saves';
 
 import { THEME } from './palette';
+
+const RESULT_LABEL: Record<'win' | 'lose' | 'draw', string> = {
+  win: 'Victory',
+  lose: 'Defeat',
+  draw: 'Stalemate',
+};
+const RESULT_COLOR: Record<'win' | 'lose' | 'draw', string> = {
+  win: THEME.good,
+  lose: THEME.bad,
+  draw: THEME.warn,
+};
 
 export default function TitleScreen() {
   const newGame = useGame((s) => s.newGame);
@@ -21,11 +40,14 @@ export default function TitleScreen() {
 
   const [slots, setSlots] = useState<SlotInfo[]>([]);
   const [pendingSlot, setPendingSlot] = useState<number | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
   const leadersRef = useRef<LeaderMap>(buildFallbackLeaders());
 
   const refresh = useCallback(async () => {
-    const list = await listSlots();
+    const [list, hist] = await Promise.all([listSlots(), loadHistory()]);
     setSlots(list);
+    setHistory(hist);
   }, []);
 
   useEffect(() => {
@@ -56,6 +78,29 @@ export default function TitleScreen() {
   };
 
   const onDelete = async (slot: number) => {
+    const info = slots.find((s) => s.slot === slot);
+    if (info && !info.empty && info.gameOver) {
+      const alreadyLogged = history.some(
+        (h) =>
+          h.turn === info.turn &&
+          h.country === info.humanRealm.name &&
+          h.kind === info.gameOver!.kind,
+      );
+      if (!alreadyLogged) {
+        await appendHistory({
+          at: info.savedAt,
+          kind: info.gameOver.kind,
+          reason: info.gameOver.reason,
+          turn: info.turn,
+          difficulty: info.difficulty,
+          country: info.humanRealm.name,
+          leader: info.humanRealm.leader,
+          iso: info.humanRealm.iso,
+          cityCount: info.cityCount,
+          unitCount: info.unitCount,
+        });
+      }
+    }
     await deleteSlot(slot);
     refresh();
   };
@@ -73,40 +118,64 @@ export default function TitleScreen() {
         </View>
 
       <View style={styles.slotRow}>
-        {slots.map((info) => (
-          <View key={info.slot} style={styles.slotWrap}>
-            <Pressable style={styles.slotCard} onPress={() => onSlotPress(info.slot, info)}>
-              <Text style={styles.slotNumber}>Realm {info.slot + 1}</Text>
-              {info.empty ? (
-                <>
-                  <Text style={styles.slotEmpty}>Empty</Text>
-                  <Text style={styles.slotHint}>Tap to start</Text>
-                </>
-              ) : (
-                <>
-                  <Text style={styles.slotMeta}>
-                    {info.humanRealm.name}
-                    {info.humanRealm.leader ? ` · ${info.humanRealm.leader}` : ''}
-                  </Text>
-                  <Text style={styles.slotMetaDim}>
-                    {DIFFICULTY_LABELS[info.difficulty]} · Turn {info.turn}
-                  </Text>
-                  <Text style={styles.slotMetaDim}>
-                    {info.cityCount} {info.cityCount === 1 ? 'city' : 'cities'} ·{' '}
-                    {info.unitCount} units
-                  </Text>
-                  <Text style={styles.slotHint}>Tap to resume</Text>
-                </>
-              )}
-            </Pressable>
-            {!info.empty && (
-              <Pressable style={styles.deleteBtn} onPress={() => onDelete(info.slot)}>
-                <Text style={styles.deleteBtnText}>Delete</Text>
+        {slots.map((info) => {
+          const ended = !info.empty && info.gameOver;
+          return (
+            <View key={info.slot} style={styles.slotWrap}>
+              <Pressable
+                style={[styles.slotCard, ended && { borderColor: RESULT_COLOR[ended.kind] }]}
+                onPress={() => onSlotPress(info.slot, info)}
+              >
+                <Text style={styles.slotNumber}>Realm {info.slot + 1}</Text>
+                {info.empty ? (
+                  <>
+                    <Text style={styles.slotEmpty}>Empty</Text>
+                    <Text style={styles.slotHint}>Tap to start</Text>
+                  </>
+                ) : (
+                  <>
+                    {ended && (
+                      <Text style={[styles.slotResult, { color: RESULT_COLOR[ended.kind] }]}>
+                        {RESULT_LABEL[ended.kind]}
+                      </Text>
+                    )}
+                    <Text style={styles.slotMeta}>
+                      {flagEmoji(info.humanRealm.iso)} {info.humanRealm.name}
+                      {info.humanRealm.leader ? ` · ${info.humanRealm.leader}` : ''}
+                    </Text>
+                    <Text style={styles.slotMetaDim}>
+                      {DIFFICULTY_LABELS[info.difficulty]} · Turn {info.turn}
+                    </Text>
+                    <Text style={styles.slotMetaDim}>
+                      {info.cityCount} {info.cityCount === 1 ? 'city' : 'cities'} ·{' '}
+                      {info.unitCount} units
+                    </Text>
+                    <Text style={styles.slotHint}>
+                      {ended ? 'Tap to view' : 'Tap to resume'}
+                    </Text>
+                  </>
+                )}
               </Pressable>
-            )}
-          </View>
-        ))}
+              {!info.empty && (
+                <Pressable
+                  style={[styles.deleteBtn, ended && styles.deleteBtnStrong]}
+                  onPress={() => onDelete(info.slot)}
+                >
+                  <Text style={[styles.deleteBtnText, ended && styles.deleteBtnTextStrong]}>
+                    {ended ? 'Clear slot' : 'Delete'}
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+          );
+        })}
       </View>
+
+      <Pressable style={styles.historyBtn} onPress={() => setHistoryOpen(true)}>
+        <Text style={styles.historyBtnText}>
+          History {history.length > 0 ? `(${history.length})` : ''}
+        </Text>
+      </Pressable>
 
       {pendingSlot !== null && (
         <View style={styles.modalBg}>
@@ -128,6 +197,61 @@ export default function TitleScreen() {
             <Pressable style={styles.modalCancel} onPress={() => setPendingSlot(null)}>
               <Text style={styles.modalCancelText}>Cancel</Text>
             </Pressable>
+          </View>
+        </View>
+      )}
+
+      {historyOpen && (
+        <View style={styles.modalBg}>
+          <View style={styles.historyCard}>
+            <View style={styles.historyHeader}>
+              <Text style={styles.modalTitle}>History</Text>
+              <Pressable onPress={() => setHistoryOpen(false)} style={styles.historyClose}>
+                <Text style={styles.historyCloseText}>Close</Text>
+              </Pressable>
+            </View>
+            {history.length === 0 ? (
+              <Text style={styles.historyEmpty}>
+                No past games yet. Win or lose a campaign and it will land here.
+              </Text>
+            ) : (
+              <ScrollView style={styles.historyList} contentContainerStyle={{ gap: 6 }}>
+                {history.map((h, i) => (
+                  <View
+                    key={`${h.at}-${i}`}
+                    style={[styles.historyRow, { borderColor: RESULT_COLOR[h.kind] }]}
+                  >
+                    <Text style={[styles.historyKind, { color: RESULT_COLOR[h.kind] }]}>
+                      {RESULT_LABEL[h.kind]}
+                    </Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.historyTitle}>
+                        {flagEmoji(h.iso)} {h.country}
+                        {h.leader ? ` · ${h.leader}` : ''}
+                      </Text>
+                      <Text style={styles.historyMeta}>
+                        {DIFFICULTY_LABELS[h.difficulty]} · Turn {h.turn} ·{' '}
+                        {new Date(h.at).toLocaleDateString()}
+                      </Text>
+                      <Text style={styles.historyMeta} numberOfLines={2}>
+                        {h.reason}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+            {history.length > 0 && (
+              <Pressable
+                style={styles.historyClear}
+                onPress={async () => {
+                  await clearHistory();
+                  refresh();
+                }}
+              >
+                <Text style={styles.historyClearText}>Clear history</Text>
+              </Pressable>
+            )}
           </View>
         </View>
       )}
@@ -184,6 +308,12 @@ const styles = StyleSheet.create({
   slotMeta: { color: THEME.ink, fontSize: 14, fontWeight: '700', marginTop: 2 },
   slotMetaDim: { color: THEME.inkMuted, fontSize: 12, marginTop: 2 },
   slotHint: { color: THEME.inkMuted, fontSize: 11, marginTop: 8 },
+  slotResult: {
+    fontSize: 18,
+    fontWeight: '900',
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
   deleteBtn: {
     paddingHorizontal: 12,
     paddingVertical: 6,
@@ -192,6 +322,71 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   deleteBtnText: { color: THEME.bad, fontSize: 11, fontWeight: '700' },
+  deleteBtnStrong: { backgroundColor: THEME.bad, borderColor: THEME.bad },
+  deleteBtnTextStrong: { color: '#0a1729', fontWeight: '800' },
+  historyBtn: {
+    marginTop: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(212, 184, 138, 0.45)',
+    backgroundColor: 'rgba(28, 22, 18, 0.6)',
+  },
+  historyBtnText: { color: THEME.ink, fontSize: 13, fontWeight: '700' },
+  historyCard: {
+    backgroundColor: 'rgba(28, 22, 18, 0.92)',
+    borderColor: 'rgba(212, 184, 138, 0.45)',
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 16,
+    width: '100%',
+    maxWidth: 540,
+    maxHeight: '85%',
+  },
+  historyHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  historyClose: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    borderColor: THEME.border,
+    borderWidth: 1,
+  },
+  historyCloseText: { color: THEME.ink, fontSize: 12, fontWeight: '700' },
+  historyEmpty: {
+    color: THEME.inkMuted,
+    fontSize: 13,
+    textAlign: 'center',
+    paddingVertical: 24,
+  },
+  historyList: { flexGrow: 0 },
+  historyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(10, 23, 41, 0.6)',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 10,
+    gap: 10,
+  },
+  historyKind: { fontSize: 12, fontWeight: '900', width: 64, letterSpacing: 1 },
+  historyTitle: { color: THEME.ink, fontSize: 13, fontWeight: '700' },
+  historyMeta: { color: THEME.inkMuted, fontSize: 11, marginTop: 2 },
+  historyClear: {
+    marginTop: 12,
+    alignSelf: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    borderColor: THEME.border,
+    borderWidth: 1,
+  },
+  historyClearText: { color: THEME.bad, fontSize: 11, fontWeight: '700' },
   modalBg: {
     position: 'absolute',
     top: 0, left: 0, right: 0, bottom: 0,
