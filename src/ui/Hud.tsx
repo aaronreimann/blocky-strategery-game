@@ -273,11 +273,20 @@ export default function Hud() {
                 Moves {selectedUnit.movesLeft}/{unitSpec.move} · ATK {unitSpec.attack} · DEF {unitSpec.defense}
               </Text>
             )}
-            {selectedUnit.kind === 'pioneer' ? (
-              <Pressable style={styles.action} onPress={foundCity}>
-                <Text style={styles.actionText}>Found City</Text>
-              </Pressable>
-            ) : null}
+            {selectedUnit.kind === 'pioneer' ? (() => {
+              const exhausted = selectedUnit.movesLeft <= 0;
+              return (
+                <Pressable
+                  style={[styles.action, exhausted && { opacity: 0.4 }]}
+                  disabled={exhausted}
+                  onPress={foundCity}
+                >
+                  <Text style={styles.actionText}>
+                    {exhausted ? 'Found City (no moves left)' : 'Found City'}
+                  </Text>
+                </Pressable>
+              );
+            })() : null}
             <View style={styles.unitActionsRow}>
               {awaitingDestinationFor === selectedUnit.id ? (
                 <Pressable style={styles.actionMuted} onPress={cancelSetDestination}>

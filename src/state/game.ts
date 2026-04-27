@@ -659,6 +659,7 @@ export const useGame = create<GameState>((set, get) => ({
     if (gameOver || !map) return;
     const selected = units.find((u) => u.id === selectedUnitId);
     if (!selected || selected.kind !== 'pioneer') return;
+    if (selected.movesLeft <= 0) return;
 
     const tooClose = cities.some(
       (c) => chebyshev(c.x, c.y, selected.x, selected.y) < MIN_CITY_SPACING,
