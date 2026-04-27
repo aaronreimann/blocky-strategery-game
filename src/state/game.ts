@@ -624,7 +624,7 @@ export const useGame = create<GameState>((set, get) => ({
             )
               ? 1
               : 0);
-          battle = resolveCombat(selected, enemyUnitAtTile, defenderTile, wallsBonus);
+          battle = resolveCombat(selected, enemyUnitAtTile, defenderTile, wallsBonus, players);
           if (!battle.attackerWon) {
             nextUnits = nextUnits.filter((u) => u.id !== selected.id);
             const finished = checkGameOver({
@@ -1634,6 +1634,7 @@ export const useGame = create<GameState>((set, get) => ({
         map,
         units: workingUnits,
         cities: workingCities,
+        players: workingPlayers,
         atPeaceWith,
       });
       workingUnits = result.units;

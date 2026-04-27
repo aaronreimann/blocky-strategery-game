@@ -1,7 +1,8 @@
 import { COUNTRIES, type Country, type LeaderMap } from '@/src/data/countries';
+import { CULTURE_FLAVOR } from '@/src/data/cultures';
 import { pickCheapestAvailable } from '@/src/data/tech';
 import { TERRAIN } from '@/src/data/terrain';
-import { UNIT } from '@/src/data/units';
+import { UNIT, type UnitKind } from '@/src/data/units';
 import { PLAYER_PALETTE } from '@/src/ui/palette';
 
 import { nextUnitId } from './ids';
@@ -134,6 +135,51 @@ function spawnStartingUnits(
   ];
 }
 
+// Drop one extra culture-flavored unit on or near the starting tile,
+// stepping out in concentric squares until we find an empty passable
+// land tile that no other starting unit already occupies.
+function spawnExtraUnit(
+  ownerIdx: number,
+  start: { x: number; y: number },
+  map: GameMap,
+  kind: UnitKind,
+  alreadyPlaced: Unit[],
+): Unit {
+  const taken = new Set(alreadyPlaced.map((u) => `${u.x},${u.y}`));
+  const candidates: { x: number; y: number }[] = [];
+  for (let r = 0; r <= 3; r++) {
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        const x = start.x + dx;
+        const y = start.y + dy;
+        if (x < 0 || y < 0 || x >= map.width || y >= map.height) continue;
+        const t = map.tiles[y * map.width + x];
+        if (!TERRAIN[t.terrain].passable) continue;
+        if (taken.has(`${x},${y}`)) continue;
+        candidates.push({ x, y });
+      }
+    }
+    if (candidates.length > 0) break;
+  }
+  const pos = candidates[0] ?? start;
+  return {
+    id: nextUnitId(),
+    kind,
+    ownerIdx,
+    x: pos.x,
+    y: pos.y,
+    movesLeft: UNIT[kind].move,
+    workingOn: null,
+    workTurnsLeft: 0,
+    destination: null,
+    stack: [kind],
+    autoMode: false,
+    exploreMode: false,
+    veteran: false,
+  };
+}
+
 function pickRandomCountries(count: number): Country[] {
   const shuffled = [...COUNTRIES].sort(() => Math.random() - 0.5);
   return shuffled.slice(0, count);
@@ -169,22 +215,31 @@ export function buildInitialState(
   const realms = pickRealms(totalPlayers, options.humanCountryQid ?? null);
   const spawns = pickSpawnPoints(map, totalPlayers);
 
-  const players: Player[] = realms.map((c, idx) => ({
-    idx,
-    name: c.name,
-    iso: c.iso,
-    leader: leaders[c.qid] ?? c.fallbackLeader,
-    color: PLAYER_PALETTE[idx % PLAYER_PALETTE.length],
-    isHuman: idx === 0,
-    researched: [],
-    researching: pickCheapestAvailable([]),
-    science: 0,
-    gold: 0,
-  }));
+  const players: Player[] = realms.map((c, idx) => {
+    const flavor = CULTURE_FLAVOR[c.iso];
+    const startingResearched = flavor?.startingResearched ?? [];
+    return {
+      idx,
+      name: c.name,
+      iso: c.iso,
+      leader: leaders[c.qid] ?? c.fallbackLeader,
+      color: PLAYER_PALETTE[idx % PLAYER_PALETTE.length],
+      isHuman: idx === 0,
+      researched: [...startingResearched],
+      researching: pickCheapestAvailable(startingResearched),
+      science: 0,
+      gold: flavor?.startingGold ?? 0,
+    };
+  });
 
   const units: Unit[] = [];
   for (let i = 0; i < totalPlayers; i++) {
-    units.push(...spawnStartingUnits(i, spawns[i] ?? spawns[0], map));
+    const start = spawns[i] ?? spawns[0];
+    units.push(...spawnStartingUnits(i, start, map));
+    const extra = CULTURE_FLAVOR[realms[i].iso]?.extraStartingUnit;
+    if (extra) {
+      units.push(spawnExtraUnit(i, start, map, extra, units));
+    }
   }
 
   const huts = pickHutSites(map, spawns, units);

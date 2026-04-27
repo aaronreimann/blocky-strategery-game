@@ -1,9 +1,9 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { flagEmoji } from '@/src/data/countries';
 import { relationKey } from '@/src/game/types';
 import { useGame } from '@/src/state/game';
 
+import CultureIcon from './CultureIcon';
 import { THEME } from './palette';
 
 type Props = {
@@ -35,6 +35,7 @@ export default function DiplomacyScreen({ onClose }: Props) {
             return (
               <View key={p.idx} style={styles.row}>
                 <View style={styles.rowLeft}>
+                  <CultureIcon iso={p.iso} size={28} />
                   <View style={[styles.colorChip, { backgroundColor: p.color }]} />
                   <View>
                     <Text style={styles.realmName}>{p.name}</Text>

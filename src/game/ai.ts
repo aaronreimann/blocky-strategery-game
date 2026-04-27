@@ -27,6 +27,7 @@ export type AITurnInput = {
   map: GameMap;
   units: Unit[];
   cities: City[];
+  players: Player[];
   atPeaceWith: Set<number>;
 };
 
@@ -343,7 +344,7 @@ export function runAITurn(input: AITurnInput): AITurnOutput {
           (c) => c.x === enemy.x && c.y === enemy.y && c.ownerIdx === enemy.ownerIdx,
         );
         const wallsBonus = cityHere?.buildings.includes('walls') ? 1 : 0;
-        const battle = resolveCombat(fresh, enemy, defenderTile, wallsBonus);
+        const battle = resolveCombat(fresh, enemy, defenderTile, wallsBonus, input.players);
         battles.push(battle);
         if (battle.attackerWon) {
           const cityToCapture = cities.find(

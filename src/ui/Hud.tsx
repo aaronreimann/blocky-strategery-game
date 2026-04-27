@@ -18,6 +18,7 @@ import {
 import { useGame } from '@/src/state/game';
 import { isTutorialSeen, markTutorialSeen } from '@/src/state/saves';
 
+import CultureIcon from './CultureIcon';
 import DiplomacyScreen from './DiplomacyScreen';
 import KingdomMenu from './KingdomMenu';
 import { GameIcon } from './GameIcon';
@@ -270,8 +271,9 @@ export default function Hud() {
             style={[styles.pill, { borderColor: players[0].color }]}
             onPress={() => setKingdomOpen(true)}
           >
+            <CultureIcon iso={players[0].iso} size={16} style={styles.pillIcon} />
             <Text style={[styles.pillText, { color: players[0].color }]}>
-              {flagEmoji(players[0].iso)} {players[0].name}
+              {players[0].name}
             </Text>
           </Pressable>
         ) : null}

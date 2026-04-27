@@ -1,8 +1,8 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { flagEmoji } from '@/src/data/countries';
 import { useGame } from '@/src/state/game';
 
+import CultureIcon from './CultureIcon';
 import { THEME } from './palette';
 
 const HUMAN_IDX = 0;
@@ -62,11 +62,10 @@ export default function ScoreScreen({ onClose }: Props) {
                 style={[styles.row, isMe && { borderColor: r.p.color, borderWidth: 1.5 }]}
               >
                 <Text style={styles.rank}>#{i + 1}</Text>
+                <CultureIcon iso={r.p.iso} size={26} />
                 <View style={[styles.colorChip, { backgroundColor: r.p.color }]} />
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.name}>
-                    {flagEmoji(r.p.iso)} {r.p.name}
-                  </Text>
+                  <Text style={styles.name}>{r.p.name}</Text>
                   <Text style={styles.meta}>
                     {r.cities}c · {r.units}u · {r.techs}t · {r.wonders}w · pop {r.pop}
                   </Text>

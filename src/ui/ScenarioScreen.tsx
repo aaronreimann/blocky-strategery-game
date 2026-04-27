@@ -3,6 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { COUNTRIES, type LeaderMap } from '@/src/data/countries';
+import { CULTURE_FLAVOR } from '@/src/data/cultures';
 import {
   DEFAULT_SCENARIO,
   DIFFICULTIES,
@@ -17,6 +18,7 @@ import {
   type ScenarioOptions,
 } from '@/src/game/types';
 
+import CultureIcon from './CultureIcon';
 import { THEME } from './palette';
 
 type Props = {
@@ -78,7 +80,9 @@ export default function ScenarioScreen({ slot, leaders, onCancel, onStart }: Pro
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Country</Text>
             <Text style={styles.sectionHint}>
-              {human ? human.name : 'Random — chosen at game start'}
+              {human
+                ? `${human.name} — ${CULTURE_FLAVOR[human.iso]?.blurb ?? 'no special bonus'}`
+                : 'Random — chosen at game start'}
             </Text>
             <View style={styles.countryGrid}>
               <Pressable
@@ -100,21 +104,7 @@ export default function ScenarioScreen({ slot, leaders, onCancel, onStart }: Pro
                     style={[styles.countryChip, cur && styles.chipActive]}
                     onPress={() => setCountryQid(c.qid)}
                   >
-                    <View
-                      style={[
-                        styles.cultureBadge,
-                        cur && { backgroundColor: '#0a1729' },
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.cultureBadgeText,
-                          cur && { color: THEME.warn },
-                        ]}
-                      >
-                        {c.name.charAt(0)}
-                      </Text>
-                    </View>
+                    <CultureIcon iso={c.iso} size={22} />
                     <Text
                       style={[
                         styles.countryName,
