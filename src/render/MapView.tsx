@@ -885,10 +885,18 @@ export default function MapView({
       const PAINTED_SIZE = Math.round(TILE_SIZE * 1.4);
       const pox = cx - PAINTED_SIZE / 2;
       const poy = cy - PAINTED_SIZE / 2;
+      const borderColor = darken(color, 0.55);
       return (
         <Group key={`city-${c.id}`}>
           <Circle cx={cx} cy={cy} r={PAINTED_SIZE * 0.45} color={color} opacity={0.6} />
-          <Circle cx={cx} cy={cy} r={PAINTED_SIZE * 0.45} color="#0a1729" style="stroke" strokeWidth={2} />
+          <Circle
+            cx={cx}
+            cy={cy}
+            r={PAINTED_SIZE * 0.45}
+            color={borderColor}
+            style="stroke"
+            strokeWidth={2}
+          />
           <SkiaImage
             image={img}
             x={pox}
