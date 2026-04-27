@@ -1,5 +1,12 @@
 # Blocky Strategery — Design Doc
 
+> **Historical document.** This is the project-kickoff design doc, kept for
+> reference. The current state of the game has diverged in places —
+> notably, the country roster is now 10 medieval British-Isles tribes
+> (not 32 modern UN states), the turn limit is configurable per game,
+> and many features below have been built out further. See `README.md`
+> for a current overview.
+
 A radically simplified classic 4X-style turn-based 4X for mobile. Target session length: **20–30 minutes**.
 
 ## Platforms & Tech
