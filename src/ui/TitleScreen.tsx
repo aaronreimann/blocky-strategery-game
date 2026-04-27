@@ -141,7 +141,6 @@ export default function TitleScreen() {
                     )}
                     <Text style={styles.slotMeta}>
                       {flagEmoji(info.humanRealm.iso)} {info.humanRealm.name}
-                      {info.humanRealm.leader ? ` · ${info.humanRealm.leader}` : ''}
                     </Text>
                     <Text style={styles.slotMetaDim}>
                       {DIFFICULTY_LABELS[info.difficulty]} · Turn {info.turn}
@@ -190,7 +189,6 @@ export default function TitleScreen() {
               </Text>
               <Text style={styles.modalSub}>
                 {flagEmoji(target.humanRealm.iso)} {target.humanRealm.name}
-                {target.humanRealm.leader ? ` · ${target.humanRealm.leader}` : ''}
               </Text>
               <Text style={styles.confirmBody}>
                 {ended
@@ -272,7 +270,6 @@ export default function TitleScreen() {
                     <View style={{ flex: 1 }}>
                       <Text style={styles.historyTitle}>
                         {flagEmoji(h.iso)} {h.country}
-                        {h.leader ? ` · ${h.leader}` : ''}
                       </Text>
                       <Text style={styles.historyMeta}>
                         {DIFFICULTY_LABELS[h.difficulty]} · Turn {h.turn} ·{' '}
