@@ -38,6 +38,7 @@ import {
   type Wonder,
 } from '@/src/game/types';
 import { cityRadius, computeCityYields, foodNeededToGrow } from '@/src/game/yields';
+import { computeCurrentVisibility, mergeExplored, nextStepToExplore } from '@/src/game/visibility';
 
 import { appendHistory, loadSlot, saveSlot } from './saves';
 
@@ -64,6 +65,8 @@ type GameState = {
   difficulty: Difficulty;
   turnLimit: number; // 0 = endless
   victories: VictoryConditions;
+  // Tile keys ("x,y") the human player has ever seen — fog-of-war "memory".
+  humanVisibility: string[];
   currentSlot: number | null;
   selectedUnitId: string | null;
   selectedCityId: string | null;
@@ -98,6 +101,7 @@ type GameState = {
   setUnitDestination: (unitId: string, x: number, y: number) => void;
   clearUnitDestination: (unitId: string) => void;
   toggleWorkerAuto: () => void;
+  toggleUnitExplore: () => void;
   rushBuild: (cityId: string) => void;
   proposePeace: (otherIdx: number) => boolean;
   declareWar: (otherIdx: number) => void;
@@ -225,6 +229,7 @@ function rollHutReward(
       workTurnsLeft: 0,
       destination: null,
       autoMode: false,
+      exploreMode: false,
       veteran: false,
     };
     units = [...state.units, newUnit];
@@ -272,6 +277,32 @@ function recordGameOver(
   }).catch((err) => console.warn('history append failed', err));
 }
 
+// Recompute the human's currently-visible tiles from their units + cities,
+// then merge into the persistent humanVisibility set. Returns the updated
+// "ever explored" array. Call this after any action that moves a human unit
+// or founds a human city.
+function refreshHumanVisibility(state: GameState): string[] {
+  if (!state.map) return state.humanVisibility;
+  const cur = computeCurrentVisibility(
+    HUMAN_IDX,
+    state.units,
+    state.cities,
+    state.map,
+  );
+  return mergeExplored(state.humanVisibility, cur);
+}
+
+// Convenience for the action handlers: refresh visibility from current state,
+// commit to the store, then autosave. Use this in place of `autosave(get())`
+// after any state change that could move/spawn a human unit or city.
+function commitWithVisibility(
+  set: (partial: Partial<GameState>) => void,
+  get: () => GameState,
+): void {
+  set({ humanVisibility: refreshHumanVisibility(get()) });
+  autosave(get());
+}
+
 function autosave(state: GameState): void {
   if (state.currentSlot === null || !state.map) return;
   saveSlot(state.currentSlot, {
@@ -289,6 +320,7 @@ function autosave(state: GameState): void {
     huts: state.huts,
     relations: state.relations,
     gameOver: state.gameOver,
+    humanVisibility: state.humanVisibility,
   }).catch((err) => console.warn('autosave failed', err));
 }
 
@@ -306,6 +338,7 @@ export const useGame = create<GameState>((set, get) => ({
   difficulty: 'normal',
   turnLimit: 100,
   victories: DEFAULT_VICTORIES,
+  humanVisibility: [],
   currentSlot: null,
   selectedUnitId: null,
   selectedCityId: null,
@@ -339,6 +372,14 @@ export const useGame = create<GameState>((set, get) => ({
       difficulty: scenario.difficulty,
       turnLimit: scenario.turnLimit,
       victories: scenario.victories,
+      humanVisibility: [
+        ...computeCurrentVisibility(
+          HUMAN_IDX,
+          initial.units,
+          initial.cities,
+          initial.map,
+        ),
+      ],
       currentSlot: slot,
       selectedUnitId: null,
       selectedCityId: null,
@@ -367,6 +408,7 @@ export const useGame = create<GameState>((set, get) => ({
         workTurnsLeft: u.workTurnsLeft ?? 0,
         destination: u.destination ?? null,
         autoMode: u.autoMode ?? false,
+        exploreMode: u.exploreMode ?? false,
         veteran: u.veteran ?? false,
       };
     });
@@ -428,6 +470,16 @@ export const useGame = create<GameState>((set, get) => ({
       difficulty: data.difficulty,
       turnLimit: data.turnLimit ?? 100,
       victories: data.victories ?? DEFAULT_VICTORIES,
+      humanVisibility:
+        data.humanVisibility ??
+        [
+          ...computeCurrentVisibility(
+            HUMAN_IDX,
+            normalizedUnits,
+            normalizedCities,
+            data.map,
+          ),
+        ],
       currentSlot: slot,
       selectedUnitId: null,
       selectedCityId: null,
@@ -452,6 +504,7 @@ export const useGame = create<GameState>((set, get) => ({
       difficulty: 'normal',
       turnLimit: 100,
       victories: DEFAULT_VICTORIES,
+      humanVisibility: [],
       currentSlot: null,
       selectedUnitId: null,
       selectedCityId: null,
@@ -596,7 +649,7 @@ export const useGame = create<GameState>((set, get) => ({
               cities: nextCities,
               units: nextUnits,
             });
-            autosave(get());
+            commitWithVisibility(set, get);
             return;
           }
           nextUnits = nextUnits.filter((u) => u.id !== enemyUnitAtTile.id);
@@ -636,7 +689,7 @@ export const useGame = create<GameState>((set, get) => ({
           cities: nextCities,
           units: nextUnits,
         });
-        autosave(get());
+        commitWithVisibility(set, get);
         return;
       }
 
@@ -685,7 +738,7 @@ export const useGame = create<GameState>((set, get) => ({
         huts: movedHuts,
         turnEvents: hutEvent ? [...get().turnEvents, hutEvent] : get().turnEvents,
       });
-      autosave(get());
+      commitWithVisibility(set, get);
       return;
     }
 
@@ -741,7 +794,7 @@ export const useGame = create<GameState>((set, get) => ({
       selectedUnitId: null,
       selectedCityId: newCity.id,
     });
-    autosave(get());
+    commitWithVisibility(set, get);
   },
 
   setCityBuild: (cityId, target) => {
@@ -1006,6 +1059,25 @@ export const useGame = create<GameState>((set, get) => ({
     autosave(get());
   },
 
+  toggleUnitExplore: () => {
+    const { units, selectedUnitId, gameOver } = get();
+    if (gameOver) return;
+    const sel = units.find((u) => u.id === selectedUnitId);
+    if (!sel || sel.ownerIdx !== HUMAN_IDX) return;
+    // Pioneers settle, Workers improve — neither needs explore. Galleys can
+    // explore (unexplored sea tiles), so allow any non-pioneer / non-worker
+    // unit (anyone with attack > 0 or sea domain).
+    if (sel.kind === 'pioneer' || sel.kind === 'worker') return;
+    set({
+      units: units.map((u) =>
+        u.id === sel.id
+          ? { ...u, exploreMode: !u.exploreMode, destination: !u.exploreMode ? null : u.destination }
+          : u,
+      ),
+    });
+    autosave(get());
+  },
+
   openTilePicker: (x, y) => {
     const { units, cities, selectedUnitId } = get();
     const unitHere = units.find(
@@ -1139,6 +1211,7 @@ export const useGame = create<GameState>((set, get) => ({
           destination: null,
           stack: [unitKind],
           autoMode: false,
+          exploreMode: false,
           veteran: city.buildings.includes('barracks'),
         });
         if (city.ownerIdx === HUMAN_IDX) {
@@ -1414,6 +1487,40 @@ export const useGame = create<GameState>((set, get) => ({
       });
     }
 
+    // Explore-mode pass. For each human unit with exploreMode on, BFS to the
+    // nearest tile not yet in humanVisibility and step toward it. Skips on
+    // combat (handled by the unit picker — exploreMode units can't attack
+    // automatically, they stop adjacent to enemies).
+    const exploredSet = new Set(get().humanVisibility);
+    workingUnits = workingUnits.map((u) => {
+      if (!u.exploreMode) return u;
+      if (u.ownerIdx !== HUMAN_IDX) return u;
+      if (u.workingOn || u.destination) return u;
+      if (u.movesLeft <= 0) return u;
+      const blocked = new Set<string>();
+      for (const o of workingUnits) {
+        if (o.id !== u.id) blocked.add(`${o.x},${o.y}`);
+      }
+      for (const c of workingCities) {
+        if (c.ownerIdx !== u.ownerIdx) blocked.add(`${c.x},${c.y}`);
+      }
+      const next = nextStepToExplore(
+        { x: u.x, y: u.y },
+        exploredSet,
+        blocked,
+        map,
+        (x, y) => {
+          const t = map.tiles[y * map.width + x];
+          return canEnterTerrain(u.kind, t.terrain);
+        },
+      );
+      if (!next) return u;
+      // Add the new tile to exploredSet so the next explorer doesn't pick the
+      // same target this turn.
+      exploredSet.add(`${next.x},${next.y}`);
+      return { ...u, x: next.x, y: next.y, movesLeft: u.movesLeft - 1 };
+    });
+
     // Science + gold: aggregate per-player gain from each city's yields.
     const scienceByPlayer = new Map<number, number>();
     const goldByPlayer = new Map<number, number>();
@@ -1631,7 +1738,7 @@ export const useGame = create<GameState>((set, get) => ({
       cities: workingCities,
       units: workingUnits,
     });
-    autosave(get());
+    commitWithVisibility(set, get);
   },
 
   dismissBattle: () => set({ lastBattle: null }),

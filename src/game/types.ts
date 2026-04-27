@@ -110,6 +110,7 @@ export type Unit = {
   workTurnsLeft: number;
   destination: { x: number; y: number } | null;
   autoMode: boolean;     // Worker only: auto-build / connect roads
+  exploreMode: boolean;  // Combat units: walk toward nearest unexplored tile
   veteran: boolean;      // built in a Barracks: +1 attack
 };
 

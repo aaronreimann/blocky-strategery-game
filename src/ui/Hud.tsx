@@ -122,6 +122,7 @@ export default function Hud() {
   const awaitingDestinationFor = useGame((s) => s.awaitingDestinationFor);
   const clearUnitDestination = useGame((s) => s.clearUnitDestination);
   const toggleWorkerAuto = useGame((s) => s.toggleWorkerAuto);
+  const toggleUnitExplore = useGame((s) => s.toggleUnitExplore);
   const exitToTitle = useGame((s) => s.exitToTitle);
   const dismissBattle = useGame((s) => s.dismissBattle);
 
@@ -446,6 +447,24 @@ export default function Hud() {
                     ]}
                   >
                     Auto: {selectedUnit.autoMode ? 'on' : 'off'}
+                  </Text>
+                </Pressable>
+              ) : null}
+              {selectedUnit.kind !== 'worker' && selectedUnit.kind !== 'pioneer' ? (
+                <Pressable
+                  style={[
+                    styles.actionMuted,
+                    selectedUnit.exploreMode && styles.actionAutoOn,
+                  ]}
+                  onPress={toggleUnitExplore}
+                >
+                  <Text
+                    style={[
+                      styles.actionMutedText,
+                      selectedUnit.exploreMode && styles.actionAutoOnText,
+                    ]}
+                  >
+                    Explore: {selectedUnit.exploreMode ? 'on' : 'off'}
                   </Text>
                 </Pressable>
               ) : null}

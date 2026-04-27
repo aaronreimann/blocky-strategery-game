@@ -104,6 +104,8 @@ type Props = {
   cities: City[];
   huts: Hut[];
   improvements: ImprovementMap;
+  explored: Set<string>;        // tiles human has ever seen
+  currentlyVisible: Set<string>; // tiles human can see right now
   selectedUnitId: string | null;
   selectedCityId: string | null;
   autoWorkerOwnerIdxs: Set<number>;
@@ -123,6 +125,8 @@ export default function MapView({
   cities,
   huts,
   improvements,
+  explored,
+  currentlyVisible,
   selectedUnitId,
   selectedCityId,
   autoWorkerOwnerIdxs,
@@ -702,8 +706,9 @@ export default function MapView({
         u.kind === 'worker' &&
         (u.autoMode || autoWorkerOwnerIdxs.has(u.ownerIdx)) &&
         !hasDest;
-      if (hasDest || isAuto) {
-        const letter = hasDest ? 'M' : 'A';
+      const isExplore = u.exploreMode && !hasDest;
+      if (hasDest || isAuto || isExplore) {
+        const letter = hasDest ? 'M' : isAuto ? 'A' : 'E';
         drawBadge(
           `bd-am-${u.id}`,
           u.x * TILE_SIZE + TILE_SIZE - 11,
@@ -875,6 +880,9 @@ export default function MapView({
       }
     }
     return cities.map((c) => {
+      // Render own cities always; render enemy cities once their tile has
+      // ever been explored (cities don't move, so memory is fine).
+      if (c.ownerIdx !== 0 && !explored.has(`${c.x},${c.y}`)) return null;
       const owner = players[c.ownerIdx];
       const color = owner?.color ?? '#ffffff';
       const isCapital = firstCityByPlayer.get(c.ownerIdx) === c.id;
@@ -907,32 +915,38 @@ export default function MapView({
         </Group>
       );
     });
-  }, [cities, players, townImg, capitalImg]);
+  }, [cities, players, explored, townImg, capitalImg]);
 
   const hutLayer = useMemo(() => {
     if (!goodyHutImg) return [] as React.ReactNode[];
-    return huts.map((h) => {
-      const cx = h.x * TILE_SIZE + TILE_SIZE / 2;
-      const cy = h.y * TILE_SIZE + TILE_SIZE / 2;
-      const PAINTED_SIZE = Math.round(TILE_SIZE * 1.2);
-      const pox = cx - PAINTED_SIZE / 2;
-      const poy = cy - PAINTED_SIZE / 2;
-      return (
-        <SkiaImage
-          key={`hut-${h.x}-${h.y}`}
-          image={goodyHutImg}
-          x={pox}
-          y={poy}
-          width={PAINTED_SIZE}
-          height={PAINTED_SIZE}
-        />
-      );
-    });
-  }, [huts, goodyHutImg]);
+    return huts
+      .filter((h) => explored.has(`${h.x},${h.y}`))
+      .map((h) => {
+        const cx = h.x * TILE_SIZE + TILE_SIZE / 2;
+        const cy = h.y * TILE_SIZE + TILE_SIZE / 2;
+        const PAINTED_SIZE = Math.round(TILE_SIZE * 1.2);
+        const pox = cx - PAINTED_SIZE / 2;
+        const poy = cy - PAINTED_SIZE / 2;
+        return (
+          <SkiaImage
+            key={`hut-${h.x}-${h.y}`}
+            image={goodyHutImg}
+            x={pox}
+            y={poy}
+            width={PAINTED_SIZE}
+            height={PAINTED_SIZE}
+          />
+        );
+      });
+  }, [huts, explored, goodyHutImg]);
 
   const unitLayer = useMemo(() => {
     const elements: React.ReactNode[] = [];
     for (const u of units) {
+      // Always render the human's own units; only render enemy units if their
+      // tile is currently in vision (units move, so "memory" of an enemy
+      // unit's location would be misleading).
+      if (u.ownerIdx !== 0 && !currentlyVisible.has(`${u.x},${u.y}`)) continue;
       const owner = players[u.ownerIdx];
       const color = owner?.color ?? '#ffffff';
       
@@ -999,7 +1013,7 @@ export default function MapView({
       }
     }
     return elements;
-  }, [units, players, pioneerImg, workerImg, footmanImg, spearmanImg, horsemanImg, swordsmanImg, catapultImg, galleyImg]);
+  }, [units, players, currentlyVisible, pioneerImg, workerImg, footmanImg, spearmanImg, horsemanImg, swordsmanImg, catapultImg, galleyImg]);
 
   const selectionLayer = useMemo(() => {
     let coord: { x: number; y: number } | null = null;
@@ -1023,6 +1037,30 @@ export default function MapView({
       />
     );
   }, [selectedUnitId, selectedCityId, units, cities]);
+
+  // Fog of war: dim explored-but-not-currently-visible tiles, hide unexplored
+  // tiles entirely. Drawn after everything else so it overlays the world.
+  const fogLayer = useMemo(() => {
+    const out: React.ReactNode[] = [];
+    for (let y = 0; y < map.height; y++) {
+      for (let x = 0; x < map.width; x++) {
+        const k = `${x},${y}`;
+        if (currentlyVisible.has(k)) continue;
+        const seen = explored.has(k);
+        out.push(
+          <Rect
+            key={`fog-${k}`}
+            x={x * TILE_SIZE}
+            y={y * TILE_SIZE}
+            width={TILE_SIZE}
+            height={TILE_SIZE}
+            color={seen ? 'rgba(0, 0, 0, 0.45)' : 'rgba(8, 14, 28, 0.94)'}
+          />,
+        );
+      }
+    }
+    return out;
+  }, [map.width, map.height, explored, currentlyVisible]);
 
   const jumpTo = (worldX: number, worldY: number) => {
     tx.value = screenW / 2 - worldX * scale.value;
@@ -1063,6 +1101,7 @@ export default function MapView({
             {unitLayer}
             {workIndicatorLayer}
             {badgeLayer}
+            {fogLayer}
             {selectionLayer}
             <Path
               path={dragLinePath}

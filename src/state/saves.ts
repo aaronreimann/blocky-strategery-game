@@ -27,6 +27,7 @@ export type SaveData = {
   difficulty: Difficulty;
   turnLimit?: number;
   victories?: VictoryConditions;
+  humanVisibility?: string[];
   map: GameMap;
   players: Player[];
   units: Unit[];

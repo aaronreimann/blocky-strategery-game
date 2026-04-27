@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { canEnterTerrain } from '@/src/data/units';
 import { chebyshev } from '@/src/game/map';
+import { computeCurrentVisibility } from '@/src/game/visibility';
 import MapView from '@/src/render/MapView';
 import { useGame } from '@/src/state/game';
 
@@ -19,6 +20,7 @@ export default function GameScreen() {
   const cities = useGame((s) => s.cities);
   const huts = useGame((s) => s.huts);
   const improvements = useGame((s) => s.improvements);
+  const humanVisibility = useGame((s) => s.humanVisibility);
   const selectedUnitId = useGame((s) => s.selectedUnitId);
   const selectedCityId = useGame((s) => s.selectedCityId);
   const tapTile = useGame((s) => s.tapTile);
@@ -32,6 +34,12 @@ export default function GameScreen() {
     }
     return out;
   }, [cities]);
+
+  const exploredSet = useMemo(() => new Set(humanVisibility), [humanVisibility]);
+  const currentVisibility = useMemo(() => {
+    if (!map) return new Set<string>();
+    return computeCurrentVisibility(HUMAN_IDX, units, cities, map);
+  }, [map, units, cities]);
 
   const { moveTiles, attackTiles } = useMemo(() => {
     const move = new Set<string>();
@@ -84,6 +92,8 @@ export default function GameScreen() {
         cities={cities}
         huts={huts}
         improvements={improvements}
+        explored={exploredSet}
+        currentlyVisible={currentVisibility}
         selectedUnitId={selectedUnitId}
         selectedCityId={selectedCityId}
         autoWorkerOwnerIdxs={autoWorkerOwnerIdxs}
@@ -102,6 +112,3 @@ export default function GameScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: THEME.bg },
 });
-
-// Suppress unused import warning if HUMAN_IDX isn't used elsewhere here.
-void HUMAN_IDX;
