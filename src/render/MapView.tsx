@@ -13,8 +13,8 @@ import {
   Image as SkiaImage,
   type SkPath,
 } from '@shopify/react-native-skia';
-import { useEffect, useMemo } from 'react';
-import { useWindowDimensions } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { Text, useWindowDimensions, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   runOnJS,
@@ -262,15 +262,21 @@ export default function MapView({
   const pinchFocalY = useSharedValue(0);
   const pinchStartDist = useSharedValue(0);
   const pinchActive = useSharedValue(false);
+  // TEMP debug: surface raw touch values so we can confirm what Android is
+  // actually sending. Remove once pinch works as expected.
+  const [pinchDebug, setPinchDebug] = useState<string>('');
+  const reportDebug = (s: string) => setPinchDebug(s);
   const pinch = Gesture.Pinch()
     .onTouchesDown((event) => {
       'worklet';
       const t = event.allTouches;
       if (t.length >= 2 && !pinchActive.value) {
-        const ax = t[0].x;
-        const ay = t[0].y;
-        const bx = t[1].x;
-        const by = t[1].y;
+        // absoluteX/Y is window-root coords. On Android's new arch,
+        // touch.x/.y can come through as 0 while absoluteX/Y is populated.
+        const ax = t[0].absoluteX || t[0].x;
+        const ay = t[0].absoluteY || t[0].y;
+        const bx = t[1].absoluteX || t[1].x;
+        const by = t[1].absoluteY || t[1].y;
         pinchFocalX.value = (ax + bx) / 2;
         pinchFocalY.value = (ay + by) / 2;
         pinchStartDist.value = Math.max(1, Math.hypot(bx - ax, by - ay));
@@ -278,6 +284,11 @@ export default function MapView({
         startTx.value = tx.value;
         startTy.value = ty.value;
         pinchActive.value = true;
+        runOnJS(reportDebug)(
+          `DOWN T=${t.length} A(${ax.toFixed(0)},${ay.toFixed(0)}) ` +
+            `B(${bx.toFixed(0)},${by.toFixed(0)}) F(${pinchFocalX.value.toFixed(0)},${pinchFocalY.value.toFixed(0)}) ` +
+            `dist=${pinchStartDist.value.toFixed(0)}`,
+        );
       }
     })
     .onTouchesMove((event) => {
@@ -285,10 +296,10 @@ export default function MapView({
       if (!pinchActive.value) return;
       const t = event.allTouches;
       if (t.length < 2) return;
-      const ax = t[0].x;
-      const ay = t[0].y;
-      const bx = t[1].x;
-      const by = t[1].y;
+      const ax = t[0].absoluteX || t[0].x;
+      const ay = t[0].absoluteY || t[0].y;
+      const bx = t[1].absoluteX || t[1].x;
+      const by = t[1].absoluteY || t[1].y;
       const dist = Math.max(1, Math.hypot(bx - ax, by - ay));
       const factor = dist / pinchStartDist.value;
       const next = Math.min(
@@ -301,6 +312,10 @@ export default function MapView({
       tx.value = fx - (fx - startTx.value) * ratio;
       ty.value = fy - (fy - startTy.value) * ratio;
       scale.value = next;
+      runOnJS(reportDebug)(
+        `MOVE A(${ax.toFixed(0)},${ay.toFixed(0)}) B(${bx.toFixed(0)},${by.toFixed(0)}) ` +
+          `F(${fx.toFixed(0)},${fy.toFixed(0)}) factor=${factor.toFixed(2)} scale=${next.toFixed(2)}`,
+      );
     })
     .onTouchesUp(() => {
       'worklet';
@@ -1274,6 +1289,25 @@ export default function MapView({
         tileSize={TILE_SIZE}
         onJumpTo={jumpTo}
       />
+      {pinchDebug ? (
+        <View
+          style={{
+            position: 'absolute',
+            top: 4,
+            left: 4,
+            paddingHorizontal: 6,
+            paddingVertical: 3,
+            backgroundColor: 'rgba(0,0,0,0.7)',
+            borderRadius: 4,
+            maxWidth: '70%',
+          }}
+          pointerEvents="none"
+        >
+          <Text style={{ color: '#facc15', fontSize: 10, fontFamily: 'Helvetica' }}>
+            {pinchDebug}
+          </Text>
+        </View>
+      ) : null}
     </Animated.View>
   );
 }
