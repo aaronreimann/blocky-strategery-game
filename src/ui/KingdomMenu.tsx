@@ -78,7 +78,7 @@ export default function KingdomMenu({ onClose, onOpenTech }: Props) {
         <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
           {myCities.length === 0 ? (
             <Text style={styles.emptyText}>
-              No cities yet — found one with a Pioneer.
+              No cities yet — found one with a Wayfarer.
             </Text>
           ) : (
             myCities.map((c) => (

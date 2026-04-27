@@ -12,7 +12,7 @@ const TIPS: Tip[] = [
   {
     title: 'Settle a city',
     body:
-      'Tap your Pioneer to select it, walk it to a green tile, then long-press to open its menu and pick "Settle". Your first city anchors your realm.',
+      'Tap your Wayfarer to select it, walk it to a green tile, then long-press to open its menu and pick "Settle". Your first city anchors your realm.',
   },
   {
     title: 'Move and fight',
@@ -25,9 +25,9 @@ const TIPS: Tip[] = [
       'Tap one of your cities to choose what to produce. Tap a build option once to set it as the current build, or long-press to add it to the queue.',
   },
   {
-    title: 'Workers improve land',
+    title: 'Serfs improve land',
     body:
-      'Toggle a Worker to auto (the "A" badge) and it will irrigate grasslands, mine hills, and lay roads inside your borders — no babysitting required.',
+      'Toggle a Serf to auto (the "A" badge) and it will irrigate grasslands, mine hills, and lay roads inside your borders — no babysitting required.',
   },
   {
     title: 'Research',

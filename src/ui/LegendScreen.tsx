@@ -136,7 +136,7 @@ export default function LegendScreen({ onClose }: Props) {
             </View>
             <Text style={styles.rowName}>"A" badge</Text>
             <Text style={styles.rowDesc}>
-              Worker on auto-pilot (city focus or per-unit)
+              Serf on auto-pilot (city focus or per-unit)
             </Text>
           </View>
           <View style={styles.row}>

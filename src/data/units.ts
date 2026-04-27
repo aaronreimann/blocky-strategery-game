@@ -26,8 +26,8 @@ export type UnitSpec = {
 };
 
 export const UNIT: Record<UnitKind, UnitSpec> = {
-  pioneer:   { name: 'Pioneer',   move: 2, attack: 0, defense: 1, cost: 30, glyph: '◆', tech: null,               domain: 'land' },
-  worker:    { name: 'Worker',    move: 1, attack: 0, defense: 1, cost: 20, glyph: '●', tech: null,               domain: 'land' },
+  pioneer:   { name: 'Wayfarer',  move: 2, attack: 0, defense: 1, cost: 30, glyph: '◆', tech: null,               domain: 'land' },
+  worker:    { name: 'Serf',      move: 1, attack: 0, defense: 1, cost: 20, glyph: '●', tech: null,               domain: 'land' },
   footman:   { name: 'Footman',   move: 1, attack: 1, defense: 1, cost: 10, glyph: '■', tech: null,               domain: 'land' },
   spearman:  { name: 'Spearman',  move: 1, attack: 1, defense: 3, cost: 20, glyph: '▲', tech: 'bronze_working',   domain: 'land' },
   horseman:  { name: 'Horseman',  move: 2, attack: 2, defense: 1, cost: 25, glyph: '▶', tech: 'horseback_riding', domain: 'land' },
