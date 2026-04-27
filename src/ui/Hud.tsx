@@ -31,6 +31,7 @@ import LegendScreen from './LegendScreen';
 import { THEME } from './palette';
 import ScoreScreen from './ScoreScreen';
 import TechScreen from './TechScreen';
+import TilePickerPopup from './TilePickerPopup';
 import TutorialOverlay from './TutorialOverlay';
 
 const HUMAN_IDX_HUD = 0;
@@ -986,32 +987,16 @@ export default function Hud() {
         );
         if (!u && !c) return null;
         return (
-          <View style={styles.pickerBg}>
-            <View style={styles.pickerCard}>
-              <Text style={styles.pickerTitle}>What do you want?</Text>
-              {u ? (
-                <Pressable
-                  style={styles.pickerBtn}
-                  onPress={() => selectUnitFromPicker(u.id)}
-                >
-                  <Text style={styles.pickerBtnTitle}>{UNIT[u.kind].name}{u.stack.length > 1 ? ` (Army x${u.stack.length})` : ''}</Text>
-                  <Text style={styles.pickerBtnSub}>Move or attack with this unit</Text>
-                </Pressable>
-              ) : null}
-              {c ? (
-                <Pressable
-                  style={styles.pickerBtn}
-                  onPress={() => selectCityFromPicker(c.id)}
-                >
-                  <Text style={styles.pickerBtnTitle}>{c.name}</Text>
-                  <Text style={styles.pickerBtnSub}>Open city: build, focus</Text>
-                </Pressable>
-              ) : null}
-              <Pressable style={styles.pickerCancel} onPress={closeTilePicker}>
-                <Text style={styles.pickerCancelText}>Cancel</Text>
-              </Pressable>
-            </View>
-          </View>
+          <TilePickerPopup
+            unit={u ?? null}
+            city={c ?? null}
+            screenX={tilePicker.screenX}
+            screenY={tilePicker.screenY}
+            ownerColor={players[0]?.color ?? '#facc15'}
+            onPickUnit={() => u && selectUnitFromPicker(u.id)}
+            onPickCity={() => c && selectCityFromPicker(c.id)}
+            onDismiss={closeTilePicker}
+          />
         );
       })() : null}
     </SafeAreaView>

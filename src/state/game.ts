@@ -74,7 +74,7 @@ type GameState = {
   selectedCityId: string | null;
   lastBattle: Battle | null;
   turnEvents: TurnEvent[];
-  tilePicker: { x: number; y: number } | null;
+  tilePicker: { x: number; y: number; screenX: number; screenY: number } | null;
   awaitingDestinationFor: string | null;
   pendingJumpTo: { x: number; y: number } | null;
   gameOver: GameOverState | null;
@@ -109,7 +109,7 @@ type GameState = {
   declareWar: (otherIdx: number) => void;
   requestJumpTo: (x: number, y: number) => void;
   clearJumpRequest: () => void;
-  openTilePicker: (x: number, y: number) => void;
+  openTilePicker: (x: number, y: number, screenX: number, screenY: number) => void;
   closeTilePicker: () => void;
   selectUnitFromPicker: (unitId: string) => void;
   selectCityFromPicker: (cityId: string) => void;
@@ -1088,7 +1088,7 @@ export const useGame = create<GameState>((set, get) => ({
     autosave(get());
   },
 
-  openTilePicker: (x, y) => {
+  openTilePicker: (x, y, screenX, screenY) => {
     const { units, cities, selectedUnitId } = get();
     const unitHere = units.find(
       (u) => u.x === x && u.y === y && u.ownerIdx === HUMAN_IDX,
@@ -1115,8 +1115,8 @@ export const useGame = create<GameState>((set, get) => ({
     }
     if (!unitHere && !cityHere) return;
 
-    // Both exist — show the picker.
-    set({ tilePicker: { x, y } });
+    // Both exist — show the picker, anchored at the finger.
+    set({ tilePicker: { x, y, screenX, screenY } });
   },
 
   closeTilePicker: () => set({ tilePicker: null }),

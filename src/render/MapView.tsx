@@ -113,7 +113,7 @@ type Props = {
   attackTiles: Set<string>;
   onTileTap: (x: number, y: number) => void;
   onSetDestination: (unitId: string, x: number, y: number) => void;
-  onTileLongPress: (x: number, y: number) => void;
+  onTileLongPress: (x: number, y: number, screenX: number, screenY: number) => void;
 };
 
 const BADGE_FONT = matchFont({ fontFamily: 'Helvetica', fontSize: 9, fontWeight: 'bold' });
@@ -284,7 +284,7 @@ export default function MapView({
       const gx = Math.floor(wx / TILE_SIZE);
       const gy = Math.floor(wy / TILE_SIZE);
       if (gx < 0 || gy < 0 || gx >= map.width || gy >= map.height) return;
-      runOnJS(onTileLongPress)(gx, gy);
+      runOnJS(onTileLongPress)(gx, gy, e.x, e.y);
     });
 
   const gesture = Gesture.Race(longPress, tap, Gesture.Simultaneous(pan, pinch));
