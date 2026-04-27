@@ -29,6 +29,52 @@ export function unitDefense(unit: Unit): number {
   return unit.stack.reduce((sum, k) => sum + UNIT[k].defense, 0);
 }
 
+// Compute exact win probability for an attacker rolling 1d6 + attMod
+// against a defender rolling 1d6 + defMod, where ties go to the defender
+// (matches resolveCombat()'s `attackerRoll > defenderRoll`). 36 outcomes,
+// closed-form.
+export function attackOdds(
+  attMod: number,
+  defMod: number,
+): { win: number; lose: number } {
+  let wins = 0;
+  for (let a = 1; a <= 6; a++) {
+    for (let d = 1; d <= 6; d++) {
+      if (attMod + a > defMod + d) wins++;
+    }
+  }
+  return { win: wins / 36, lose: 1 - wins / 36 };
+}
+
+// Same as resolveCombat's modifier math but exposed as helpers so the UI
+// can preview combat without rolling dice.
+export function attackerCombatMod(
+  attacker: Unit,
+  defenderTile: Tile,
+  attackerPlayer: Player | undefined,
+): number {
+  return (
+    unitAttack(attacker)
+    + (attacker.veteran ? 1 : 0)
+    + cultureTerrainBonus(attackerPlayer, defenderTile.terrain).attack
+  );
+}
+
+export function defenderCombatMod(
+  defender: Unit,
+  defenderTile: Tile,
+  defenderWallsBonus: number,
+  defenderPlayer: Player | undefined,
+): number {
+  return (
+    unitDefense(defender)
+    + (defender.veteran ? 1 : 0)
+    + TERRAIN[defenderTile.terrain].defenseBonus
+    + defenderWallsBonus
+    + cultureTerrainBonus(defenderPlayer, defenderTile.terrain).defense
+  );
+}
+
 // Per-culture terrain combat bonus, looked up by player.iso. Only applies
 // when fighting on the named terrain — e.g. Welsh +1 attack/defense in hills.
 function cultureTerrainBonus(

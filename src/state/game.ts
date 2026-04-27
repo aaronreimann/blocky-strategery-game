@@ -39,6 +39,7 @@ import {
 } from '@/src/game/types';
 import { cityRadius, computeCityYields, foodNeededToGrow } from '@/src/game/yields';
 import { computeCurrentVisibility, mergeExplored, pickExploreTarget } from '@/src/game/visibility';
+import { cityNameForTribe } from '@/src/data/cityNames';
 
 import { appendHistory, loadSlot, saveSlot } from './saves';
 
@@ -118,10 +119,6 @@ type GameState = {
   dismissTurnEvents: () => void;
 };
 
-const CITY_NAMES = [
-  'Rivermouth', 'Highkeep', 'Stonehold', 'Goldfield', 'Ironreach',
-  'Saltmarsh', 'Greenvale', 'Northwatch', 'Sunhaven', 'Whitefall',
-];
 
 function findSpawnTile(
   city: City,
@@ -780,7 +777,9 @@ export const useGame = create<GameState>((set, get) => ({
     const tile = map.tiles[selected.y * map.width + selected.x];
     if (!TERRAIN[tile.terrain].passable) return;
 
-    const cityName = CITY_NAMES[cities.length % CITY_NAMES.length];
+    const owner = get().players[selected.ownerIdx];
+    const ownedCount = cities.filter((c) => c.ownerIdx === selected.ownerIdx).length;
+    const cityName = cityNameForTribe(owner?.iso, ownedCount);
     const newCity: City = {
       id: nextCityId(),
       ownerIdx: selected.ownerIdx,

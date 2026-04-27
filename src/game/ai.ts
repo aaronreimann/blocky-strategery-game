@@ -9,13 +9,11 @@ import { chebyshev, type GameMap } from './map';
 import { nextStepToTiles } from './path';
 import type { City, CityBuildTarget, Player, Unit, Wonder } from './types';
 
+import { cityNameForTribe } from '@/src/data/cityNames';
+
 const MIN_CITY_SPACING = 3;
 const DEFAULT_PRODUCTION_PER_TURN = 3;
 
-const AI_CITY_NAMES = [
-  'Karakorum', 'Samarkand', 'Khiva', 'Bukhara', 'Tashkent',
-  'Almaty', 'Bishkek', 'Urumqi', 'Kashgar', 'Mandalay',
-];
 
 const MILITARY_KINDS: UnitKind[] = ['footman', 'spearman', 'horseman', 'swordsman', 'catapult'];
 function isMilitary(k: UnitKind): boolean {
@@ -287,7 +285,7 @@ export function runAITurn(input: AITurnInput): AITurnOutput {
         const newCity: City = {
           id: nextCityId(),
           ownerIdx: myIdx,
-          name: AI_CITY_NAMES[myCityCount % AI_CITY_NAMES.length],
+          name: cityNameForTribe(input.players[myIdx]?.iso, myCityCount),
           x: fresh.x,
           y: fresh.y,
           population: 1,

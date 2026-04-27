@@ -9,6 +9,11 @@ import { IMPROVEMENT, tileKey } from '@/src/data/improvements';
 import { TECH } from '@/src/data/tech';
 import { UNIT, UNIT_KINDS } from '@/src/data/units';
 import { WONDER, WONDER_KINDS } from '@/src/data/wonders';
+import {
+  attackerCombatMod,
+  attackOdds,
+  defenderCombatMod,
+} from '@/src/game/combat';
 import { computeCityYields, foodNeededToGrow } from '@/src/game/yields';
 import {
   CITY_FOCUSES,
@@ -111,6 +116,7 @@ export default function Hud() {
   const selectCityFromPicker = useGame((s) => s.selectCityFromPicker);
   const endTurn = useGame((s) => s.endTurn);
   const selectNextUnmovedUnit = useGame((s) => s.selectNextUnmovedUnit);
+  const tapTile = useGame((s) => s.tapTile);
   const foundCity = useGame((s) => s.foundCity);
   const setCityBuild = useGame((s) => s.setCityBuild);
   const enqueueBuild = useGame((s) => s.enqueueBuild);
@@ -402,6 +408,90 @@ export default function Hud() {
                 Moves {selectedUnit.movesLeft}/{unitSpec.move} · ATK {unitSpec.attack} · DEF {unitSpec.defense}
               </Text>
             )}
+            {(() => {
+              if (!map) return null;
+              if (selectedUnit.movesLeft <= 0) return null;
+              if (unitSpec.attack <= 0) return null;
+              const targets: {
+                key: string;
+                label: string;
+                win: number;
+                x: number;
+                y: number;
+              }[] = [];
+              const seen = new Set<string>();
+              for (let dy = -1; dy <= 1; dy++) {
+                for (let dx = -1; dx <= 1; dx++) {
+                  if (dx === 0 && dy === 0) continue;
+                  const x = selectedUnit.x + dx;
+                  const y = selectedUnit.y + dy;
+                  if (x < 0 || y < 0 || x >= map.width || y >= map.height) continue;
+                  const k = `${x},${y}`;
+                  if (seen.has(k)) continue;
+                  seen.add(k);
+                  const enemyUnit = units.find(
+                    (u) => u.x === x && u.y === y && u.ownerIdx !== selectedUnit.ownerIdx,
+                  );
+                  const enemyCity = cities.find(
+                    (c) => c.x === x && c.y === y && c.ownerIdx !== selectedUnit.ownerIdx,
+                  );
+                  if (!enemyUnit && !enemyCity) continue;
+                  const tile = map.tiles[y * map.width + x];
+                  const wallsBonus = enemyCity?.buildings.includes('walls') ? 1 : 0;
+                  const defender = enemyUnit;
+                  if (!defender) {
+                    // Empty enemy city — auto-capture, ~100% odds.
+                    targets.push({
+                      key: k,
+                      label: `${enemyCity!.name} (undefended)`,
+                      win: 1,
+                      x,
+                      y,
+                    });
+                    continue;
+                  }
+                  const attMod = attackerCombatMod(selectedUnit, tile, players[selectedUnit.ownerIdx]);
+                  const defMod = defenderCombatMod(
+                    defender,
+                    tile,
+                    wallsBonus,
+                    players[defender.ownerIdx],
+                  );
+                  const odds = attackOdds(attMod, defMod);
+                  const stackTag = defender.stack.length > 1 ? ` ×${defender.stack.length}` : '';
+                  targets.push({
+                    key: k,
+                    label: `${UNIT[defender.kind].name}${stackTag}`,
+                    win: odds.win,
+                    x,
+                    y,
+                  });
+                }
+              }
+              if (targets.length === 0) return null;
+              return (
+                <View style={styles.previewBlock}>
+                  <Text style={styles.previewTitle}>Attack preview</Text>
+                  {targets.map((t) => {
+                    const pct = Math.round(t.win * 100);
+                    const color =
+                      pct >= 70 ? THEME.good : pct >= 40 ? THEME.warn : THEME.bad;
+                    return (
+                      <Pressable
+                        key={t.key}
+                        style={[styles.previewRow, { borderLeftColor: color }]}
+                        onPress={() => tapTile(t.x, t.y)}
+                      >
+                        <Text style={styles.previewLabel} numberOfLines={1}>
+                          {t.label}
+                        </Text>
+                        <Text style={[styles.previewOdds, { color }]}>{pct}%</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              );
+            })()}
             {selectedUnit.kind === 'pioneer' ? (() => {
               const exhausted = selectedUnit.movesLeft <= 0;
               return (
@@ -1086,6 +1176,35 @@ const styles = StyleSheet.create({
   actionAutoOnText: { color: '#0a1729' },
   workRow: { marginTop: 6 },
   unitActionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 },
+  previewBlock: {
+    marginTop: 6,
+    borderColor: THEME.border,
+    borderWidth: 1,
+    borderRadius: 6,
+    padding: 4,
+    gap: 3,
+  },
+  previewTitle: {
+    color: THEME.inkMuted,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1,
+    paddingHorizontal: 4,
+  },
+  previewRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(10, 23, 41, 0.4)',
+    borderLeftWidth: 3,
+    borderTopRightRadius: 4,
+    borderBottomRightRadius: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    gap: 8,
+  },
+  previewLabel: { color: THEME.ink, fontSize: 11, flex: 1 },
+  previewOdds: { fontSize: 12, fontWeight: '900' },
   queueRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
