@@ -237,14 +237,17 @@ export const useGame = create<GameState>((set, get) => ({
         veteran: u.veteran ?? false,
       };
     });
-    const normalizedPlayers: Player[] = data.players.map((p) => ({
-      ...p,
-      iso: p.iso ?? '',
-      researched: p.researched ?? [],
-      researching: p.researching ?? null,
-      science: p.science ?? 0,
-      gold: p.gold ?? 0,
-    }));
+    const normalizedPlayers: Player[] = data.players.map((p) => {
+      const researched = p.researched ?? [];
+      return {
+        ...p,
+        iso: p.iso ?? '',
+        researched,
+        researching: p.researching ?? pickCheapestAvailable(researched),
+        science: p.science ?? 0,
+        gold: p.gold ?? 0,
+      };
+    });
     // Forward-compat: older cities used a string `building` and a numeric
     // `productionPerTurn`. New schema uses a build target object and yields
     // come from worked tiles.
@@ -1130,16 +1133,17 @@ export const useGame = create<GameState>((set, get) => ({
         const finished = researching;
         science -= TECH[finished].cost;
         researched = [...researched, finished];
-        researching = null;
+        researching = pickCheapestAvailable(researched);
         if (p.isHuman) {
           events.push({
             kind: 'research',
-            text: `Researched ${TECH[finished].name}.`,
+            text: researching
+              ? `Researched ${TECH[finished].name}. Now researching ${TECH[researching].name}.`
+              : `Researched ${TECH[finished].name}.`,
           });
         }
-        if (!p.isHuman) researching = pickCheapestAvailable(researched);
       }
-      if (!p.isHuman && !researching) {
+      if (!researching) {
         researching = pickCheapestAvailable(researched);
       }
       return { ...p, science, researching, researched, gold: p.gold + goldGain };

@@ -1,4 +1,5 @@
 import { COUNTRIES, type Country, type LeaderMap } from '@/src/data/countries';
+import { pickCheapestAvailable } from '@/src/data/tech';
 import { TERRAIN } from '@/src/data/terrain';
 import { UNIT } from '@/src/data/units';
 import { PLAYER_PALETTE } from '@/src/ui/palette';
@@ -150,7 +151,7 @@ export function buildInitialState(
     color: PLAYER_PALETTE[idx % PLAYER_PALETTE.length],
     isHuman: idx === 0,
     researched: [],
-    researching: null,
+    researching: pickCheapestAvailable([]),
     science: 0,
     gold: 0,
   }));

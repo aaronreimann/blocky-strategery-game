@@ -140,14 +140,11 @@ export default function Hud() {
           />
           <Text style={styles.pillText}>{myUnitsCount}</Text>
         </View>
-        <Pressable
-          style={[styles.pill, !researching && styles.pillAlert]}
-          onPress={() => setTechOpen(true)}
-        >
+        <Pressable style={styles.pill} onPress={() => setTechOpen(true)}>
           <FontAwesome5
             name="flask"
             size={12}
-            color={researching ? THEME.ink : THEME.warn}
+            color={THEME.ink}
             style={styles.pillIcon}
           />
           {researching ? (
@@ -155,9 +152,7 @@ export default function Hud() {
               {science}/{TECH[researching].cost}
             </Text>
           ) : (
-            <Text style={[styles.pillText, styles.pillAlertText]}>
-              {science} · pick research
-            </Text>
+            <Text style={styles.pillText}>All researched</Text>
           )}
         </Pressable>
         <View style={styles.pill}>
