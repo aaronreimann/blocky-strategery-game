@@ -27,8 +27,8 @@ export default function TechScreen({ onClose }: Props) {
   };
 
   return (
-    <View style={styles.bg}>
-      <View style={styles.card}>
+    <Pressable style={styles.bg} onPress={onClose}>
+      <Pressable style={styles.card} onPress={() => {}}>
         <View style={styles.header}>
           <View>
             <Text style={styles.title}>Tech Tree</Text>
@@ -92,8 +92,8 @@ export default function TechScreen({ onClose }: Props) {
             );
           })}
         </ScrollView>
-      </View>
-    </View>
+      </Pressable>
+    </Pressable>
   );
 }
 

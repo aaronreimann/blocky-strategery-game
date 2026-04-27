@@ -182,8 +182,8 @@ export default function TitleScreen() {
         }
         const ended = !!target.gameOver;
         return (
-          <View style={styles.modalBg}>
-            <View style={styles.confirmCard}>
+          <Pressable style={styles.modalBg} onPress={() => setPendingDelete(null)}>
+            <Pressable style={styles.confirmCard} onPress={() => {}}>
               <Text style={styles.modalTitle}>
                 {ended ? 'Clear this slot?' : 'Delete this game?'}
               </Text>
@@ -215,14 +215,14 @@ export default function TitleScreen() {
                   </Text>
                 </Pressable>
               </View>
-            </View>
-          </View>
+            </Pressable>
+          </Pressable>
         );
       })()}
 
       {pendingSlot !== null && (
-        <View style={styles.modalBg}>
-          <View style={styles.modalCard}>
+        <Pressable style={styles.modalBg} onPress={() => setPendingSlot(null)}>
+          <Pressable style={styles.modalCard} onPress={() => {}}>
             <Text style={styles.modalTitle}>Pick a difficulty</Text>
             <Text style={styles.modalSub}>Realm {pendingSlot + 1}</Text>
             <View style={styles.modalRow}>
@@ -240,13 +240,13 @@ export default function TitleScreen() {
             <Pressable style={styles.modalCancel} onPress={() => setPendingSlot(null)}>
               <Text style={styles.modalCancelText}>Cancel</Text>
             </Pressable>
-          </View>
-        </View>
+          </Pressable>
+        </Pressable>
       )}
 
       {historyOpen && (
-        <View style={styles.modalBg}>
-          <View style={styles.historyCard}>
+        <Pressable style={styles.modalBg} onPress={() => setHistoryOpen(false)}>
+          <Pressable style={styles.historyCard} onPress={() => {}}>
             <View style={styles.historyHeader}>
               <Text style={styles.modalTitle}>History</Text>
               <Pressable onPress={() => setHistoryOpen(false)} style={styles.historyClose}>
@@ -294,8 +294,8 @@ export default function TitleScreen() {
                 <Text style={styles.historyClearText}>Clear history</Text>
               </Pressable>
             )}
-          </View>
-        </View>
+          </Pressable>
+        </Pressable>
       )}
       </SafeAreaView>
     </ImageBackground>
@@ -308,7 +308,9 @@ const styles = StyleSheet.create({
     backgroundColor: THEME.bg,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 120,
   },
   header: { alignItems: 'center', marginTop: 60, marginBottom: 16 },
   logo: {

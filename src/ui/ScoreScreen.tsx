@@ -42,8 +42,8 @@ export default function ScoreScreen({ onClose }: Props) {
   rows.sort((a, b) => b.score - a.score);
 
   return (
-    <View style={styles.bg}>
-      <View style={styles.card}>
+    <Pressable style={styles.bg} onPress={onClose}>
+      <Pressable style={styles.card} onPress={() => {}}>
         <View style={styles.header}>
           <View>
             <Text style={styles.title}>Standings</Text>
@@ -79,8 +79,8 @@ export default function ScoreScreen({ onClose }: Props) {
         <Text style={styles.footnote}>
           Score = cities×10 + units×2 + techs×5 + wonders×15 + total population
         </Text>
-      </View>
-    </View>
+      </Pressable>
+    </Pressable>
   );
 }
 

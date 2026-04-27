@@ -26,8 +26,8 @@ type Props = {
 
 export default function LegendScreen({ onClose }: Props) {
   return (
-    <View style={styles.bg}>
-      <View style={styles.card}>
+    <Pressable style={styles.bg} onPress={onClose}>
+      <Pressable style={styles.card} onPress={() => {}}>
         <View style={styles.header}>
           <Text style={styles.title}>Legend</Text>
           <Pressable onPress={onClose} style={styles.closeBtn}>
@@ -166,8 +166,8 @@ export default function LegendScreen({ onClose }: Props) {
             </Text>
           </View>
         </ScrollView>
-      </View>
-    </View>
+      </Pressable>
+    </Pressable>
   );
 }
 

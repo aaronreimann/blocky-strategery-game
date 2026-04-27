@@ -21,8 +21,8 @@ export default function DiplomacyScreen({ onClose }: Props) {
   const others = players.filter((p) => p.idx !== HUMAN_IDX);
 
   return (
-    <View style={styles.bg}>
-      <View style={styles.card}>
+    <Pressable style={styles.bg} onPress={onClose}>
+      <Pressable style={styles.card} onPress={() => {}}>
         <View style={styles.header}>
           <Text style={styles.title}>Diplomacy</Text>
           <Pressable onPress={onClose} style={styles.closeBtn}>
@@ -78,8 +78,8 @@ export default function DiplomacyScreen({ onClose }: Props) {
             );
           })}
         </ScrollView>
-      </View>
-    </View>
+      </Pressable>
+    </Pressable>
   );
 }
 

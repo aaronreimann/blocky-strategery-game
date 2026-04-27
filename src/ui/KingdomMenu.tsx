@@ -31,8 +31,8 @@ export default function KingdomMenu({ onClose, onOpenTech }: Props) {
   };
 
   return (
-    <View style={styles.bg}>
-      <View style={styles.card}>
+    <Pressable style={styles.bg} onPress={onClose}>
+      <Pressable style={styles.card} onPress={() => {}}>
         <View style={styles.header}>
           <View>
             <Text style={styles.title}>
@@ -98,8 +98,8 @@ export default function KingdomMenu({ onClose, onOpenTech }: Props) {
             ))
           )}
         </ScrollView>
-      </View>
-    </View>
+      </Pressable>
+    </Pressable>
   );
 }
 
