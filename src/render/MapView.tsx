@@ -1,6 +1,7 @@
 import {
   Canvas,
   Circle,
+  DashPathEffect,
   Group,
   matchFont,
   Path,
@@ -337,7 +338,19 @@ export default function MapView({
       }
     }
     const out: React.ReactNode[] = [];
-    const EDGE = 2;
+    const STROKE = 2;
+    const DASH: number[] = [5, 4];
+    const dashEdge = (key: string, path: string, color: string) => (
+      <Path
+        key={key}
+        path={path}
+        color={color}
+        style="stroke"
+        strokeWidth={STROKE}
+      >
+        <DashPathEffect intervals={DASH} />
+      </Path>
+    );
     for (const [k, ownerIdx] of ownerByTile) {
       const [xs, ys] = k.split(',');
       const x = Number(xs);
@@ -354,57 +367,40 @@ export default function MapView({
           color={`${color}22`}
         />,
       );
-      // Edges where the neighbor isn't the same owner.
+      const tx = x * TILE_SIZE;
+      const ty = y * TILE_SIZE;
+      // Edges where the neighbor isn't the same owner — drawn as dashed
+      // stroked paths instead of solid rect strips.
       const top = ownerByTile.get(`${x},${y - 1}`);
       const bottom = ownerByTile.get(`${x},${y + 1}`);
       const left = ownerByTile.get(`${x - 1},${y}`);
       const right = ownerByTile.get(`${x + 1},${y}`);
       if (top !== ownerIdx) {
         out.push(
-          <Rect
-            key={`bt-${k}`}
-            x={x * TILE_SIZE}
-            y={y * TILE_SIZE}
-            width={TILE_SIZE}
-            height={EDGE}
-            color={color}
-          />,
+          dashEdge(`bt-${k}`, `M ${tx} ${ty + 1} L ${tx + TILE_SIZE} ${ty + 1}`, color),
         );
       }
       if (bottom !== ownerIdx) {
         out.push(
-          <Rect
-            key={`bb-${k}`}
-            x={x * TILE_SIZE}
-            y={(y + 1) * TILE_SIZE - EDGE}
-            width={TILE_SIZE}
-            height={EDGE}
-            color={color}
-          />,
+          dashEdge(
+            `bb-${k}`,
+            `M ${tx} ${ty + TILE_SIZE - 1} L ${tx + TILE_SIZE} ${ty + TILE_SIZE - 1}`,
+            color,
+          ),
         );
       }
       if (left !== ownerIdx) {
         out.push(
-          <Rect
-            key={`bl-${k}`}
-            x={x * TILE_SIZE}
-            y={y * TILE_SIZE}
-            width={EDGE}
-            height={TILE_SIZE}
-            color={color}
-          />,
+          dashEdge(`bl-${k}`, `M ${tx + 1} ${ty} L ${tx + 1} ${ty + TILE_SIZE}`, color),
         );
       }
       if (right !== ownerIdx) {
         out.push(
-          <Rect
-            key={`br-${k}`}
-            x={(x + 1) * TILE_SIZE - EDGE}
-            y={y * TILE_SIZE}
-            width={EDGE}
-            height={TILE_SIZE}
-            color={color}
-          />,
+          dashEdge(
+            `br-${k}`,
+            `M ${tx + TILE_SIZE - 1} ${ty} L ${tx + TILE_SIZE - 1} ${ty + TILE_SIZE}`,
+            color,
+          ),
         );
       }
     }
