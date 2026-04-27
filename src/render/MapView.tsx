@@ -236,10 +236,20 @@ export default function MapView({
         const wy = (e.y - ty.value) / scale.value;
         dragWorldX.value = wx;
         dragWorldY.value = wy;
-      } else {
-        tx.value = startTx.value + e.translationX;
-        ty.value = startTy.value + e.translationY;
+        return;
       }
+      // While pinch owns the camera, pan stops writing tx/ty (otherwise
+      // pan and pinch race each frame and pan wins, dragging the zoom
+      // anchor off-screen). Rebase startTx/startTy to the current tx/ty
+      // minus the running translation so pan resumes seamlessly when
+      // pinch ends.
+      if (pinchActive.value) {
+        startTx.value = tx.value - e.translationX;
+        startTy.value = ty.value - e.translationY;
+        return;
+      }
+      tx.value = startTx.value + e.translationX;
+      ty.value = startTy.value + e.translationY;
     })
     .onEnd((e) => {
       'worklet';
