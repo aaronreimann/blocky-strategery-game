@@ -253,53 +253,62 @@ export default function MapView({
       }
     });
 
-  // Pinch zoom around the actual finger midpoint. Android's Gesture.Pinch
-  // sometimes reports focalX/focalY as 0 during onStart and only fills them
-  // in once both fingers have moved. The first frame with a real focal
-  // becomes the gesture's true origin — we rebase startScale/startTx/Ty
-  // and remember e.scale at that moment so subsequent zoom is measured
-  // from the rebase, not from gesture-start.
+  // Pinch zoom — compute the focal ourselves from raw touch positions
+  // instead of trusting e.focalX/focalY (broken on Android new arch).
+  // onTouchesDown fires for every additional finger down; once we see two
+  // touches, snapshot their midpoint as the anchor and the initial finger
+  // distance as the baseline for the zoom ratio.
   const pinchFocalX = useSharedValue(0);
   const pinchFocalY = useSharedValue(0);
-  const pinchEScaleAtRebase = useSharedValue(1);
-  const pinchHasFocal = useSharedValue(false);
+  const pinchStartDist = useSharedValue(0);
+  const pinchActive = useSharedValue(false);
   const pinch = Gesture.Pinch()
-    .onStart(() => {
+    .onTouchesDown((event) => {
       'worklet';
-      startScale.value = scale.value;
-      startTx.value = tx.value;
-      startTy.value = ty.value;
-      pinchHasFocal.value = false;
-      pinchEScaleAtRebase.value = 1;
-    })
-    .onUpdate((e) => {
-      'worklet';
-      if (
-        !pinchHasFocal.value
-        && Number.isFinite(e.focalX)
-        && Number.isFinite(e.focalY)
-        && (e.focalX !== 0 || e.focalY !== 0)
-      ) {
-        // First frame with a real focal — rebase to here.
-        pinchFocalX.value = e.focalX;
-        pinchFocalY.value = e.focalY;
+      const t = event.allTouches;
+      if (t.length >= 2 && !pinchActive.value) {
+        const ax = t[0].x;
+        const ay = t[0].y;
+        const bx = t[1].x;
+        const by = t[1].y;
+        pinchFocalX.value = (ax + bx) / 2;
+        pinchFocalY.value = (ay + by) / 2;
+        pinchStartDist.value = Math.max(1, Math.hypot(bx - ax, by - ay));
         startScale.value = scale.value;
         startTx.value = tx.value;
         startTy.value = ty.value;
-        pinchEScaleAtRebase.value = e.scale;
-        pinchHasFocal.value = true;
+        pinchActive.value = true;
       }
-      const fx = pinchHasFocal.value ? pinchFocalX.value : screenW / 2;
-      const fy = pinchHasFocal.value ? pinchFocalY.value : screenH / 2;
-      const baselineEScale = pinchHasFocal.value ? pinchEScaleAtRebase.value : 1;
+    })
+    .onTouchesMove((event) => {
+      'worklet';
+      if (!pinchActive.value) return;
+      const t = event.allTouches;
+      if (t.length < 2) return;
+      const ax = t[0].x;
+      const ay = t[0].y;
+      const bx = t[1].x;
+      const by = t[1].y;
+      const dist = Math.max(1, Math.hypot(bx - ax, by - ay));
+      const factor = dist / pinchStartDist.value;
       const next = Math.min(
-        Math.max(startScale.value * (e.scale / baselineEScale), MIN_SCALE),
+        Math.max(startScale.value * factor, MIN_SCALE),
         MAX_SCALE,
       );
       const ratio = next / startScale.value;
+      const fx = pinchFocalX.value;
+      const fy = pinchFocalY.value;
       tx.value = fx - (fx - startTx.value) * ratio;
       ty.value = fy - (fy - startTy.value) * ratio;
       scale.value = next;
+    })
+    .onTouchesUp(() => {
+      'worklet';
+      pinchActive.value = false;
+    })
+    .onTouchesCancelled(() => {
+      'worklet';
+      pinchActive.value = false;
     });
 
   const tap = Gesture.Tap().onEnd((e) => {
