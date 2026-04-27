@@ -119,9 +119,17 @@ export default function MapView({
   onSetDestination,
   onTileLongPress,
 }: Props) {
-  const pioneerImg = useImage(require('../../assets/images/icons/icon_wayfarer.png'));
-  const workerImg = useImage(require('../../assets/images/icons/icon_serf.png'));
+  const pioneerImg = useImage(require('../../assets/images/icons/icon_pioneer.png'));
+  const workerImg = useImage(require('../../assets/images/icons/icon_worker.png'));
   const footmanImg = useImage(require('../../assets/images/icons/icon_footman.png'));
+  const spearmanImg = useImage(require('../../assets/images/icons/icon_spearman.png'));
+  const horsemanImg = useImage(require('../../assets/images/icons/icon_horseman.png'));
+  const swordsmanImg = useImage(require('../../assets/images/icons/icon_swordsman.png'));
+  const catapultImg = useImage(require('../../assets/images/icons/icon_catapult.png'));
+  const galleyImg = useImage(require('../../assets/images/icons/icon_galley.png'));
+  const townImg = useImage(require('../../assets/images/icons/icon_town.png'));
+  const capitalImg = useImage(require('../../assets/images/icons/icon_capital.png'));
+  const goodyHutImg = useImage(require('../../assets/images/icons/icon_goody_hut.png'));
   const { width: screenW, height: screenH } = useWindowDimensions();
 
   // Font Awesome 5 Solid for unit + city icons. While loading we just skip
@@ -856,66 +864,63 @@ export default function MapView({
         firstCityByPlayer.set(c.ownerIdx, c.id);
       }
     }
-    const scale = ICON_SIZE / ICON_VIEWBOX;
     return cities.map((c) => {
       const owner = players[c.ownerIdx];
       const color = owner?.color ?? '#ffffff';
       const isCapital = firstCityByPlayer.get(c.ownerIdx) === c.id;
-      const path = iconPath(isCapital ? CITY_CAPITAL_ICON : CITY_HOUSE_ICON);
-      if (!path) return null;
+      const img = isCapital ? capitalImg : townImg;
+      if (!img) return null;
       const cx = c.x * TILE_SIZE + TILE_SIZE / 2;
       const cy = c.y * TILE_SIZE + TILE_SIZE / 2;
-      const ox = cx - ICON_SIZE / 2;
-      const oy = cy - ICON_SIZE / 2;
+      const PAINTED_SIZE = Math.round(TILE_SIZE * 1.4);
+      const pox = cx - PAINTED_SIZE / 2;
+      const poy = cy - PAINTED_SIZE / 2;
       return (
-        <Group
-          key={`city-${c.id}`}
-          transform={[{ translateX: ox }, { translateY: oy }, { scale }]}
-        >
-          <Path path={path} color="rgba(0,0,0,0.6)" transform={[{ translateX: 12 }, { translateY: 12 }]} />
-          <Path path={path} color={color} />
+        <Group key={`city-${c.id}`}>
+          <Circle cx={cx} cy={cy} r={PAINTED_SIZE * 0.45} color={color} opacity={0.6} />
+          <Circle cx={cx} cy={cy} r={PAINTED_SIZE * 0.45} color="#0a1729" style="stroke" strokeWidth={2} />
+          <SkiaImage
+            image={img}
+            x={pox}
+            y={poy - 4}
+            width={PAINTED_SIZE}
+            height={PAINTED_SIZE}
+          />
         </Group>
       );
     });
-  }, [cities, players]);
+  }, [cities, players, townImg, capitalImg]);
 
   const hutLayer = useMemo(() => {
-    const HUT_ICON_SIZE = 22;
-    const scale = HUT_ICON_SIZE / ICON_VIEWBOX;
-    const path = iconPath('mushroom_house');
-    if (!path) return [] as React.ReactNode[];
+    if (!goodyHutImg) return [] as React.ReactNode[];
     return huts.map((h) => {
       const cx = h.x * TILE_SIZE + TILE_SIZE / 2;
       const cy = h.y * TILE_SIZE + TILE_SIZE / 2;
-      const ox = cx - HUT_ICON_SIZE / 2;
-      const oy = cy - HUT_ICON_SIZE / 2;
+      const PAINTED_SIZE = Math.round(TILE_SIZE * 1.2);
+      const pox = cx - PAINTED_SIZE / 2;
+      const poy = cy - PAINTED_SIZE / 2;
       return (
-        <Group
+        <SkiaImage
           key={`hut-${h.x}-${h.y}`}
-          transform={[{ translateX: ox }, { translateY: oy }, { scale }]}
-        >
-          <Path
-            path={path}
-            color="rgba(0,0,0,0.55)"
-            transform={[{ translateX: 14 }, { translateY: 14 }]}
-          />
-          <Path path={path} color="#c08a3e" />
-        </Group>
+          image={goodyHutImg}
+          x={pox}
+          y={poy}
+          width={PAINTED_SIZE}
+          height={PAINTED_SIZE}
+        />
       );
     });
-  }, [huts]);
+  }, [huts, goodyHutImg]);
 
   const unitLayer = useMemo(() => {
     const elements: React.ReactNode[] = [];
-    const scale = ICON_SIZE / ICON_VIEWBOX;
     for (const u of units) {
       const owner = players[u.ownerIdx];
       const color = owner?.color ?? '#ffffff';
       
       const cx = u.x * TILE_SIZE + TILE_SIZE / 2;
       const cy = u.y * TILE_SIZE + TILE_SIZE / 2;
-      const ox = cx - ICON_SIZE / 2;
-      const oy = cy - ICON_SIZE / 2;
+      
       if (u.stack.length > 1) {
         elements.push(
           <Circle
@@ -934,44 +939,46 @@ export default function MapView({
       if (u.kind === 'pioneer') img = pioneerImg;
       else if (u.kind === 'worker') img = workerImg;
       else if (u.kind === 'footman') img = footmanImg;
+      else if (u.kind === 'spearman') img = spearmanImg;
+      else if (u.kind === 'horseman') img = horsemanImg;
+      else if (u.kind === 'swordsman') img = swordsmanImg;
+      else if (u.kind === 'catapult') img = catapultImg;
+      else if (u.kind === 'galley') img = galleyImg;
 
       if (img) {
-        // Painted icons render at 1.25× tile size. Once the artwork ships
-        // without its baked black ring, an owner-color ring will be drawn
-        // here instead — left out for now to avoid double-rings.
-        const PAINTED_SIZE = Math.round(TILE_SIZE * 1.25);
+        const PAINTED_SIZE = Math.round(TILE_SIZE * 1.35);
         const pox = cx - PAINTED_SIZE / 2;
         const poy = cy - PAINTED_SIZE / 2;
+        // Owner-color medallion sized to comfortably contain the character.
+        const DISC_R = PAINTED_SIZE * 0.42;
+        elements.push(
+          <Circle key={`u-${u.id}-bg`} cx={cx} cy={cy} r={DISC_R} color={color} />,
+        );
+        elements.push(
+          <Circle
+            key={`u-${u.id}-bdr`}
+            cx={cx}
+            cy={cy}
+            r={DISC_R}
+            color="#0a1729"
+            style="stroke"
+            strokeWidth={1.5}
+          />,
+        );
         elements.push(
           <SkiaImage
             key={`u-${u.id}`}
             image={img}
             x={pox}
-            y={poy}
+            y={poy - 4}
             width={PAINTED_SIZE}
             height={PAINTED_SIZE}
           />,
         );
-      } else {
-        const path = iconPath(UNIT_ICON[u.kind]);
-        if (!path) continue;
-        elements.push(
-          <Group
-            key={`u-${u.id}`}
-            transform={[{ translateX: ox }, { translateY: oy }, { scale }]}
-          >
-            <Path
-              path={path}
-              color="rgba(0,0,0,0.6)"
-              transform={[{ translateX: 12 }, { translateY: 12 }]}
-            />
-            <Path path={path} color={color} />
-          </Group>,
-        );
       }
     }
     return elements;
-  }, [units, players, pioneerImg, workerImg, footmanImg]);
+  }, [units, players, pioneerImg, workerImg, footmanImg, spearmanImg, horsemanImg, swordsmanImg, catapultImg, galleyImg]);
 
   const selectionLayer = useMemo(() => {
     let coord: { x: number; y: number } | null = null;

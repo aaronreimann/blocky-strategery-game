@@ -8,8 +8,22 @@ import {
   type GameIconName,
 } from '@/src/data/gameIcons';
 
+const PNG_ICONS: Record<string, any> = {
+  png_pioneer: require('../../assets/images/icons/icon_pioneer.png'),
+  png_worker: require('../../assets/images/icons/icon_worker.png'),
+  png_footman: require('../../assets/images/icons/icon_footman.png'),
+  png_spearman: require('../../assets/images/icons/icon_spearman.png'),
+  png_horseman: require('../../assets/images/icons/icon_horseman.png'),
+  png_swordsman: require('../../assets/images/icons/icon_swordsman.png'),
+  png_catapult: require('../../assets/images/icons/icon_catapult.png'),
+  png_galley: require('../../assets/images/icons/icon_galley.png'),
+  png_town: require('../../assets/images/icons/icon_town.png'),
+  png_capital: require('../../assets/images/icons/icon_capital.png'),
+  png_goody_hut: require('../../assets/images/icons/icon_goody_hut.png'),
+};
+
 type Props = {
-  name: GameIconName | 'png_pioneer' | 'png_worker' | 'png_footman';
+  name: GameIconName | string;
   size?: number;
   color?: string;
   style?: StyleProp<ViewStyle>;
@@ -20,19 +34,16 @@ type Props = {
 // new native dependency — it ships with the same Skia we already use for
 // the map rendering.
 export function GameIcon({ name, size = 24, color = '#f5f1e8', style }: Props) {
-  if (name === 'png_pioneer' || name === 'png_worker' || name === 'png_footman') {
-    const source =
-      name === 'png_pioneer'
-        ? require('../../assets/images/icons/icon_wayfarer.png')
-        : name === 'png_worker'
-          ? require('../../assets/images/icons/icon_serf.png')
-          : require('../../assets/images/icons/icon_footman.png');
-    return (
-      <Image
-        source={source}
-        style={[{ width: size, height: size }, style as StyleProp<ImageStyle>]}
-      />
-    );
+  if (name.startsWith('png_')) {
+    const source = PNG_ICONS[name];
+    if (source) {
+      return (
+        <Image
+          source={source}
+          style={[{ width: size, height: size }, style as StyleProp<ImageStyle>]}
+        />
+      );
+    }
   }
 
   const skPath = useMemo(() => Skia.Path.MakeFromSVGString(ICON_PATHS[name as GameIconName]), [name]);

@@ -33,11 +33,11 @@ const UNIT_ICON_NAME: Record<string, string> = {
   pioneer: 'png_pioneer',
   worker: 'png_worker',
   footman: 'png_footman',
-  spearman: 'spear_hook',
-  horseman: 'horse_head',
-  swordsman: 'broadsword',
-  catapult: 'catapult',
-  galley: 'caravel',
+  spearman: 'png_spearman',
+  horseman: 'png_horseman',
+  swordsman: 'png_swordsman',
+  catapult: 'png_catapult',
+  galley: 'png_galley',
 };
 
 function eventStyle(kind: string): { color: string } {
