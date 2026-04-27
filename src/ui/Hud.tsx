@@ -108,6 +108,7 @@ export default function Hud() {
   const selectUnitFromPicker = useGame((s) => s.selectUnitFromPicker);
   const selectCityFromPicker = useGame((s) => s.selectCityFromPicker);
   const endTurn = useGame((s) => s.endTurn);
+  const selectNextUnmovedUnit = useGame((s) => s.selectNextUnmovedUnit);
   const foundCity = useGame((s) => s.foundCity);
   const setCityBuild = useGame((s) => s.setCityBuild);
   const enqueueBuild = useGame((s) => s.enqueueBuild);
@@ -783,9 +784,34 @@ export default function Hud() {
           })()
         ) : null}
 
-        <Pressable style={styles.endTurn} onPress={endTurn}>
-          <Text style={styles.endTurnText}>End Turn</Text>
-        </Pressable>
+        {(() => {
+          const unmoved = units.filter(
+            (u) =>
+              u.ownerIdx === 0 &&
+              u.movesLeft > 0 &&
+              !u.destination &&
+              !u.workingOn &&
+              !u.autoMode,
+          ).length;
+          if (unmoved === 0) {
+            return (
+              <Pressable style={styles.endTurn} onPress={endTurn}>
+                <Text style={styles.endTurnText}>End Turn</Text>
+              </Pressable>
+            );
+          }
+          return (
+            <View style={styles.endTurnRow}>
+              <Pressable style={styles.nextUnit} onPress={selectNextUnmovedUnit}>
+                <FontAwesome5 name="forward" size={11} color={THEME.ink} />
+                <Text style={styles.nextUnitText}>Next ({unmoved})</Text>
+              </Pressable>
+              <Pressable style={[styles.endTurn, styles.endTurnDim]} onPress={endTurn}>
+                <Text style={styles.endTurnText}>End Turn</Text>
+              </Pressable>
+            </View>
+          );
+        })()}
       </View>
 
       {techOpen ? <TechScreen onClose={() => setTechOpen(false)} /> : null}
@@ -1077,13 +1103,33 @@ const styles = StyleSheet.create({
   buildBtnCost: { color: THEME.inkMuted, fontSize: 10 },
   hint: { flex: 1, alignSelf: 'center' },
   hintText: { color: THEME.inkMuted, fontSize: 11, textAlign: 'center' },
+  endTurnRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   endTurn: {
     backgroundColor: THEME.warn,
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 10,
   },
+  endTurnDim: {
+    backgroundColor: 'rgba(224, 176, 74, 0.55)',
+  },
   endTurnText: { color: '#0a1729', fontWeight: '800', fontSize: 14 },
+  nextUnit: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: THEME.bgElevated,
+    borderColor: THEME.warn,
+    borderWidth: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+  },
+  nextUnitText: { color: THEME.ink, fontWeight: '800', fontSize: 13 },
   pickerBg: {
     position: 'absolute',
     top: 0, left: 0, right: 0, bottom: 0,

@@ -74,6 +74,7 @@ type GameState = {
   exitToTitle: () => void;
 
   selectUnit: (id: string | null) => void;
+  selectNextUnmovedUnit: () => void;
   selectCity: (id: string | null) => void;
   tapTile: (x: number, y: number) => void;
   foundCity: () => void;
@@ -437,6 +438,28 @@ export const useGame = create<GameState>((set, get) => ({
   },
 
   selectUnit: (id) => set({ selectedUnitId: id, selectedCityId: id ? null : get().selectedCityId }),
+
+  selectNextUnmovedUnit: () => {
+    const { units, selectedUnitId } = get();
+    const candidates = units.filter(
+      (u) =>
+        u.ownerIdx === HUMAN_IDX &&
+        u.movesLeft > 0 &&
+        !u.destination &&
+        !u.workingOn &&
+        !u.autoMode,
+    );
+    if (candidates.length === 0) return;
+    const currentIdx = selectedUnitId
+      ? candidates.findIndex((u) => u.id === selectedUnitId)
+      : -1;
+    const next = candidates[(currentIdx + 1) % candidates.length];
+    set({
+      selectedUnitId: next.id,
+      selectedCityId: null,
+      pendingJumpTo: { x: next.x, y: next.y },
+    });
+  },
   selectCity: (id) => set({ selectedCityId: id, selectedUnitId: id ? null : get().selectedUnitId }),
 
   tapTile: (x, y) => {
