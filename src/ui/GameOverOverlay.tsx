@@ -10,6 +10,7 @@ export default function GameOverOverlay() {
   const currentSlot = useGame((s) => s.currentSlot);
   const newGame = useGame((s) => s.newGame);
   const exitToTitle = useGame((s) => s.exitToTitle);
+  const difficulty = useGame((s) => s.difficulty);
 
   if (!gameOver) return null;
 
@@ -23,7 +24,6 @@ export default function GameOverOverlay() {
     : gameOver.kind === 'lose' ? THEME.bad
     : THEME.warn;
 
-  const difficulty = useGame((s) => s.difficulty);
   const onPlayAgain = async () => {
     if (currentSlot === null) return;
     const leaders = await getCachedLeaders();
