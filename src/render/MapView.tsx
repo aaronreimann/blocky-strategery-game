@@ -936,36 +936,21 @@ export default function MapView({
       else if (u.kind === 'footman') img = footmanImg;
 
       if (img) {
-        // Painted icons have a black-circle composition baked into the art.
-        // We scale them 1.25× and overpaint that black ring with the owner's
-        // color so the unit reads at a glance: same circular medallion, but
-        // tinted by realm.
+        // Painted icons render at 1.25× tile size. Once the artwork ships
+        // without its baked black ring, an owner-color ring will be drawn
+        // here instead — left out for now to avoid double-rings.
         const PAINTED_SIZE = Math.round(TILE_SIZE * 1.25);
         const pox = cx - PAINTED_SIZE / 2;
         const poy = cy - PAINTED_SIZE / 2;
-        // The bundled PNGs put the black ring right at the canvas perimeter
-        // (verified by reading icon_footman.png). Center radius ≈ 48% of
-        // canvas, ring thickness ≈ 5%. Match those numbers in world units.
-        const ringR = PAINTED_SIZE * 0.48;
-        const ringW = PAINTED_SIZE * 0.07;
         elements.push(
-          <Group key={`u-${u.id}`}>
-            <SkiaImage
-              image={img}
-              x={pox}
-              y={poy}
-              width={PAINTED_SIZE}
-              height={PAINTED_SIZE}
-            />
-            <Circle
-              cx={cx}
-              cy={cy}
-              r={ringR}
-              color={color}
-              style="stroke"
-              strokeWidth={ringW}
-            />
-          </Group>,
+          <SkiaImage
+            key={`u-${u.id}`}
+            image={img}
+            x={pox}
+            y={poy}
+            width={PAINTED_SIZE}
+            height={PAINTED_SIZE}
+          />,
         );
       } else {
         const path = iconPath(UNIT_ICON[u.kind]);
