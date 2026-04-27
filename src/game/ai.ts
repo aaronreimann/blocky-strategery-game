@@ -403,6 +403,35 @@ export function runAITurn(input: AITurnInput): AITurnOutput {
     units = tryMove(fresh, units, cities, map);
   }
 
+  // Stack pass: merge two adjacent friendly military units if total stack
+  // size would stay ≤ 3. Up to 2 merges per turn to keep things tame.
+  let merges = 0;
+  let didMerge = true;
+  while (didMerge && merges < 2) {
+    didMerge = false;
+    const myMil = units.filter(
+      (u) => u.ownerIdx === myIdx && isMilitary(u.kind) && u.stack.length < 3,
+    );
+    outer: for (let i = 0; i < myMil.length; i++) {
+      for (let j = i + 1; j < myMil.length; j++) {
+        const a = myMil[i];
+        const b = myMil[j];
+        if (chebyshev(a.x, a.y, b.x, b.y) !== 1) continue;
+        if (a.stack.length + b.stack.length > 3) continue;
+        // Source unit (a) is consumed; receiver (b) keeps position and
+        // grows its stack.
+        units = units
+          .filter((u) => u.id !== a.id)
+          .map((u) =>
+            u.id === b.id ? { ...u, stack: [...u.stack, ...a.stack] } : u,
+          );
+        didMerge = true;
+        merges += 1;
+        break outer;
+      }
+    }
+  }
+
   return { units, cities, battles };
 }
 

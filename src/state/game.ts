@@ -788,9 +788,14 @@ export const useGame = create<GameState>((set, get) => ({
   cancelSetDestination: () => set({ awaitingDestinationFor: null }),
 
   endTurn: () => {
-    const { units, cities, turn, map, players, improvements, wonders, gameOver } = get();
+    const { units, cities, turn, map, players, improvements, wonders, difficulty, gameOver } = get();
     if (gameOver || !map) return;
     let workingWonders = wonders;
+    // King-difficulty AI bonus: +25% production and science from each AI city.
+    const aiBonus = (ownerIdx: number) =>
+      difficulty === 'hard' && !players.find((p) => p.idx === ownerIdx)?.isHuman
+        ? 1.25
+        : 1;
 
     const events: TurnEvent[] = [];
     const playerName = (idx: number) => players[idx]?.name ?? `Player ${idx}`;
@@ -847,7 +852,7 @@ export const useGame = create<GameState>((set, get) => ({
       }
 
       // Production: accumulate prod from yields toward the current build.
-      const accrued = city.production + yields.prod;
+      const accrued = city.production + Math.floor(yields.prod * aiBonus(city.ownerIdx));
       if (!city.building) {
         return { ...city, population: nextPop, food: nextFood, production: accrued };
       }
@@ -1069,7 +1074,11 @@ export const useGame = create<GameState>((set, get) => ({
     const goldByPlayer = new Map<number, number>();
     for (const c of workingCities) {
       const y = computeCityYields(c, map, workingWonders, workingImprovements);
-      scienceByPlayer.set(c.ownerIdx, (scienceByPlayer.get(c.ownerIdx) ?? 0) + y.science);
+      const mult = aiBonus(c.ownerIdx);
+      scienceByPlayer.set(
+        c.ownerIdx,
+        (scienceByPlayer.get(c.ownerIdx) ?? 0) + Math.floor(y.science * mult),
+      );
       goldByPlayer.set(c.ownerIdx, (goldByPlayer.get(c.ownerIdx) ?? 0) + y.gold);
     }
 
