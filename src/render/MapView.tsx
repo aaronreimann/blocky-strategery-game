@@ -253,29 +253,50 @@ export default function MapView({
       }
     });
 
-  // Anchor for the pinch — captured at onStart so a buggy focalX/focalY
-  // during onUpdate (Android-Pinch on new arch sometimes reports 0,0) can't
-  // yank the zoom toward the top-left corner. Falls back to screen center
-  // if onStart's focal is also 0.
+  // Pinch zoom around the actual finger midpoint. Android's Gesture.Pinch
+  // sometimes reports focalX/focalY as 0 during onStart and only fills them
+  // in once both fingers have moved. The first frame with a real focal
+  // becomes the gesture's true origin — we rebase startScale/startTx/Ty
+  // and remember e.scale at that moment so subsequent zoom is measured
+  // from the rebase, not from gesture-start.
   const pinchFocalX = useSharedValue(0);
   const pinchFocalY = useSharedValue(0);
+  const pinchEScaleAtRebase = useSharedValue(1);
+  const pinchHasFocal = useSharedValue(false);
   const pinch = Gesture.Pinch()
-    .onStart((e) => {
+    .onStart(() => {
       'worklet';
       startScale.value = scale.value;
       startTx.value = tx.value;
       startTy.value = ty.value;
-      const fx = e.focalX || screenW / 2;
-      const fy = e.focalY || screenH / 2;
-      pinchFocalX.value = fx;
-      pinchFocalY.value = fy;
+      pinchHasFocal.value = false;
+      pinchEScaleAtRebase.value = 1;
     })
     .onUpdate((e) => {
       'worklet';
-      const next = Math.min(Math.max(startScale.value * e.scale, MIN_SCALE), MAX_SCALE);
+      if (
+        !pinchHasFocal.value
+        && Number.isFinite(e.focalX)
+        && Number.isFinite(e.focalY)
+        && (e.focalX !== 0 || e.focalY !== 0)
+      ) {
+        // First frame with a real focal — rebase to here.
+        pinchFocalX.value = e.focalX;
+        pinchFocalY.value = e.focalY;
+        startScale.value = scale.value;
+        startTx.value = tx.value;
+        startTy.value = ty.value;
+        pinchEScaleAtRebase.value = e.scale;
+        pinchHasFocal.value = true;
+      }
+      const fx = pinchHasFocal.value ? pinchFocalX.value : screenW / 2;
+      const fy = pinchHasFocal.value ? pinchFocalY.value : screenH / 2;
+      const baselineEScale = pinchHasFocal.value ? pinchEScaleAtRebase.value : 1;
+      const next = Math.min(
+        Math.max(startScale.value * (e.scale / baselineEScale), MIN_SCALE),
+        MAX_SCALE,
+      );
       const ratio = next / startScale.value;
-      const fx = pinchFocalX.value;
-      const fy = pinchFocalY.value;
       tx.value = fx - (fx - startTx.value) * ratio;
       ty.value = fy - (fy - startTy.value) * ratio;
       scale.value = next;
