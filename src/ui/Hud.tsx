@@ -415,14 +415,16 @@ export default function Hud() {
               );
             })() : null}
             <View style={styles.unitActionsRow}>
-              {awaitingDestinationFor === selectedUnit.id ? (
-                <Pressable style={styles.actionMuted} onPress={cancelSetDestination}>
-                  <Text style={styles.actionMutedText}>Cancel — tap a tile to send, or here to abort</Text>
-                </Pressable>
-              ) : (
-                <Pressable style={styles.actionMuted} onPress={armSetDestination}>
-                  <Text style={styles.actionMutedText}>Set destination…</Text>
-                </Pressable>
+              {selectedUnit.autoMode || selectedUnit.exploreMode ? null : (
+                awaitingDestinationFor === selectedUnit.id ? (
+                  <Pressable style={styles.actionMuted} onPress={cancelSetDestination}>
+                    <Text style={styles.actionMutedText}>Cancel — tap a tile to send, or here to abort</Text>
+                  </Pressable>
+                ) : (
+                  <Pressable style={styles.actionMuted} onPress={armSetDestination}>
+                    <Text style={styles.actionMutedText}>Set destination…</Text>
+                  </Pressable>
+                )
               )}
               {selectedUnit.destination ? (
                 <Pressable

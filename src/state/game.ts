@@ -693,6 +693,13 @@ export const useGame = create<GameState>((set, get) => ({
         return;
       }
 
+      // Auto / Explore lock: a unit running on its own ignores manual taps
+      // until you toggle the mode off. Prevents accidentally yanking a Serf
+      // mid-irrigation by tapping the wrong tile.
+      if (selected.autoMode || selected.exploreMode) {
+        return;
+      }
+
       // Plain move — but if the tap can't possibly become a move (no moves
       // left, out of range, impassable, blocked) then treat the tap as a
       // deselect instead of a no-op.
@@ -904,6 +911,8 @@ export const useGame = create<GameState>((set, get) => ({
     if (gameOver || !map) return;
     const u = units.find((u) => u.id === unitId);
     if (!u || u.ownerIdx !== HUMAN_IDX) return;
+    // Auto / Explore lock — same rule as tapTile.
+    if (u.autoMode || u.exploreMode) return;
     if (x < 0 || y < 0 || x >= map.width || y >= map.height) return;
     if (u.x === x && u.y === y) {
       set({
