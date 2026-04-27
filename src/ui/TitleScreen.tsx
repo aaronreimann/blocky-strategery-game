@@ -312,7 +312,7 @@ const styles = StyleSheet.create({
     paddingTop: 24,
     paddingBottom: 120,
   },
-  header: { alignItems: 'center', marginTop: 90, marginBottom: 16 },
+  header: { alignItems: 'center', marginTop: 120, marginBottom: 16 },
   logo: {
     width: 600,
     height: 260,
