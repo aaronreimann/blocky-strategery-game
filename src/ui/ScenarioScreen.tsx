@@ -298,24 +298,26 @@ function RulesStep({
       </View>
 
       <Text style={[styles.sectionTitle, { marginTop: 18 }]}>Victory conditions</Text>
-      <Toggle
-        label="Conquest"
-        blurb="Win by capturing every other tribe's last city."
-        value={vConquest}
-        onToggle={onToggleConquest}
-      />
-      <Toggle
-        label="Tech"
-        blurb="Win by being the first to research Philosophy."
-        value={vTech}
-        onToggle={onToggleTech}
-      />
-      <Toggle
-        label="Time"
-        blurb="Win by holding the most cities at the turn limit."
-        value={vTime}
-        onToggle={onToggleTime}
-      />
+      <View style={styles.toggleRowGroup}>
+        <Toggle
+          label="Conquest"
+          blurb="Capture every rival's last city."
+          value={vConquest}
+          onToggle={onToggleConquest}
+        />
+        <Toggle
+          label="Tech"
+          blurb="First to research Philosophy."
+          value={vTech}
+          onToggle={onToggleTech}
+        />
+        <Toggle
+          label="Time"
+          blurb="Most cities at the turn limit."
+          value={vTime}
+          onToggle={onToggleTime}
+        />
+      </View>
     </>
   );
 }
@@ -333,18 +335,18 @@ function Toggle({
 }) {
   return (
     <Pressable
-      style={[styles.toggleRow, value && styles.toggleRowOn]}
+      style={[styles.toggleCard, value && styles.toggleRowOn]}
       onPress={onToggle}
     >
-      <View style={[styles.toggleBox, value && styles.toggleBoxOn]}>
-        <Text style={[styles.toggleCheck, value && styles.toggleCheckOn]}>
-          {value ? '✓' : ''}
-        </Text>
-      </View>
-      <View style={{ flex: 1 }}>
+      <View style={styles.toggleCardHeader}>
+        <View style={[styles.toggleBox, value && styles.toggleBoxOn]}>
+          <Text style={[styles.toggleCheck, value && styles.toggleCheckOn]}>
+            {value ? '✓' : ''}
+          </Text>
+        </View>
         <Text style={[styles.toggleLabel, value && styles.toggleLabelOn]}>{label}</Text>
-        <Text style={styles.toggleBlurb}>{blurb}</Text>
       </View>
+      <Text style={styles.toggleBlurb}>{blurb}</Text>
     </Pressable>
   );
 }
@@ -469,18 +471,25 @@ const styles = StyleSheet.create({
     lineHeight: 14,
   },
 
-  // Victory toggles (step 3)
-  toggleRow: {
+  // Victory toggles (step 3) — three cards in one row.
+  toggleRowGroup: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+    gap: 8,
+  },
+  toggleCard: {
+    flex: 1,
     backgroundColor: 'rgba(45, 32, 22, 0.9)',
     borderColor: 'rgba(212, 184, 138, 0.45)',
     borderWidth: 1.5,
     borderRadius: 10,
     paddingVertical: 10,
     paddingHorizontal: 12,
-    marginTop: 8,
+  },
+  toggleCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
   },
   toggleRowOn: { borderColor: THEME.warn },
   toggleBox: {
