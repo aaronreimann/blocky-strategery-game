@@ -152,19 +152,18 @@ export default function TitleScreen() {
                     <Text style={styles.slotHint}>
                       {ended ? 'Tap to view' : 'Tap to resume'}
                     </Text>
+                    <Pressable
+                      style={[styles.deleteBtn, ended && styles.deleteBtnStrong]}
+                      onPress={() => onDelete(info.slot)}
+                      hitSlop={6}
+                    >
+                      <Text style={[styles.deleteBtnText, ended && styles.deleteBtnTextStrong]}>
+                        {ended ? 'Clear' : 'Delete'}
+                      </Text>
+                    </Pressable>
                   </>
                 )}
               </Pressable>
-              {!info.empty && (
-                <Pressable
-                  style={[styles.deleteBtn, ended && styles.deleteBtnStrong]}
-                  onPress={() => onDelete(info.slot)}
-                >
-                  <Text style={[styles.deleteBtnText, ended && styles.deleteBtnTextStrong]}>
-                    {ended ? 'Clear slot' : 'Delete'}
-                  </Text>
-                </Pressable>
-              )}
             </View>
           );
         })}
@@ -285,13 +284,15 @@ const styles = StyleSheet.create({
     maxWidth: 760,
     justifyContent: 'center',
   },
-  slotWrap: { flex: 1, maxWidth: 240, alignItems: 'center', gap: 8 },
+  slotWrap: { flex: 1, maxWidth: 240, alignItems: 'center' },
   slotCard: {
+    position: 'relative',
     backgroundColor: 'rgba(28, 22, 18, 0.78)',
     borderColor: 'rgba(212, 184, 138, 0.45)',
     borderWidth: 1,
     borderRadius: 12,
     padding: 16,
+    paddingBottom: 44,
     width: '100%',
     minHeight: 160,
     justifyContent: 'center',
@@ -307,8 +308,11 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   deleteBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    position: 'absolute',
+    right: 10,
+    bottom: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     borderRadius: 6,
     borderColor: THEME.border,
     borderWidth: 1,
