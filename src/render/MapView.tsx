@@ -29,7 +29,7 @@ import { RESOURCE, type Resource } from '@/src/data/resources';
 import { TERRAIN } from '@/src/data/terrain';
 import { type UnitKind } from '@/src/data/units';
 import type { GameMap } from '@/src/game/map';
-import type { City, Player, Unit } from '@/src/game/types';
+import type { City, Hut, Player, Unit } from '@/src/game/types';
 import { cityRadius } from '@/src/game/yields';
 
 import { pathToTile } from '@/src/game/path';
@@ -87,6 +87,7 @@ type Props = {
   players: Player[];
   units: Unit[];
   cities: City[];
+  huts: Hut[];
   improvements: ImprovementMap;
   selectedUnitId: string | null;
   selectedCityId: string | null;
@@ -105,6 +106,7 @@ export default function MapView({
   players,
   units,
   cities,
+  huts,
   improvements,
   selectedUnitId,
   selectedCityId,
@@ -865,6 +867,32 @@ export default function MapView({
     });
   }, [cities, players]);
 
+  const hutLayer = useMemo(() => {
+    const HUT_ICON_SIZE = 22;
+    const scale = HUT_ICON_SIZE / ICON_VIEWBOX;
+    const path = iconPath('mushroom_house');
+    if (!path) return [] as React.ReactNode[];
+    return huts.map((h) => {
+      const cx = h.x * TILE_SIZE + TILE_SIZE / 2;
+      const cy = h.y * TILE_SIZE + TILE_SIZE / 2;
+      const ox = cx - HUT_ICON_SIZE / 2;
+      const oy = cy - HUT_ICON_SIZE / 2;
+      return (
+        <Group
+          key={`hut-${h.x}-${h.y}`}
+          transform={[{ translateX: ox }, { translateY: oy }, { scale }]}
+        >
+          <Path
+            path={path}
+            color="rgba(0,0,0,0.55)"
+            transform={[{ translateX: 14 }, { translateY: 14 }]}
+          />
+          <Path path={path} color="#c08a3e" />
+        </Group>
+      );
+    });
+  }, [huts]);
+
   const unitLayer = useMemo(() => {
     const elements: React.ReactNode[] = [];
     const scale = ICON_SIZE / ICON_VIEWBOX;
@@ -964,6 +992,7 @@ export default function MapView({
             {arrowLayer}
             {destinationPathLayer}
             {destLayer}
+            {hutLayer}
             {cityLayer}
             {unitLayer}
             {workIndicatorLayer}

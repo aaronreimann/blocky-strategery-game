@@ -6,6 +6,7 @@ import type {
   City,
   Difficulty,
   GameOverState,
+  Hut,
   Player,
   RelationsMap,
   Unit,
@@ -29,6 +30,7 @@ export type SaveData = {
   cities: City[];
   improvements: ImprovementMap;
   wonders: Wonder[];
+  huts: Hut[];
   relations: RelationsMap;
   gameOver: GameOverState | null;
   savedAt: string;

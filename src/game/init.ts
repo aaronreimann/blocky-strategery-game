@@ -11,6 +11,7 @@ import {
   DIFFICULTY_AI_COUNT,
   type City,
   type Difficulty,
+  type Hut,
   type Player,
   type Unit,
 } from './types';
@@ -20,6 +21,7 @@ export type InitialState = {
   players: Player[];
   units: Unit[];
   cities: City[];
+  huts: Hut[];
 };
 
 const PREFERRED_TERRAIN = new Set(['grassland', 'plains']);
@@ -161,5 +163,46 @@ export function buildInitialState(
     units.push(...spawnStartingUnits(i, spawns[i] ?? spawns[0], map));
   }
 
-  return { map, players, units, cities: [] };
+  const huts = pickHutSites(map, spawns, units);
+
+  return { map, players, units, cities: [], huts };
+}
+
+const HUT_COUNT = 14;
+const HUT_MIN_DIST_FROM_SPAWN = 4;
+
+function pickHutSites(
+  map: GameMap,
+  spawns: { x: number; y: number }[],
+  units: Unit[],
+): Hut[] {
+  const occupied = new Set<string>();
+  for (const u of units) occupied.add(`${u.x},${u.y}`);
+  const candidates = map.tiles.filter((t) => {
+    if (!TERRAIN[t.terrain].passable) return false;
+    if (occupied.has(`${t.x},${t.y}`)) return false;
+    for (const s of spawns) {
+      if (chebyshev(s.x, s.y, t.x, t.y) < HUT_MIN_DIST_FROM_SPAWN) return false;
+    }
+    return true;
+  });
+  // Deterministic shuffle keyed off the map seed so the same world has the
+  // same huts every load.
+  const rng = mulberry32(map.seed * 9277 + 1);
+  for (let i = candidates.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+  }
+  return candidates.slice(0, HUT_COUNT).map((t) => ({ x: t.x, y: t.y }));
+}
+
+function mulberry32(seed: number) {
+  let s = seed >>> 0;
+  return function () {
+    s = (s + 0x6d2b79f5) >>> 0;
+    let t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
 }

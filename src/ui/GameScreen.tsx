@@ -17,6 +17,7 @@ export default function GameScreen() {
   const players = useGame((s) => s.players);
   const units = useGame((s) => s.units);
   const cities = useGame((s) => s.cities);
+  const huts = useGame((s) => s.huts);
   const improvements = useGame((s) => s.improvements);
   const selectedUnitId = useGame((s) => s.selectedUnitId);
   const selectedCityId = useGame((s) => s.selectedCityId);
@@ -81,6 +82,7 @@ export default function GameScreen() {
         players={players}
         units={units}
         cities={cities}
+        huts={huts}
         improvements={improvements}
         selectedUnitId={selectedUnitId}
         selectedCityId={selectedCityId}

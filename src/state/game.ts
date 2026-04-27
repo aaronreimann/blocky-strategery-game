@@ -26,6 +26,8 @@ import {
   type CityFocus,
   type Difficulty,
   type GameOverState,
+  type Hut,
+  type HutReward,
   type Player,
   type RelationsMap,
   type TurnEvent,
@@ -52,6 +54,7 @@ type GameState = {
   cities: City[];
   improvements: ImprovementMap;
   wonders: Wonder[];
+  huts: Hut[];
   relations: RelationsMap;
   turn: number;
   seed: number;
@@ -132,6 +135,111 @@ function findSpawnTile(
   return null;
 }
 
+// Roll a goody-hut reward for a unit that just stepped on a hut tile.
+// Mutates a copy of (huts, players, units) and returns the new arrays
+// plus an event describing what happened.
+function rollHutReward(
+  unit: Unit,
+  hut: Hut,
+  state: {
+    huts: Hut[];
+    players: Player[];
+    units: Unit[];
+    cities: City[];
+    map: GameMap;
+  },
+): {
+  huts: Hut[];
+  players: Player[];
+  units: Unit[];
+  reward: HutReward;
+} {
+  const huts = state.huts.filter((h) => !(h.x === hut.x && h.y === hut.y));
+  const owner = state.players[unit.ownerIdx];
+  if (!owner) return { huts, players: state.players, units: state.units, reward: { kind: 'empty' } };
+
+  const roll = Math.random();
+  let reward: HutReward;
+  let players = state.players;
+  let units = state.units;
+
+  if (roll < 0.35) {
+    // +25–50 gold
+    const amount = 25 + Math.floor(Math.random() * 26);
+    players = state.players.map((p) =>
+      p.idx === unit.ownerIdx ? { ...p, gold: p.gold + amount } : p,
+    );
+    reward = { kind: 'gold', amount };
+  } else if (roll < 0.55) {
+    // +20–35 science (banked toward current research)
+    const amount = 20 + Math.floor(Math.random() * 16);
+    players = state.players.map((p) =>
+      p.idx === unit.ownerIdx ? { ...p, science: p.science + amount } : p,
+    );
+    reward = { kind: 'science', amount };
+  } else if (roll < 0.75) {
+    // Free tech: cheapest available the player doesn't have. If everything's
+    // researched, fall back to gold.
+    const next = pickCheapestAvailable(owner.researched);
+    if (next) {
+      players = state.players.map((p) =>
+        p.idx === unit.ownerIdx
+          ? {
+              ...p,
+              researched: [...p.researched, next],
+              researching: pickCheapestAvailable([...p.researched, next]),
+            }
+          : p,
+      );
+      reward = { kind: 'tech', tech: next };
+    } else {
+      const amount = 50;
+      players = state.players.map((p) =>
+        p.idx === unit.ownerIdx ? { ...p, gold: p.gold + amount } : p,
+      );
+      reward = { kind: 'gold', amount };
+    }
+  } else if (roll < 0.95) {
+    // Free Footman on the hut tile (replacing the entrant is fine — they
+    // share the tile with the new unit which then stacks on next move).
+    const newUnit: Unit = {
+      id: nextUnitId(),
+      ownerIdx: unit.ownerIdx,
+      kind: 'footman',
+      stack: ['footman'],
+      x: hut.x,
+      y: hut.y,
+      movesLeft: 0,
+      workingOn: null,
+      workTurnsLeft: 0,
+      destination: null,
+      autoMode: false,
+      veteran: false,
+    };
+    units = [...state.units, newUnit];
+    reward = { kind: 'unit', unit: 'footman' };
+  } else {
+    reward = { kind: 'empty' };
+  }
+
+  return { huts, players, units, reward };
+}
+
+function hutEventText(reward: HutReward): string {
+  switch (reward.kind) {
+    case 'gold':
+      return `Tribal village joined you — +${reward.amount} gold.`;
+    case 'science':
+      return `Tribal scholars taught your scouts — +${reward.amount} science.`;
+    case 'tech':
+      return `Tribal elders shared their knowledge — researched ${TECH[reward.tech].name}.`;
+    case 'unit':
+      return `Tribal warriors enlisted with you — free ${UNIT[reward.unit].name}.`;
+    case 'empty':
+      return 'The village was abandoned.';
+  }
+}
+
 function recordGameOver(
   prev: GameOverState | null,
   next: GameOverState | null,
@@ -165,6 +273,7 @@ function autosave(state: GameState): void {
     cities: state.cities,
     improvements: state.improvements,
     wonders: state.wonders,
+    huts: state.huts,
     relations: state.relations,
     gameOver: state.gameOver,
   }).catch((err) => console.warn('autosave failed', err));
@@ -177,6 +286,7 @@ export const useGame = create<GameState>((set, get) => ({
   cities: [],
   improvements: {},
   wonders: [],
+  huts: [],
   relations: {},
   turn: 1,
   seed: 0,
@@ -204,6 +314,7 @@ export const useGame = create<GameState>((set, get) => ({
       cities: initial.cities,
       improvements: {},
       wonders: [],
+      huts: initial.huts,
       relations: {},
       turn: 1,
       seed,
@@ -290,6 +401,7 @@ export const useGame = create<GameState>((set, get) => ({
       cities: normalizedCities,
       improvements: data.improvements ?? {},
       wonders: data.wonders ?? [],
+      huts: data.huts ?? [],
       relations: data.relations ?? {},
       turn: data.turn,
       seed: data.seed,
@@ -311,6 +423,7 @@ export const useGame = create<GameState>((set, get) => ({
       cities: [],
       improvements: {},
       wonders: [],
+      huts: [],
       relations: {},
       turn: 1,
       seed: 0,
@@ -491,10 +604,36 @@ export const useGame = create<GameState>((set, get) => ({
         set({ selectedUnitId: null, selectedCityId: null });
         return;
       }
+      let movedUnits = units.map((u) =>
+        u.id === selected.id ? { ...u, x, y, movesLeft: u.movesLeft - dist } : u,
+      );
+      let movedPlayers = get().players;
+      let movedHuts = get().huts;
+      const hutHere = movedHuts.find((h) => h.x === x && h.y === y);
+      let hutEvent: TurnEvent | null = null;
+      if (hutHere) {
+        const movedSelected = movedUnits.find((u) => u.id === selected.id);
+        if (movedSelected) {
+          const result = rollHutReward(movedSelected, hutHere, {
+            huts: movedHuts,
+            players: movedPlayers,
+            units: movedUnits,
+            cities: get().cities,
+            map,
+          });
+          movedHuts = result.huts;
+          movedPlayers = result.players;
+          movedUnits = result.units;
+          if (movedSelected.ownerIdx === HUMAN_IDX) {
+            hutEvent = { kind: 'event', text: hutEventText(result.reward) };
+          }
+        }
+      }
       set({
-        units: units.map((u) =>
-          u.id === selected.id ? { ...u, x, y, movesLeft: u.movesLeft - dist } : u,
-        ),
+        units: movedUnits,
+        players: movedPlayers,
+        huts: movedHuts,
+        turnEvents: hutEvent ? [...get().turnEvents, hutEvent] : get().turnEvents,
       });
       autosave(get());
       return;
@@ -1394,6 +1533,28 @@ export const useGame = create<GameState>((set, get) => ({
       }
     }
 
+    // Goody-hut pickup pass: any unit standing on a hut tile triggers the
+    // hut and removes it. Iterate by hut so we only roll once per village
+    // even if multiple units somehow share the tile.
+    let workingHuts = get().huts;
+    for (const hut of [...workingHuts]) {
+      const visitor = workingUnits.find((u) => u.x === hut.x && u.y === hut.y);
+      if (!visitor) continue;
+      const result = rollHutReward(visitor, hut, {
+        huts: workingHuts,
+        players: workingPlayers,
+        units: workingUnits,
+        cities: workingCities,
+        map,
+      });
+      workingHuts = result.huts;
+      workingPlayers = result.players;
+      workingUnits = result.units;
+      if (visitor.ownerIdx === HUMAN_IDX) {
+        events.push({ kind: 'event', text: hutEventText(result.reward) });
+      }
+    }
+
     const prevOver = get().gameOver;
     set({
       turn: newTurn,
@@ -1404,6 +1565,7 @@ export const useGame = create<GameState>((set, get) => ({
       cities: workingCities,
       improvements: workingImprovements,
       wonders: workingWonders,
+      huts: workingHuts,
       relations: workingRelations,
       lastBattle: lastAIBattle,
       turnEvents: events,

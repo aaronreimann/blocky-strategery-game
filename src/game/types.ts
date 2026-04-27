@@ -99,3 +99,15 @@ export type City = {
   production: number;
   focus: CityFocus;
 };
+
+export type Hut = {
+  x: number;
+  y: number;
+};
+
+export type HutReward =
+  | { kind: 'gold'; amount: number }
+  | { kind: 'science'; amount: number }
+  | { kind: 'tech'; tech: TechId }
+  | { kind: 'unit'; unit: UnitKind }
+  | { kind: 'empty' };
