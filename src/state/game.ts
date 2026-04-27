@@ -75,6 +75,8 @@ type GameState = {
   tapTile: (x: number, y: number) => void;
   foundCity: () => void;
   setCityBuild: (cityId: string, target: CityBuildTarget) => void;
+  enqueueBuild: (cityId: string, target: CityBuildTarget) => void;
+  removeFromQueue: (cityId: string, idx: number) => void;
   setCityFocus: (cityId: string, focus: CityFocus) => void;
   setResearch: (tech: TechId) => void;
   startWork: (kind: ImprovementKind) => void;
@@ -273,6 +275,7 @@ export const useGame = create<GameState>((set, get) => ({
         food: c.food ?? 0,
         buildings: c.buildings ?? [],
         building,
+        buildQueue: c.buildQueue ?? [],
         focus: c.focus ?? 'balanced',
       };
     });
@@ -537,6 +540,7 @@ export const useGame = create<GameState>((set, get) => ({
       food: 0,
       buildings: [],
       building: { kind: 'unit', unit: 'footman' },
+      buildQueue: [],
       production: 0,
       focus: 'balanced',
     };
@@ -555,6 +559,31 @@ export const useGame = create<GameState>((set, get) => ({
     set({
       cities: get().cities.map((c) =>
         c.id === cityId ? { ...c, building: target } : c,
+      ),
+    });
+    autosave(get());
+  },
+
+  enqueueBuild: (cityId, target) => {
+    if (get().gameOver) return;
+    set({
+      cities: get().cities.map((c) => {
+        if (c.id !== cityId) return c;
+        if (!c.building) return { ...c, building: target };
+        if (c.buildQueue.length >= 5) return c;
+        return { ...c, buildQueue: [...c.buildQueue, target] };
+      }),
+    });
+    autosave(get());
+  },
+
+  removeFromQueue: (cityId, idx) => {
+    if (get().gameOver) return;
+    set({
+      cities: get().cities.map((c) =>
+        c.id === cityId
+          ? { ...c, buildQueue: c.buildQueue.filter((_, i) => i !== idx) }
+          : c,
       ),
     });
     autosave(get());
@@ -928,9 +957,13 @@ export const useGame = create<GameState>((set, get) => ({
             text: `${city.name} built a ${UNIT[unitKind].name}.`,
           });
         }
-        // For AI cities, pick the next build dynamically based on need.
+        // Pick next build: queue first, then AI selection, then repeat.
         let nextBuilding: CityBuildTarget = city.building;
-        if (city.ownerIdx !== HUMAN_IDX) {
+        let nextQueue = city.buildQueue;
+        if (city.buildQueue.length > 0) {
+          nextBuilding = city.buildQueue[0];
+          nextQueue = city.buildQueue.slice(1);
+        } else if (city.ownerIdx !== HUMAN_IDX) {
           const owner = players.find((p) => p.idx === city.ownerIdx);
           nextBuilding = pickAINextBuild(
             city,
@@ -946,21 +979,31 @@ export const useGame = create<GameState>((set, get) => ({
           food: nextFood,
           production: accrued - cost,
           building: nextBuilding,
+          buildQueue: nextQueue,
         };
       }
+
+      // Pick the next build after a building/wonder completes: queue if any,
+      // otherwise revert to a footman so the city keeps producing.
+      const fallback: CityBuildTarget = { kind: 'unit', unit: 'footman' };
+      const nextFromQueue: CityBuildTarget =
+        city.buildQueue.length > 0 ? city.buildQueue[0] : fallback;
+      const nextQueueAfter =
+        city.buildQueue.length > 0 ? city.buildQueue.slice(1) : city.buildQueue;
 
       // Building or wonder completed.
       if (city.building.kind === 'wonder') {
         const wonderKind = city.building.wonder;
         // If someone (anyone!) already built this wonder, refund nothing and
-        // revert to footman.
+        // revert to next build.
         if (workingWonders.some((w) => w.kind === wonderKind)) {
           return {
             ...city,
             population: nextPop,
             food: nextFood,
             production: 0,
-            building: { kind: 'unit', unit: 'footman' },
+            building: nextFromQueue,
+            buildQueue: nextQueueAfter,
           };
         }
         workingWonders = [
@@ -978,11 +1021,12 @@ export const useGame = create<GameState>((set, get) => ({
           population: nextPop,
           food: nextFood,
           production: 0,
-          building: { kind: 'unit', unit: 'footman' },
+          building: nextFromQueue,
+          buildQueue: nextQueueAfter,
         };
       }
 
-      // Regular building completed: add to buildings, default back to footman.
+      // Regular building completed: add to buildings, take next from queue.
       const kind = city.building.building;
       if (city.buildings.includes(kind)) {
         return {
@@ -990,7 +1034,8 @@ export const useGame = create<GameState>((set, get) => ({
           population: nextPop,
           food: nextFood,
           production: 0,
-          building: { kind: 'unit', unit: 'footman' },
+          building: nextFromQueue,
+          buildQueue: nextQueueAfter,
         };
       }
       if (city.ownerIdx === HUMAN_IDX) {
@@ -1005,7 +1050,8 @@ export const useGame = create<GameState>((set, get) => ({
         food: nextFood,
         production: 0,
         buildings: [...city.buildings, kind],
-        building: { kind: 'unit', unit: 'footman' },
+        building: nextFromQueue,
+        buildQueue: nextQueueAfter,
       };
     });
 

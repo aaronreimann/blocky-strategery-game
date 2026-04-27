@@ -69,6 +69,8 @@ export default function Hud() {
   const endTurn = useGame((s) => s.endTurn);
   const foundCity = useGame((s) => s.foundCity);
   const setCityBuild = useGame((s) => s.setCityBuild);
+  const enqueueBuild = useGame((s) => s.enqueueBuild);
+  const removeFromQueue = useGame((s) => s.removeFromQueue);
   const setCityFocus = useGame((s) => s.setCityFocus);
   const startWork = useGame((s) => s.startWork);
   const cancelWork = useGame((s) => s.cancelWork);
@@ -404,6 +406,28 @@ export default function Hud() {
                   </Text>
                 ) : null}
                 <Text style={styles.cardMeta}>Building: {buildTargetLabel}</Text>
+                {selectedCity.buildQueue.length > 0 ? (
+                  <View style={styles.queueRow}>
+                    <Text style={styles.queueLabel}>Up next:</Text>
+                    {selectedCity.buildQueue.map((q, i) => {
+                      const label =
+                        q.kind === 'unit'
+                          ? UNIT[q.unit].name
+                          : q.kind === 'building'
+                            ? BUILDING[q.building].name
+                            : WONDER[q.wonder].name;
+                      return (
+                        <Pressable
+                          key={`q-${i}`}
+                          style={styles.queueChip}
+                          onPress={() => removeFromQueue(selectedCity.id, i)}
+                        >
+                          <Text style={styles.queueChipText}>{label} ✕</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                ) : null}
                 {selectedCity.building &&
                 selectedCity.production < buildCost ? (() => {
                   const remaining = buildCost - selectedCity.production;
@@ -470,6 +494,7 @@ export default function Hud() {
                     );
                   })}
                 </View>
+                <Text style={styles.queueHint}>Tap to build · long-press to queue</Text>
                 <View style={styles.buildRow}>
                   {cityTab === 'wonders'
                     ? WONDER_KINDS.filter(
@@ -489,6 +514,7 @@ export default function Hud() {
                             ]}
                             disabled={taken}
                             onPress={() => setCityBuild(selectedCity.id, target)}
+                            onLongPress={() => enqueueBuild(selectedCity.id, target)}
                           >
                             <Text
                               style={[
@@ -539,6 +565,7 @@ export default function Hud() {
                             key={`u-${kind}`}
                             style={[styles.buildBtn, cur && styles.buildBtnActive]}
                             onPress={() => setCityBuild(selectedCity.id, target)}
+                            onLongPress={() => enqueueBuild(selectedCity.id, target)}
                           >
                             <Text
                               style={[
@@ -576,6 +603,7 @@ export default function Hud() {
                             ]}
                             disabled={owned}
                             onPress={() => setCityBuild(selectedCity.id, target)}
+                            onLongPress={() => enqueueBuild(selectedCity.id, target)}
                           >
                             <Text
                               style={[
@@ -791,6 +819,24 @@ const styles = StyleSheet.create({
   actionAutoOnText: { color: '#0a1729' },
   workRow: { marginTop: 6 },
   unitActionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 },
+  queueRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 4,
+  },
+  queueLabel: { color: THEME.inkMuted, fontSize: 11 },
+  queueChip: {
+    backgroundColor: THEME.bg,
+    borderColor: THEME.border,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+  },
+  queueChipText: { color: THEME.ink, fontSize: 11, fontWeight: '700' },
+  queueHint: { color: THEME.inkMuted, fontSize: 10, marginTop: 8, fontStyle: 'italic' },
   focusRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
   focusLabel: { color: THEME.inkMuted, fontSize: 11 },
   focusBtn: {

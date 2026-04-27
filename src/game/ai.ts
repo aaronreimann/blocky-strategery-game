@@ -293,6 +293,7 @@ export function runAITurn(input: AITurnInput): AITurnOutput {
           food: 0,
           buildings: [],
           building: { kind: 'unit', unit: 'footman' },
+          buildQueue: [],
           production: 0,
           focus: 'roads',
         };

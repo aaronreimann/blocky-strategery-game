@@ -95,6 +95,7 @@ export type City = {
   food: number;
   buildings: BuildingKind[];
   building: CityBuildTarget | null;
+  buildQueue: CityBuildTarget[];
   production: number;
   focus: CityFocus;
 };
