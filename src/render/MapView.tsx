@@ -515,17 +515,37 @@ export default function MapView({
     const ROAD_INK = '#6b4a26';
     const BASE_W = 5;
     const INK_W = 2;
-    // Deterministic per-segment wiggle. Two control points, each offset
-    // perpendicular to the segment by a small amount derived from a hash so
-    // the road meanders the same way every render but differently per tile.
-    const hash01 = (x: number, y: number, dx: number, dy: number, salt: number) => {
-      let h = (x * 73856093) ^ (y * 19349663) ^ ((dx + 2) * 83492791) ^ ((dy + 2) * 2971215073) ^ (salt * 1376312589);
+    // Deterministic per-(segment, sample) hash → [0, 1).
+    const hash01 = (
+      x: number,
+      y: number,
+      dx: number,
+      dy: number,
+      salt: number,
+    ) => {
+      let h =
+        (x * 73856093) ^
+        (y * 19349663) ^
+        ((dx + 2) * 83492791) ^
+        ((dy + 2) * 2971215073) ^
+        (salt * 1376312589);
       h = (h ^ (h >>> 13)) >>> 0;
       h = ((h * 1597334677) ^ (h >>> 16)) >>> 0;
       return (h & 0xffff) / 0xffff;
     };
-    const wander = (x: number, y: number, dx: number, dy: number, salt: number) =>
-      (hash01(x, y, dx, dy, salt) * 2 - 1) * 4; // ±4px
+    const wander = (
+      x: number,
+      y: number,
+      dx: number,
+      dy: number,
+      salt: number,
+      amp: number,
+    ) => (hash01(x, y, dx, dy, salt) * 2 - 1) * amp;
+    // 5 interior samples per segment, each pushed perpendicular by up to
+    // ±10px (≈⅓ of a tile). Connect with cubic Bezier through midpoints
+    // (Catmull-Rom-ish) so the path stays smooth instead of zig-zagging.
+    const SAMPLES = 5;
+    const AMP = 10;
     for (const key in improvements) {
       if (improvements[key] !== 'road') continue;
       const [xs, ys] = key.split(',');
@@ -533,80 +553,67 @@ export default function MapView({
       const y = Number(ys);
       const cx = x * TILE_SIZE + TILE_SIZE / 2;
       const cy = y * TILE_SIZE + TILE_SIZE / 2;
-      // Edges to neighbor road tiles (deduped).
       for (let dy = -1; dy <= 1; dy++) {
         for (let dx = -1; dx <= 1; dx++) {
           if (dx === 0 && dy === 0) continue;
           if (!isRoad(x + dx, y + dy)) continue;
-          if (dx > 0 || (dx === 0 && dy > 0)) {
-            const nx = (x + dx) * TILE_SIZE + TILE_SIZE / 2;
-            const ny = (y + dy) * TILE_SIZE + TILE_SIZE / 2;
-            // Perpendicular unit vector (rotate the segment 90°).
-            const sx = nx - cx;
-            const sy = ny - cy;
-            const len = Math.hypot(sx, sy) || 1;
-            const px = -sy / len;
-            const py = sx / len;
-            // Two control points at 1/3 and 2/3 along the segment, each
-            // pushed perpendicular by an independent random amount. This
-            // produces a gentle S-curve rather than a stiff line.
-            const ax = cx + sx / 3;
-            const ay = cy + sy / 3;
-            const bx = cx + (sx * 2) / 3;
-            const by = cy + (sy * 2) / 3;
-            const o1 = wander(x, y, dx, dy, 1);
-            const o2 = wander(x, y, dx, dy, 2);
-            const c1x = ax + px * o1;
-            const c1y = ay + py * o1;
-            const c2x = bx + px * o2;
-            const c2y = by + py * o2;
-            const path = `M ${cx} ${cy} C ${c1x} ${c1y} ${c2x} ${c2y} ${nx} ${ny}`;
-            base.push(
-              <Path
-                key={`rd-b-${key}-${dx}${dy}`}
-                path={path}
-                color={ROAD_BASE}
-                style="stroke"
-                strokeWidth={BASE_W}
-                strokeCap="round"
-              />,
-            );
-            top.push(
-              <Path
-                key={`rd-t-${key}-${dx}${dy}`}
-                path={path}
-                color={ROAD_INK}
-                style="stroke"
-                strokeWidth={INK_W}
-                strokeCap="round"
-                strokeJoin="round"
-              />,
-            );
-            // Dashed-look: dot every ~8 units along the curve to suggest
-            // worn cobbles. Cheap to draw a few small circles per segment.
-            for (let t = 0.2; t < 1; t += 0.2) {
-              const it = 1 - t;
-              const bxx =
-                it * it * it * cx +
-                3 * it * it * t * c1x +
-                3 * it * t * t * c2x +
-                t * t * t * nx;
-              const byy =
-                it * it * it * cy +
-                3 * it * it * t * c1y +
-                3 * it * t * t * c2y +
-                t * t * t * ny;
-              top.push(
-                <Circle
-                  key={`rd-d-${key}-${dx}${dy}-${t}`}
-                  cx={bxx}
-                  cy={byy}
-                  r={0.7}
-                  color={ROAD_INK}
-                />,
-              );
-            }
+          if (!(dx > 0 || (dx === 0 && dy > 0))) continue;
+          const nx = (x + dx) * TILE_SIZE + TILE_SIZE / 2;
+          const ny = (y + dy) * TILE_SIZE + TILE_SIZE / 2;
+          const sx = nx - cx;
+          const sy = ny - cy;
+          const len = Math.hypot(sx, sy) || 1;
+          const px = -sy / len;
+          const py = sx / len;
+          // Build the polyline of (interior) sample points.
+          const pts: { x: number; y: number }[] = [{ x: cx, y: cy }];
+          for (let i = 1; i <= SAMPLES; i++) {
+            const t = i / (SAMPLES + 1);
+            const bx = cx + sx * t;
+            const by = cy + sy * t;
+            // Larger wander in the middle, tapering near the endpoints so
+            // segments meet cleanly at tile centers.
+            const taper = Math.sin(t * Math.PI); // 0 at ends, 1 in middle
+            const o = wander(x, y, dx, dy, i, AMP) * taper;
+            pts.push({ x: bx + px * o, y: by + py * o });
           }
+          pts.push({ x: nx, y: ny });
+          // Smooth cubic through points using a Catmull-Rom → Bezier
+          // conversion (alpha=0.5 for centripetal feel).
+          let path = `M ${pts[0].x.toFixed(2)} ${pts[0].y.toFixed(2)}`;
+          for (let i = 0; i < pts.length - 1; i++) {
+            const p0 = pts[Math.max(0, i - 1)];
+            const p1 = pts[i];
+            const p2 = pts[i + 1];
+            const p3 = pts[Math.min(pts.length - 1, i + 2)];
+            const c1x = p1.x + (p2.x - p0.x) / 6;
+            const c1y = p1.y + (p2.y - p0.y) / 6;
+            const c2x = p2.x - (p3.x - p1.x) / 6;
+            const c2y = p2.y - (p3.y - p1.y) / 6;
+            path += ` C ${c1x.toFixed(2)} ${c1y.toFixed(2)} ${c2x.toFixed(2)} ${c2y.toFixed(2)} ${p2.x.toFixed(2)} ${p2.y.toFixed(2)}`;
+          }
+          base.push(
+            <Path
+              key={`rd-b-${key}-${dx}${dy}`}
+              path={path}
+              color={ROAD_BASE}
+              style="stroke"
+              strokeWidth={BASE_W}
+              strokeCap="round"
+              strokeJoin="round"
+            />,
+          );
+          top.push(
+            <Path
+              key={`rd-t-${key}-${dx}${dy}`}
+              path={path}
+              color={ROAD_INK}
+              style="stroke"
+              strokeWidth={INK_W}
+              strokeCap="round"
+              strokeJoin="round"
+            />,
+          );
         }
       }
       // Junction node: a small disc so isolated/branching tiles read.
