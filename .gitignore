@@ -45,3 +45,4 @@ android/.gradle/
 # Logs / coverage
 *.log
 coverage/
+remove_white_bg*.py
