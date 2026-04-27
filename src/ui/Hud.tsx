@@ -152,7 +152,7 @@ export default function Hud() {
           />
           {researching ? (
             <Text style={styles.pillText}>
-              {science}/{TECH[researching].cost} · {TECH[researching].name}
+              {science}/{TECH[researching].cost}
             </Text>
           ) : (
             <Text style={[styles.pillText, styles.pillAlertText]}>
