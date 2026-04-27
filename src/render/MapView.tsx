@@ -8,6 +8,8 @@ import {
   Skia,
   Text as SkText,
   useFont,
+  useImage,
+  Image as SkiaImage,
   type SkPath,
 } from '@shopify/react-native-skia';
 import { useEffect, useMemo } from 'react';
@@ -117,6 +119,9 @@ export default function MapView({
   onSetDestination,
   onTileLongPress,
 }: Props) {
+  const pioneerImg = useImage(require('../../assets/images/icons/icon_wayfarer.png'));
+  const workerImg = useImage(require('../../assets/images/icons/icon_serf.png'));
+  const footmanImg = useImage(require('../../assets/images/icons/icon_footman.png'));
   const { width: screenW, height: screenH } = useWindowDimensions();
 
   // Font Awesome 5 Solid for unit + city icons. While loading we just skip
@@ -906,8 +911,7 @@ export default function MapView({
     for (const u of units) {
       const owner = players[u.ownerIdx];
       const color = owner?.color ?? '#ffffff';
-      const path = iconPath(UNIT_ICON[u.kind]);
-      if (!path) continue;
+      
       const cx = u.x * TILE_SIZE + TILE_SIZE / 2;
       const cy = u.y * TILE_SIZE + TILE_SIZE / 2;
       const ox = cx - ICON_SIZE / 2;
@@ -925,22 +929,58 @@ export default function MapView({
           />,
         );
       }
-      elements.push(
-        <Group
-          key={`u-${u.id}`}
-          transform={[{ translateX: ox }, { translateY: oy }, { scale }]}
-        >
-          <Path
-            path={path}
-            color="rgba(0,0,0,0.6)"
-            transform={[{ translateX: 12 }, { translateY: 12 }]}
-          />
-          <Path path={path} color={color} />
-        </Group>,
-      );
+
+      let img = null;
+      if (u.kind === 'pioneer') img = pioneerImg;
+      else if (u.kind === 'worker') img = workerImg;
+      else if (u.kind === 'footman') img = footmanImg;
+
+      if (img) {
+        // Painted icons render larger than the SVG glyphs and skip the owner-
+        // colored disc; ownership reads from a thin colored ring around the
+        // icon instead so the artwork stays the focal point.
+        const PAINTED_SIZE = TILE_SIZE - 2;
+        const pox = cx - PAINTED_SIZE / 2;
+        const poy = cy - PAINTED_SIZE / 2;
+        elements.push(
+          <Group key={`u-${u.id}`}>
+            <SkiaImage
+              image={img}
+              x={pox}
+              y={poy}
+              width={PAINTED_SIZE}
+              height={PAINTED_SIZE}
+            />
+            <Circle
+              cx={cx}
+              cy={cy}
+              r={PAINTED_SIZE / 2 - 0.5}
+              color={color}
+              style="stroke"
+              strokeWidth={1.5}
+            />
+          </Group>,
+        );
+      } else {
+        const path = iconPath(UNIT_ICON[u.kind]);
+        if (!path) continue;
+        elements.push(
+          <Group
+            key={`u-${u.id}`}
+            transform={[{ translateX: ox }, { translateY: oy }, { scale }]}
+          >
+            <Path
+              path={path}
+              color="rgba(0,0,0,0.6)"
+              transform={[{ translateX: 12 }, { translateY: 12 }]}
+            />
+            <Path path={path} color={color} />
+          </Group>,
+        );
+      }
     }
     return elements;
-  }, [units, players]);
+  }, [units, players, pioneerImg, workerImg, footmanImg]);
 
   const selectionLayer = useMemo(() => {
     let coord: { x: number; y: number } | null = null;

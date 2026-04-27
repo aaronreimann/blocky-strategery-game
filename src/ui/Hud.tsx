@@ -30,9 +30,9 @@ import TutorialOverlay from './TutorialOverlay';
 const HUMAN_IDX_HUD = 0;
 
 const UNIT_ICON_NAME: Record<string, string> = {
-  pioneer: 'wood_axe',
-  worker: 'stone_axe',
-  footman: 'visored_helm',
+  pioneer: 'png_pioneer',
+  worker: 'png_worker',
+  footman: 'png_footman',
   spearman: 'spear_hook',
   horseman: 'horse_head',
   swordsman: 'broadsword',

@@ -1,6 +1,6 @@
 import { Canvas, Group, Path, Skia } from '@shopify/react-native-skia';
 import { useMemo } from 'react';
-import type { StyleProp, ViewStyle } from 'react-native';
+import { Image, type StyleProp, type ViewStyle } from 'react-native';
 
 import {
   ICON_PATHS,
@@ -9,7 +9,7 @@ import {
 } from '@/src/data/gameIcons';
 
 type Props = {
-  name: GameIconName;
+  name: GameIconName | 'png_pioneer' | 'png_worker' | 'png_footman';
   size?: number;
   color?: string;
   style?: StyleProp<ViewStyle>;
@@ -20,7 +20,17 @@ type Props = {
 // new native dependency — it ships with the same Skia we already use for
 // the map rendering.
 export function GameIcon({ name, size = 24, color = '#f5f1e8', style }: Props) {
-  const skPath = useMemo(() => Skia.Path.MakeFromSVGString(ICON_PATHS[name]), [name]);
+  if (name === 'png_pioneer') {
+    return <Image source={require('../../assets/images/icons/icon_wayfarer.png')} style={[{width: size, height: size}, style]} />;
+  }
+  if (name === 'png_worker') {
+    return <Image source={require('../../assets/images/icons/icon_serf.png')} style={[{width: size, height: size}, style]} />;
+  }
+  if (name === 'png_footman') {
+    return <Image source={require('../../assets/images/icons/icon_footman.png')} style={[{width: size, height: size}, style]} />;
+  }
+
+  const skPath = useMemo(() => Skia.Path.MakeFromSVGString(ICON_PATHS[name as GameIconName]), [name]);
   if (!skPath) return null;
   const scale = size / ICON_VIEWBOX;
   return (
