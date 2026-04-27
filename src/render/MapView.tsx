@@ -33,7 +33,7 @@ import { TERRAIN } from '@/src/data/terrain';
 import { type UnitKind } from '@/src/data/units';
 import type { GameMap } from '@/src/game/map';
 import type { City, Hut, Player, Unit } from '@/src/game/types';
-import { cityRadius } from '@/src/game/yields';
+import { cityRadius, computeTradeRoutes } from '@/src/game/yields';
 
 import { pathToTile } from '@/src/game/path';
 import { useGame } from '@/src/state/game';
@@ -412,6 +412,82 @@ export default function MapView({
     const out: React.ReactNode[] = [...fills, ...edges];
     return out;
   }, [cities, players, map.width, map.height]);
+
+  // Trade-route lines: a thin dashed gold line between any two of the human's
+  // cities that share a connected territory component. Only drawn for the
+  // human (idx 0) so AI economies don't visually clutter.
+  const tradeLineLayer = useMemo(() => {
+    const HUMAN = 0;
+    const out: React.ReactNode[] = [];
+    const links = computeTradeRoutes(HUMAN, cities, map);
+    if (links.size === 0) return out;
+    const myCities = cities.filter((c) => c.ownerIdx === HUMAN);
+    // Walk pairs in the same component (rebuild components quickly via the
+    // link counts — same count alone isn't enough; do a tiny BFS again).
+    const territory = new Set<string>();
+    for (const c of myCities) {
+      const r = cityRadius(c.population);
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          const x = c.x + dx;
+          const y = c.y + dy;
+          if (x < 0 || y < 0 || x >= map.width || y >= map.height) continue;
+          territory.add(`${x},${y}`);
+        }
+      }
+    }
+    const visited = new Set<string>();
+    const cityByTile = new Map<string, typeof myCities[number]>();
+    for (const c of myCities) cityByTile.set(`${c.x},${c.y}`, c);
+    for (const start of myCities) {
+      if (visited.has(start.id)) continue;
+      const queue: { x: number; y: number }[] = [{ x: start.x, y: start.y }];
+      const seen = new Set<string>([`${start.x},${start.y}`]);
+      const component: typeof myCities = [];
+      while (queue.length > 0) {
+        const node = queue.shift()!;
+        const cityHere = cityByTile.get(`${node.x},${node.y}`);
+        if (cityHere && !visited.has(cityHere.id)) component.push(cityHere);
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            if (dx === 0 && dy === 0) continue;
+            const nx = node.x + dx;
+            const ny = node.y + dy;
+            const k = `${nx},${ny}`;
+            if (seen.has(k)) continue;
+            if (!territory.has(k)) continue;
+            seen.add(k);
+            queue.push({ x: nx, y: ny });
+          }
+        }
+      }
+      for (const cc of component) visited.add(cc.id);
+      // Connect every pair in this component with a dashed line.
+      for (let i = 0; i < component.length; i++) {
+        for (let j = i + 1; j < component.length; j++) {
+          const a = component[i];
+          const b = component[j];
+          const ax = a.x * TILE_SIZE + TILE_SIZE / 2;
+          const ay = a.y * TILE_SIZE + TILE_SIZE / 2;
+          const bx = b.x * TILE_SIZE + TILE_SIZE / 2;
+          const by = b.y * TILE_SIZE + TILE_SIZE / 2;
+          out.push(
+            <Path
+              key={`tr-${a.id}-${b.id}`}
+              path={`M ${ax} ${ay} L ${bx} ${by}`}
+              color="#facc15"
+              style="stroke"
+              strokeWidth={1.5}
+              opacity={0.75}
+            >
+              <DashPathEffect intervals={[3, 4]} />
+            </Path>,
+          );
+        }
+      }
+    }
+    return out;
+  }, [cities, map]);
 
   const resourceLayer = useMemo(() => {
     const scale = RESOURCE_ICON_SIZE / ICON_VIEWBOX;
@@ -1097,6 +1173,7 @@ export default function MapView({
             {destinationPathLayer}
             {destLayer}
             {hutLayer}
+            {tradeLineLayer}
             {cityLayer}
             {unitLayer}
             {workIndicatorLayer}

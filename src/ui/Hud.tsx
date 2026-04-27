@@ -14,7 +14,7 @@ import {
   attackOdds,
   defenderCombatMod,
 } from '@/src/game/combat';
-import { computeCityYields, foodNeededToGrow } from '@/src/game/yields';
+import { computeCityYields, computeTradeRoutes, foodNeededToGrow } from '@/src/game/yields';
 import {
   CITY_FOCUSES,
   CITY_FOCUS_LABELS,
@@ -653,7 +653,12 @@ export default function Hud() {
           </View>
         ) : selectedCity ? (
           (() => {
-            const yields = map ? computeCityYields(selectedCity, map, wonders, improvements) : null;
+            const tradeBonus = map
+              ? computeTradeRoutes(selectedCity.ownerIdx, cities, map).get(selectedCity.id) ?? 0
+              : 0;
+            const yields = map
+              ? computeCityYields(selectedCity, map, wonders, improvements, tradeBonus)
+              : null;
             const growthThreshold = foodNeededToGrow(selectedCity.population);
             const buildTargetLabel = (() => {
               const b = selectedCity.building;
@@ -694,6 +699,7 @@ export default function Hud() {
                     {yields.food >= 0 ? '+' : ''}
                     {yields.food}/t) · Prod {selectedCity.production}/{buildCost} (+
                     {yields.prod}/t) · Gold +{yields.gold}/t
+                    {tradeBonus > 0 ? ` (incl. trade +${tradeBonus})` : ''}
                   </Text>
                 ) : null}
                 {yields?.disorder ? (

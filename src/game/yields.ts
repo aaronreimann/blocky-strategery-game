@@ -61,6 +61,73 @@ export function cityRadius(population: number): number {
   return 1;
 }
 
+// Trade routes: two of a player's cities form a route if they're linked by
+// an unbroken chain of that player's territory tiles (cities project a
+// radius via cityRadius). Each city earns +1 gold per *other* city it
+// reaches through that chain — encourages settling close enough that your
+// borders touch, and rewards building toward your neighbors.
+//
+// Returns: Map<cityId, number of other linked cities in the same component>.
+export function computeTradeRoutes(
+  playerIdx: number,
+  cities: { id: string; ownerIdx: number; x: number; y: number; population: number }[],
+  map: GameMap,
+): Map<string, number> {
+  const myCities = cities.filter((c) => c.ownerIdx === playerIdx);
+  const result = new Map<string, number>();
+  if (myCities.length <= 1) {
+    for (const c of myCities) result.set(c.id, 0);
+    return result;
+  }
+  // Union of territory tiles (every tile in cityRadius of any of my cities).
+  const territory = new Set<string>();
+  for (const c of myCities) {
+    const r = cityRadius(c.population);
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        const x = c.x + dx;
+        const y = c.y + dy;
+        if (x < 0 || y < 0 || x >= map.width || y >= map.height) continue;
+        territory.add(`${x},${y}`);
+      }
+    }
+  }
+  // BFS from each unvisited city through territory tiles to find its
+  // connected component of cities, then assign each member the size minus 1.
+  const visited = new Set<string>();
+  const cityByTile = new Map<string, typeof myCities[number]>();
+  for (const c of myCities) cityByTile.set(`${c.x},${c.y}`, c);
+  for (const start of myCities) {
+    if (visited.has(start.id)) continue;
+    const queue: { x: number; y: number }[] = [{ x: start.x, y: start.y }];
+    const seen = new Set<string>([`${start.x},${start.y}`]);
+    const component: typeof myCities = [];
+    while (queue.length > 0) {
+      const node = queue.shift()!;
+      const cityHere = cityByTile.get(`${node.x},${node.y}`);
+      if (cityHere && !visited.has(cityHere.id)) component.push(cityHere);
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (dx === 0 && dy === 0) continue;
+          const nx = node.x + dx;
+          const ny = node.y + dy;
+          const k = `${nx},${ny}`;
+          if (seen.has(k)) continue;
+          if (!territory.has(k)) continue;
+          seen.add(k);
+          queue.push({ x: nx, y: ny });
+        }
+      }
+    }
+    const links = component.length - 1;
+    for (const cc of component) {
+      visited.add(cc.id);
+      result.set(cc.id, links);
+    }
+  }
+  return result;
+}
+
 export function tilesInCityRadius(
   city: { x: number; y: number; population: number },
   map: GameMap,
@@ -83,6 +150,7 @@ export function computeCityYields(
   map: GameMap,
   wonders: Wonder[] = [],
   improvements: ImprovementMap = {},
+  tradeBonus: number = 0,
 ): CityYields {
   const ownerWonders = wonders.filter((w) => w.ownerIdx === city.ownerIdx);
   const hasPyramids = ownerWonders.some((w) => w.kind === 'pyramids');
@@ -137,6 +205,9 @@ export function computeCityYields(
   let gold = trade;
   if (city.buildings.includes('marketplace')) gold = Math.floor(gold * 1.5);
   if (hasColossusHere) gold = Math.floor(gold * 1.5);
+  // Trade-route gold is added after multipliers — represents external
+  // commerce, not local terrain trade, so marketplace doesn't compound it.
+  gold += tradeBonus;
 
   const templeHappy = city.buildings.includes('temple') ? 1 : 0;
   const courthouseHappy = city.buildings.includes('courthouse') ? 1 : 0;

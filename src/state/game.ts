@@ -37,7 +37,7 @@ import {
   type VictoryConditions,
   type Wonder,
 } from '@/src/game/types';
-import { cityRadius, computeCityYields, foodNeededToGrow } from '@/src/game/yields';
+import { cityRadius, computeCityYields, computeTradeRoutes, foodNeededToGrow } from '@/src/game/yields';
 import { computeCurrentVisibility, mergeExplored, pickExploreTarget } from '@/src/game/visibility';
 import { cityNameForTribe } from '@/src/data/cityNames';
 
@@ -1556,11 +1556,25 @@ export const useGame = create<GameState>((set, get) => ({
       });
     }
 
+    // Trade routes: per-player connectivity over territory tiles. Computed
+    // once per player so each city in endTurn can pick up its share.
+    const tradeByCity = new Map<string, number>();
+    {
+      const seenPlayers = new Set<number>();
+      for (const c of workingCities) {
+        if (seenPlayers.has(c.ownerIdx)) continue;
+        seenPlayers.add(c.ownerIdx);
+        const m = computeTradeRoutes(c.ownerIdx, workingCities, map);
+        for (const [id, n] of m) tradeByCity.set(id, n);
+      }
+    }
+
     // Science + gold: aggregate per-player gain from each city's yields.
     const scienceByPlayer = new Map<number, number>();
     const goldByPlayer = new Map<number, number>();
     for (const c of workingCities) {
-      const y = computeCityYields(c, map, workingWonders, workingImprovements);
+      const tradeBonus = tradeByCity.get(c.id) ?? 0;
+      const y = computeCityYields(c, map, workingWonders, workingImprovements, tradeBonus);
       const mult = aiBonus(c.ownerIdx);
       scienceByPlayer.set(
         c.ownerIdx,
