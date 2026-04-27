@@ -337,7 +337,8 @@ export default function MapView({
         }
       }
     }
-    const out: React.ReactNode[] = [];
+    const fills: React.ReactNode[] = [];
+    const edges: React.ReactNode[] = [];
     const STROKE = 2;
     const DASH: number[] = [5, 4];
     const dashEdge = (key: string, path: string, color: string) => (
@@ -357,7 +358,7 @@ export default function MapView({
       const y = Number(ys);
       const color = players[ownerIdx]?.color ?? '#ffffff';
       // Soft fill (low alpha so terrain stays readable).
-      out.push(
+      fills.push(
         <Rect
           key={`bf-${k}`}
           x={x * TILE_SIZE}
@@ -376,12 +377,12 @@ export default function MapView({
       const left = ownerByTile.get(`${x - 1},${y}`);
       const right = ownerByTile.get(`${x + 1},${y}`);
       if (top !== ownerIdx) {
-        out.push(
+        edges.push(
           dashEdge(`bt-${k}`, `M ${tx} ${ty + 1} L ${tx + TILE_SIZE} ${ty + 1}`, color),
         );
       }
       if (bottom !== ownerIdx) {
-        out.push(
+        edges.push(
           dashEdge(
             `bb-${k}`,
             `M ${tx} ${ty + TILE_SIZE - 1} L ${tx + TILE_SIZE} ${ty + TILE_SIZE - 1}`,
@@ -390,12 +391,12 @@ export default function MapView({
         );
       }
       if (left !== ownerIdx) {
-        out.push(
+        edges.push(
           dashEdge(`bl-${k}`, `M ${tx + 1} ${ty} L ${tx + 1} ${ty + TILE_SIZE}`, color),
         );
       }
       if (right !== ownerIdx) {
-        out.push(
+        edges.push(
           dashEdge(
             `br-${k}`,
             `M ${tx + TILE_SIZE - 1} ${ty} L ${tx + TILE_SIZE - 1} ${ty + TILE_SIZE}`,
@@ -404,6 +405,7 @@ export default function MapView({
         );
       }
     }
+    const out: React.ReactNode[] = [...fills, ...edges];
     return out;
   }, [cities, players, map.width, map.height]);
 
