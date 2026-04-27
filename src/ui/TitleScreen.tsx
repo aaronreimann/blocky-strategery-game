@@ -312,12 +312,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 24,
   },
-  header: { alignItems: 'center', marginTop: -40 },
+  header: { alignItems: 'center', marginTop: -60 },
   bottomGroup: {
     position: 'absolute',
     left: 24,
     right: 24,
-    bottom: 24,
+    bottom: 4,
     alignItems: 'center',
   },
   logo: {
