@@ -18,7 +18,7 @@ import { checkGameOver } from '@/src/game/gameOver';
 import { nextCityId, nextUnitId, parseIdNum, syncIdCounters } from '@/src/game/ids';
 import { buildInitialState } from '@/src/game/init';
 import { chebyshev, type GameMap } from '@/src/game/map';
-import { nextStepToFriendlyCity, nextStepToTiles } from '@/src/game/path';
+import { nextStepToTiles } from '@/src/game/path';
 import {
   relationKey,
   type City,
@@ -32,7 +32,7 @@ import {
   type Unit,
   type Wonder,
 } from '@/src/game/types';
-import { computeCityYields, foodNeededToGrow } from '@/src/game/yields';
+import { cityRadius, computeCityYields, foodNeededToGrow } from '@/src/game/yields';
 
 import { appendHistory, loadSlot, saveSlot } from './saves';
 
@@ -1117,10 +1117,12 @@ export const useGame = create<GameState>((set, get) => ({
       }
     }
 
-    // Auto-Worker pass: any Worker whose city has focus='roads' OR whose
-    // own autoMode flag is set (and isn't already busy / has no manual
-    // destination) either builds on the current tile or steps toward the
-    // closest friendly city.
+    // Auto-Worker pass. A Worker is on auto if `u.autoMode` is true OR any
+    // of its owner's cities is focused on 'roads'. Auto Workers walk their
+    // owner's territory (tiles within cityRadius of any friendly city) and
+    // pick the highest-value improvement: irrigation on grass/plains,
+    // mine on hills, road everywhere else. If a roads-focused city exists,
+    // every territory tile is treated as a road target instead.
     const playersWantingRoads = new Set(
       workingCities.filter((c) => c.focus === 'roads').map((c) => c.ownerIdx),
     );
@@ -1128,29 +1130,96 @@ export const useGame = create<GameState>((set, get) => ({
       (u) => u.kind === 'worker' && u.autoMode,
     );
     if (playersWantingRoads.size > 0 || anyWorkerOnAuto) {
+      // Precompute per-owner territory once to avoid O(workers × cities × r²).
+      const territoryByOwner = new Map<number, Set<string>>();
+      for (const c of workingCities) {
+        const r = cityRadius(c.population);
+        let set = territoryByOwner.get(c.ownerIdx);
+        if (!set) {
+          set = new Set();
+          territoryByOwner.set(c.ownerIdx, set);
+        }
+        for (let dy = -r; dy <= r; dy++) {
+          for (let dx = -r; dx <= r; dx++) {
+            const x = c.x + dx;
+            const y = c.y + dy;
+            if (x < 0 || y < 0 || x >= map.width || y >= map.height) continue;
+            set.add(`${x},${y}`);
+          }
+        }
+      }
+      const cityTiles = new Set(workingCities.map((c) => `${c.x},${c.y}`));
+      const bestImprovement = (
+        terrain: string,
+        roadsOnly: boolean,
+      ): ImprovementKind => {
+        if (roadsOnly) return 'road';
+        if (terrain === 'grassland' || terrain === 'plains') return 'irrigation';
+        if (terrain === 'hills') return 'mine';
+        return 'road';
+      };
       workingUnits = workingUnits.map((u) => {
         if (u.kind !== 'worker') return u;
-        if (!playersWantingRoads.has(u.ownerIdx) && !u.autoMode) return u;
+        const onAuto = u.autoMode || playersWantingRoads.has(u.ownerIdx);
+        if (!onAuto) return u;
         if (u.workingOn) return u;
         if (u.destination) return u; // manual order takes priority
         if (u.movesLeft <= 0) return u;
-        const here = tileKey(u.x, u.y);
-        const onCity = workingCities.some((c) => c.x === u.x && c.y === u.y);
-        if (!onCity && !workingImprovements[here]) {
+
+        const territory = territoryByOwner.get(u.ownerIdx);
+        if (!territory || territory.size === 0) return u;
+        const roadsOnly = playersWantingRoads.has(u.ownerIdx);
+
+        // Build a list of improvable tiles inside the owner's territory.
+        type Cand = { x: number; y: number; imp: ImprovementKind; pri: number };
+        const candidates: Cand[] = [];
+        for (const k of territory) {
+          if (workingImprovements[k]) continue; // already improved
+          if (cityTiles.has(k)) continue;       // never improve a city center
+          const [xs, ys] = k.split(',');
+          const x = Number(xs);
+          const y = Number(ys);
+          const tile = map.tiles[y * map.width + x];
+          if (!TERRAIN[tile.terrain].passable) continue;
+          const imp = bestImprovement(tile.terrain, roadsOnly);
+          // Priority: irrigation 0, mine 1, road 2 — lower is better.
+          const pri = imp === 'irrigation' ? 0 : imp === 'mine' ? 1 : 2;
+          candidates.push({ x, y, imp, pri });
+        }
+        if (candidates.length === 0) return u; // territory fully improved — idle
+
+        // If we're standing on a candidate, build it now.
+        const here = candidates.find((c) => c.x === u.x && c.y === u.y);
+        if (here) {
           return {
             ...u,
-            workingOn: 'road' as const,
-            workTurnsLeft: IMPROVEMENT.road.buildTurns,
+            workingOn: here.imp,
+            workTurnsLeft: IMPROVEMENT[here.imp].buildTurns,
             movesLeft: 0,
           };
         }
-        const next = nextStepToFriendlyCity(u, workingCities, workingUnits, map);
-        if (!next) return u;
-        const blockedByFriendly = workingUnits.some(
-          (o) =>
-            o.id !== u.id && o.x === next.x && o.y === next.y && o.ownerIdx === u.ownerIdx,
+
+        // Otherwise, pick the best (priority, then closest) and step toward it.
+        candidates.sort((a, b) => {
+          if (a.pri !== b.pri) return a.pri - b.pri;
+          return chebyshev(u.x, u.y, a.x, a.y) - chebyshev(u.x, u.y, b.x, b.y);
+        });
+        const target = candidates[0];
+        const blocked = new Set<string>();
+        for (const o of workingUnits) {
+          if (o.id !== u.id) blocked.add(`${o.x},${o.y}`);
+        }
+        for (const c of workingCities) {
+          if (c.ownerIdx !== u.ownerIdx) blocked.add(`${c.x},${c.y}`);
+        }
+        const next = nextStepToTiles(
+          { x: u.x, y: u.y },
+          new Set([`${target.x},${target.y}`]),
+          blocked,
+          map,
+          u.kind,
         );
-        if (blockedByFriendly) return u;
+        if (!next) return u;
         return { ...u, x: next.x, y: next.y, movesLeft: u.movesLeft - 1 };
       });
     }

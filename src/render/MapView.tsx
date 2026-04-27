@@ -30,6 +30,7 @@ import { TERRAIN } from '@/src/data/terrain';
 import { type UnitKind } from '@/src/data/units';
 import type { GameMap } from '@/src/game/map';
 import type { City, Player, Unit } from '@/src/game/types';
+import { cityRadius } from '@/src/game/yields';
 
 import { pathToTile } from '@/src/game/path';
 import { useGame } from '@/src/state/game';
@@ -281,6 +282,107 @@ export default function MapView({
     () => map.tiles.flatMap((tile) => decorateTile(tile, TILE_SIZE)),
     [map],
   );
+
+  // Owner-colored territory borders. Tile is "owned" by the closest city of
+  // any owner whose radius includes it; ties go to the older city. We draw a
+  // soft tint over each owned tile, then a thin edge line wherever a tile's
+  // neighbor belongs to a different (or no) owner.
+  const borderLayer = useMemo(() => {
+    const ownerByTile = new Map<string, number>();
+    const cityIdByTile = new Map<string, string>();
+    for (const c of cities) {
+      const r = cityRadius(c.population);
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          const x = c.x + dx;
+          const y = c.y + dy;
+          if (x < 0 || y < 0 || x >= map.width || y >= map.height) continue;
+          const k = `${x},${y}`;
+          const existing = ownerByTile.get(k);
+          if (existing === undefined) {
+            ownerByTile.set(k, c.ownerIdx);
+            cityIdByTile.set(k, c.id);
+          } else if (existing !== c.ownerIdx) {
+            // Conflict: keep the older claim (cities are appended over time).
+            // No-op since the existing claim wins.
+          }
+        }
+      }
+    }
+    const out: React.ReactNode[] = [];
+    const EDGE = 2;
+    for (const [k, ownerIdx] of ownerByTile) {
+      const [xs, ys] = k.split(',');
+      const x = Number(xs);
+      const y = Number(ys);
+      const color = players[ownerIdx]?.color ?? '#ffffff';
+      // Soft fill (low alpha so terrain stays readable).
+      out.push(
+        <Rect
+          key={`bf-${k}`}
+          x={x * TILE_SIZE}
+          y={y * TILE_SIZE}
+          width={TILE_SIZE}
+          height={TILE_SIZE}
+          color={`${color}22`}
+        />,
+      );
+      // Edges where the neighbor isn't the same owner.
+      const top = ownerByTile.get(`${x},${y - 1}`);
+      const bottom = ownerByTile.get(`${x},${y + 1}`);
+      const left = ownerByTile.get(`${x - 1},${y}`);
+      const right = ownerByTile.get(`${x + 1},${y}`);
+      if (top !== ownerIdx) {
+        out.push(
+          <Rect
+            key={`bt-${k}`}
+            x={x * TILE_SIZE}
+            y={y * TILE_SIZE}
+            width={TILE_SIZE}
+            height={EDGE}
+            color={color}
+          />,
+        );
+      }
+      if (bottom !== ownerIdx) {
+        out.push(
+          <Rect
+            key={`bb-${k}`}
+            x={x * TILE_SIZE}
+            y={(y + 1) * TILE_SIZE - EDGE}
+            width={TILE_SIZE}
+            height={EDGE}
+            color={color}
+          />,
+        );
+      }
+      if (left !== ownerIdx) {
+        out.push(
+          <Rect
+            key={`bl-${k}`}
+            x={x * TILE_SIZE}
+            y={y * TILE_SIZE}
+            width={EDGE}
+            height={TILE_SIZE}
+            color={color}
+          />,
+        );
+      }
+      if (right !== ownerIdx) {
+        out.push(
+          <Rect
+            key={`br-${k}`}
+            x={(x + 1) * TILE_SIZE - EDGE}
+            y={y * TILE_SIZE}
+            width={EDGE}
+            height={TILE_SIZE}
+            color={color}
+          />,
+        );
+      }
+    }
+    return out;
+  }, [cities, players, map.width, map.height]);
 
   const resourceLayer = useMemo(() => {
     const scale = RESOURCE_ICON_SIZE / ICON_VIEWBOX;
@@ -798,6 +900,7 @@ export default function MapView({
           <Canvas style={{ flex: 1 }}>
             <Group transform={transform}>
             {baseLayer}
+            {borderLayer}
             {decorLayer}
             {farmMineIrrigationLayer}
             {roadLayer}

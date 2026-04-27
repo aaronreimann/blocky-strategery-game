@@ -312,8 +312,8 @@ const styles = StyleSheet.create({
   },
   header: { alignItems: 'center', marginTop: 60, marginBottom: 16 },
   logo: {
-    width: 420,
-    height: 180,
+    width: 600,
+    height: 260,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.6,

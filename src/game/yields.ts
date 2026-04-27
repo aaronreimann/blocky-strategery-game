@@ -50,6 +50,34 @@ export function foodNeededToGrow(population: number): number {
   return 5 + population * 5;
 }
 
+// City borders grow with size. Returns the chebyshev radius the city
+// considers "its territory" (and what tiles it can work).
+//   pop 1–3 → 1 (3×3 = 9 tiles)
+//   pop 4–7 → 2 (5×5 = 25 tiles)
+//   pop 8+  → 3 (7×7 = 49 tiles)
+export function cityRadius(population: number): number {
+  if (population >= 8) return 3;
+  if (population >= 4) return 2;
+  return 1;
+}
+
+export function tilesInCityRadius(
+  city: { x: number; y: number; population: number },
+  map: GameMap,
+): Tile[] {
+  const r = cityRadius(city.population);
+  const out: Tile[] = [];
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      const x = city.x + dx;
+      const y = city.y + dy;
+      if (x < 0 || y < 0 || x >= map.width || y >= map.height) continue;
+      out.push(map.tiles[y * map.width + x]);
+    }
+  }
+  return out;
+}
+
 export function computeCityYields(
   city: City,
   map: GameMap,
@@ -70,9 +98,10 @@ export function computeCityYields(
   let prod = tileProd(center, centerImp);
   let trade = tileTrade(center, centerImp);
 
+  const r = cityRadius(city.population);
   const outer: Tile[] = [];
-  for (let dy = -1; dy <= 1; dy++) {
-    for (let dx = -1; dx <= 1; dx++) {
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
       if (dx === 0 && dy === 0) continue;
       const x = city.x + dx;
       const y = city.y + dy;
