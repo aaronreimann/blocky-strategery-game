@@ -32,6 +32,7 @@ import { THEME } from './palette';
 import ScoreScreen from './ScoreScreen';
 import TechScreen from './TechScreen';
 import TilePickerPopup from './TilePickerPopup';
+import TileYieldTooltip from './TileYieldTooltip';
 import TutorialOverlay from './TutorialOverlay';
 import WonderOverlay from './WonderOverlay';
 
@@ -115,6 +116,8 @@ export default function Hud() {
   const dismissTurnEvents = useGame((s) => s.dismissTurnEvents);
   const tilePicker = useGame((s) => s.tilePicker);
   const closeTilePicker = useGame((s) => s.closeTilePicker);
+  const tileTooltip = useGame((s) => s.tileTooltip);
+  const closeTileTooltip = useGame((s) => s.closeTileTooltip);
   const selectUnitFromPicker = useGame((s) => s.selectUnitFromPicker);
   const selectCityFromPicker = useGame((s) => s.selectCityFromPicker);
   const endTurn = useGame((s) => s.endTurn);
@@ -1067,6 +1070,18 @@ export default function Hud() {
           />
         );
       })() : null}
+
+      {tileTooltip && map ? (
+        <TileYieldTooltip
+          x={tileTooltip.x}
+          y={tileTooltip.y}
+          screenX={tileTooltip.screenX}
+          screenY={tileTooltip.screenY}
+          map={map}
+          improvement={improvements[tileKey(tileTooltip.x, tileTooltip.y)]}
+          onDismiss={closeTileTooltip}
+        />
+      ) : null}
     </SafeAreaView>
   );
 }

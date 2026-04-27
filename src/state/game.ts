@@ -81,6 +81,7 @@ type GameState = {
   combatFlashes: { x: number; y: number }[];
   turnEvents: TurnEvent[];
   tilePicker: { x: number; y: number; screenX: number; screenY: number } | null;
+  tileTooltip: { x: number; y: number; screenX: number; screenY: number } | null;
   awaitingDestinationFor: string | null;
   pendingJumpTo: { x: number; y: number } | null;
   gameOver: GameOverState | null;
@@ -116,6 +117,7 @@ type GameState = {
   requestJumpTo: (x: number, y: number) => void;
   clearJumpRequest: () => void;
   openTilePicker: (x: number, y: number, screenX: number, screenY: number) => void;
+  closeTileTooltip: () => void;
   closeTilePicker: () => void;
   selectUnitFromPicker: (unitId: string) => void;
   selectCityFromPicker: (cityId: string) => void;
@@ -353,6 +355,7 @@ export const useGame = create<GameState>((set, get) => ({
   combatFlashes: [],
   turnEvents: [],
   tilePicker: null,
+  tileTooltip: null,
   awaitingDestinationFor: null,
   pendingJumpTo: null,
   gameOver: null,
@@ -1136,13 +1139,18 @@ export const useGame = create<GameState>((set, get) => ({
       set({ selectedCityId: cityHere.id, selectedUnitId: null });
       return;
     }
-    if (!unitHere && !cityHere) return;
+    if (!unitHere && !cityHere) {
+      // Empty (or terrain-only) tile — show the yield tooltip instead.
+      set({ tileTooltip: { x, y, screenX, screenY }, tilePicker: null });
+      return;
+    }
 
     // Both exist — show the picker, anchored at the finger.
-    set({ tilePicker: { x, y, screenX, screenY } });
+    set({ tilePicker: { x, y, screenX, screenY }, tileTooltip: null });
   },
 
   closeTilePicker: () => set({ tilePicker: null }),
+  closeTileTooltip: () => set({ tileTooltip: null }),
 
   armSetDestination: () => {
     const { selectedUnitId } = get();
