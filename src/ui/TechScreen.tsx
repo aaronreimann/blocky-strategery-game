@@ -1,4 +1,5 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
   prereqsMet,
@@ -27,8 +28,8 @@ export default function TechScreen({ onClose }: Props) {
   };
 
   return (
-    <Pressable style={styles.bg} onPress={onClose}>
-      <Pressable style={styles.card} onPress={() => {}}>
+    <View style={styles.bg}>
+      <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
         <View style={styles.header}>
           <View>
             <Text style={styles.title}>Tech Tree</Text>
@@ -44,19 +45,23 @@ export default function TechScreen({ onClose }: Props) {
           </Pressable>
         </View>
 
-        <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
+        <ScrollView
+          style={styles.list}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator
+        >
           {TECH_IDS.map((tid) => {
             const t = TECH[tid];
             const done = human.researched.includes(tid);
             const current = human.researching === tid;
             const locked = !prereqsMet(human.researched, tid);
             const status = done
-              ? 'Researched'
+              ? '✓'
               : current
-                ? `Researching (${human.science}/${t.cost})`
+                ? `${human.science}/${t.cost}`
                 : locked
-                  ? 'Locked'
-                  : 'Available';
+                  ? '🔒'
+                  : `${t.cost}`;
             const tint = done
               ? THEME.good
               : current
@@ -64,10 +69,6 @@ export default function TechScreen({ onClose }: Props) {
                 : locked
                   ? THEME.inkMuted
                   : THEME.ink;
-            const prereqText =
-              t.prereqs.length === 0
-                ? 'No prereqs'
-                : 'Needs: ' + t.prereqs.map((p) => TECH[p].name).join(', ');
             return (
               <Pressable
                 key={tid}
@@ -80,47 +81,44 @@ export default function TechScreen({ onClose }: Props) {
                 ]}
                 onPress={() => onPick(tid)}
               >
-                <View style={styles.techHeader}>
-                  <Text style={[styles.techName, { color: tint }]}>{t.name}</Text>
-                  <Text style={[styles.techStatus, { color: tint }]}>{status}</Text>
+                <View style={styles.techMain}>
+                  <Text style={[styles.techName, { color: tint }]} numberOfLines={1}>
+                    {t.name}
+                  </Text>
+                  <Text style={styles.techUnlocks} numberOfLines={1}>
+                    {t.unlocks}
+                  </Text>
                 </View>
-                <Text style={styles.techMeta}>
-                  Cost {t.cost} · {prereqText}
-                </Text>
-                <Text style={styles.techMeta}>Unlocks: {t.unlocks}</Text>
+                <Text style={[styles.techStatus, { color: tint }]}>{status}</Text>
               </Pressable>
             );
           })}
         </ScrollView>
-      </Pressable>
-    </Pressable>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   bg: {
     position: 'absolute',
-    top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: 'rgba(10, 23, 41, 0.85)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(28, 22, 18, 0.97)',
   },
-  card: {
-    backgroundColor: THEME.bgElevated,
-    borderColor: THEME.border,
-    borderWidth: 1,
-    borderRadius: 14,
-    padding: 16,
-    width: '100%',
-    maxWidth: 720,
-    maxHeight: '90%',
+  safe: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 12,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   title: { color: THEME.ink, fontSize: 22, fontWeight: '900' },
   subtitle: { color: THEME.inkMuted, fontSize: 12, marginTop: 4 },
@@ -132,24 +130,24 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   closeText: { color: THEME.ink, fontSize: 12, fontWeight: '700' },
-  list: { flexGrow: 0 },
-  listContent: { gap: 8 },
+  list: { flex: 1 },
+  listContent: { gap: 4, paddingBottom: 12 },
   tech: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: THEME.bg,
     borderColor: THEME.border,
     borderWidth: 1,
-    borderRadius: 8,
-    padding: 10,
+    borderRadius: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    gap: 10,
   },
   techCurrent: { borderColor: THEME.warn },
-  techDone: { borderColor: THEME.good, opacity: 0.7 },
+  techDone: { borderColor: THEME.good, opacity: 0.65 },
   techLocked: { opacity: 0.5 },
-  techHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-  },
-  techName: { fontSize: 14, fontWeight: '800' },
-  techStatus: { fontSize: 11, fontWeight: '700' },
-  techMeta: { color: THEME.inkMuted, fontSize: 11, marginTop: 2 },
+  techMain: { flex: 1 },
+  techName: { fontSize: 13, fontWeight: '800' },
+  techUnlocks: { color: THEME.inkMuted, fontSize: 10, marginTop: 1 },
+  techStatus: { fontSize: 12, fontWeight: '800', minWidth: 48, textAlign: 'right' },
 });
