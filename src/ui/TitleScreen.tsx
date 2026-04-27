@@ -118,6 +118,7 @@ export default function TitleScreen() {
           <Image source={require('../../assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
         </View>
 
+      <View style={styles.bottomGroup}>
       <View style={styles.slotRow}>
         {slots.map((info) => {
           const ended = !info.empty && info.gameOver;
@@ -174,6 +175,7 @@ export default function TitleScreen() {
           History {history.length > 0 ? `(${history.length})` : ''}
         </Text>
       </Pressable>
+      </View>
 
       {pendingDelete !== null && (() => {
         const target = slots.find((s) => s.slot === pendingDelete);
@@ -306,13 +308,18 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: THEME.bg,
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 24,
     paddingTop: 24,
-    paddingBottom: 120,
+    paddingBottom: 24,
   },
-  header: { alignItems: 'center', marginTop: 120, marginBottom: 16 },
+  header: { alignItems: 'center', marginTop: 120 },
+  bottomGroup: {
+    width: '100%',
+    alignItems: 'center',
+    paddingBottom: 60,
+  },
   logo: {
     width: 600,
     height: 260,
