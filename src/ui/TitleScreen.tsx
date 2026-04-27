@@ -138,7 +138,7 @@ export default function TitleScreen() {
                 ) : (
                   <>
                     <View style={styles.slotThumbWrap}>
-                      <SlotThumbnail preview={info.preview} width={120} height={72} />
+                      <SlotThumbnail preview={info.preview} width={96} height={54} />
                     </View>
                     {ended && (
                       <Text style={[styles.slotResult, { color: RESULT_COLOR[ended.kind] }]}>
@@ -349,15 +349,16 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(212, 184, 138, 0.45)',
     borderWidth: 1,
     borderRadius: 12,
-    padding: 16,
-    paddingBottom: 44,
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 36,
     width: '100%',
-    minHeight: 160,
+    minHeight: 150,
     justifyContent: 'center',
   },
   slotThumbWrap: {
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   slotEmpty: { color: THEME.ink, fontSize: 18, fontWeight: '700' },
   slotMeta: { color: THEME.ink, fontSize: 14, fontWeight: '700', marginTop: 2 },
