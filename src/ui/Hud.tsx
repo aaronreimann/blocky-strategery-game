@@ -50,10 +50,35 @@ function eventStyle(kind: string): { color: string } {
       return { color: '#facc15' };
     case 'research':
       return { color: '#06b6d4' };
+    case 'captured':
+      return { color: '#facc15' };
+    case 'lost':
+      return { color: '#ef4444' };
     case 'event':
       return { color: '#a855f7' };
     default:
       return { color: '#f5f1e8' };
+  }
+}
+
+function eventIcon(kind: string): string {
+  switch (kind) {
+    case 'battle':
+      return 'crossed-swords';
+    case 'grew':
+      return 'seedling';
+    case 'built':
+      return 'hammer';
+    case 'research':
+      return 'flask';
+    case 'captured':
+      return 'flag';
+    case 'lost':
+      return 'skull-crossbones';
+    case 'event':
+      return 'star';
+    default:
+      return 'circle';
   }
 }
 
@@ -317,15 +342,25 @@ export default function Hud() {
               <Text style={styles.eventsTitle}>Last turn</Text>
               <Text style={styles.eventsCloseText}>tap to dismiss</Text>
             </View>
-            {turnEvents.slice(0, 8).map((ev, i) => (
-              <Text
-                key={i}
-                style={[styles.eventLine, eventStyle(ev.kind)]}
-                numberOfLines={2}
-              >
-                · {ev.text}
-              </Text>
-            ))}
+            {turnEvents.slice(0, 8).map((ev, i) => {
+              const color = eventStyle(ev.kind).color;
+              return (
+                <View
+                  key={i}
+                  style={[styles.eventRow, { borderLeftColor: color }]}
+                >
+                  <FontAwesome5
+                    name={eventIcon(ev.kind)}
+                    size={11}
+                    color={color}
+                    style={styles.eventIcon}
+                  />
+                  <Text style={styles.eventText} numberOfLines={2}>
+                    {ev.text}
+                  </Text>
+                </View>
+              );
+            })}
             {turnEvents.length > 8 ? (
               <Text style={styles.eventOverflow}>
                 +{turnEvents.length - 8} more
@@ -915,7 +950,20 @@ const styles = StyleSheet.create({
   eventsTitle: { color: THEME.warn, fontSize: 12, fontWeight: '800', letterSpacing: 1 },
   eventsClose: { paddingHorizontal: 6, paddingVertical: 2 },
   eventsCloseText: { color: THEME.inkMuted, fontSize: 11, fontWeight: '700' },
-  eventLine: { color: THEME.ink, fontSize: 11, marginTop: 2 },
+  eventRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(10, 23, 41, 0.4)',
+    borderLeftWidth: 3,
+    borderTopRightRadius: 4,
+    borderBottomRightRadius: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    marginTop: 4,
+    gap: 8,
+  },
+  eventIcon: { width: 14, textAlign: 'center' },
+  eventText: { color: THEME.ink, fontSize: 11, flex: 1 },
   eventOverflow: { color: THEME.inkMuted, fontSize: 10, marginTop: 4 },
   bottomRightStack: {
     position: 'absolute',
