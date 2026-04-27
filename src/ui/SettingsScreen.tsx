@@ -34,7 +34,7 @@ export default function SettingsScreen({ onClose, onAfterReset }: Props) {
 
   return (
     <View style={styles.bg}>
-      <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+      <SafeAreaView style={styles.safe} edges={['top', 'bottom', 'left', 'right']}>
         <View style={styles.header}>
           <Text style={styles.title}>Settings</Text>
           <Pressable onPress={onClose} style={styles.closeBtn}>

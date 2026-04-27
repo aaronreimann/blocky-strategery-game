@@ -43,7 +43,7 @@ export default function TechScreen({ onClose }: Props) {
 
   return (
     <View style={styles.bg}>
-      <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+      <SafeAreaView style={styles.safe} edges={['top', 'bottom', 'left', 'right']}>
         <View style={styles.header}>
           <View>
             <Text style={styles.title}>Tech Tree</Text>
