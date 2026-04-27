@@ -1099,6 +1099,30 @@ export const useGame = create<GameState>((set, get) => ({
       return { ...p, science, researching, researched, gold: p.gold + goldGain };
     });
 
+    // AI diplomacy: each AI re-evaluates its stance toward the human
+    // based on score. Falling behind → sue for peace. Pulling ahead while
+    // at peace → declare war.
+    const aiScore = (idx: number) =>
+      workingCities.filter((c) => c.ownerIdx === idx).length * 10 +
+      workingUnits.filter((u) => u.ownerIdx === idx).length * 2 +
+      (workingPlayers[idx]?.researched.length ?? 0) * 5;
+    const humanScoreNow = aiScore(HUMAN_IDX);
+    let workingRelations: typeof get extends never ? never : Record<string, 'war' | 'peace'> =
+      { ...get().relations };
+    for (const p of workingPlayers) {
+      if (p.isHuman) continue;
+      const k = relationKey(HUMAN_IDX, p.idx);
+      const cur = workingRelations[k] ?? 'war';
+      const ratio = aiScore(p.idx) / Math.max(1, humanScoreNow);
+      if (cur === 'war' && ratio < 0.7) {
+        workingRelations[k] = 'peace';
+        events.push({ kind: 'event', text: `${p.name} sues for peace.` });
+      } else if (cur === 'peace' && ratio > 1.6) {
+        workingRelations[k] = 'war';
+        events.push({ kind: 'battle', text: `${p.name} has declared war on you!` });
+      }
+    }
+
     let lastAIBattle: Battle | null = null;
     for (const player of workingPlayers) {
       if (player.isHuman) continue;
@@ -1106,7 +1130,7 @@ export const useGame = create<GameState>((set, get) => ({
       for (const other of workingPlayers) {
         if (other.idx === player.idx) continue;
         const k = relationKey(player.idx, other.idx);
-        if (get().relations[k] === 'peace') atPeaceWith.add(other.idx);
+        if (workingRelations[k] === 'peace') atPeaceWith.add(other.idx);
       }
       const result = runAITurn({
         ownerIdx: player.idx,
@@ -1214,6 +1238,7 @@ export const useGame = create<GameState>((set, get) => ({
       cities: workingCities,
       improvements: workingImprovements,
       wonders: workingWonders,
+      relations: workingRelations,
       lastBattle: lastAIBattle,
       turnEvents: events,
       gameOver: finished,

@@ -341,6 +341,68 @@ export default function MapView({
     return out;
   }, [moveTiles, attackTiles]);
 
+  const farmMineIrrigationLayer = useMemo(() => {
+    const out: React.ReactNode[] = [];
+    for (const key in improvements) {
+      const imp = improvements[key];
+      if (imp === 'road') continue; // roads have their own layer
+      const [xs, ys] = key.split(',');
+      const x = Number(xs);
+      const y = Number(ys);
+      const cx = x * TILE_SIZE + TILE_SIZE / 2;
+      const cy = y * TILE_SIZE + TILE_SIZE / 2;
+      if (imp === 'farm') {
+        // 2x2 cross-hatch suggesting fields
+        const grid = `M ${cx - 7} ${cy - 4} L ${cx + 7} ${cy - 4} M ${cx - 7} ${cy + 4} L ${cx + 7} ${cy + 4} M ${cx - 4} ${cy - 7} L ${cx - 4} ${cy + 7} M ${cx + 4} ${cy - 7} L ${cx + 4} ${cy + 7}`;
+        out.push(
+          <Path
+            key={`fm-${key}`}
+            path={grid}
+            color="#7a4f1c"
+            style="stroke"
+            strokeWidth={1.2}
+          />,
+        );
+      } else if (imp === 'mine') {
+        // dark triangular peak
+        const tri = `M ${cx - 6} ${cy + 6} L ${cx} ${cy - 6} L ${cx + 6} ${cy + 6} Z`;
+        out.push(
+          <Path key={`mn-${key}-f`} path={tri} color="#1f1f1f" />,
+        );
+        out.push(
+          <Path
+            key={`mn-${key}-s`}
+            path={tri}
+            color="#facc15"
+            style="stroke"
+            strokeWidth={0.8}
+          />,
+        );
+      } else if (imp === 'irrigation') {
+        // two wavy blue lines suggesting channels
+        out.push(
+          <Path
+            key={`ir-${key}-1`}
+            path={`M ${cx - 8} ${cy - 3} Q ${cx - 3} ${cy - 5} ${cx} ${cy - 3} Q ${cx + 3} ${cy - 1} ${cx + 8} ${cy - 3}`}
+            color="#3a7ac0"
+            style="stroke"
+            strokeWidth={1.2}
+          />,
+        );
+        out.push(
+          <Path
+            key={`ir-${key}-2`}
+            path={`M ${cx - 8} ${cy + 3} Q ${cx - 3} ${cy + 1} ${cx} ${cy + 3} Q ${cx + 3} ${cy + 5} ${cx + 8} ${cy + 3}`}
+            color="#3a7ac0"
+            style="stroke"
+            strokeWidth={1.2}
+          />,
+        );
+      }
+    }
+    return out;
+  }, [improvements]);
+
   const roadLayer = useMemo(() => {
     const base: React.ReactNode[] = [];
     const top: React.ReactNode[] = [];
@@ -737,6 +799,7 @@ export default function MapView({
             <Group transform={transform}>
             {baseLayer}
             {decorLayer}
+            {farmMineIrrigationLayer}
             {roadLayer}
             {resourceLayer}
             {highlightLayer}

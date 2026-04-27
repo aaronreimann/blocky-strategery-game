@@ -312,8 +312,30 @@ export function runAITurn(input: AITurnInput): AITurnOutput {
     }
 
     if (isMilitary(fresh.kind)) {
+      // Defensive doctrine: if this unit is the sole defender of one of
+      // our own cities, only act if there's an immediate adjacent threat
+      // — otherwise hold position so the city stays garrisoned.
+      const hereCity = cities.find(
+        (c) => c.x === fresh.x && c.y === fresh.y && c.ownerIdx === myIdx,
+      );
+      const isLastDefender =
+        !!hereCity &&
+        !units.some(
+          (o) =>
+            o.id !== fresh.id &&
+            o.x === fresh.x &&
+            o.y === fresh.y &&
+            o.ownerIdx === myIdx &&
+            isMilitary(o.kind),
+        );
+
       // Adjacent enemy unit → attack.
       const enemy = findAdjacentEnemy(fresh, units, atPeaceWith);
+
+      if (isLastDefender && !enemy) {
+        // Hold the city.
+        continue;
+      }
       if (enemy) {
         const defenderTile = map.tiles[enemy.y * map.width + enemy.x];
         const cityHere = cities.find(
