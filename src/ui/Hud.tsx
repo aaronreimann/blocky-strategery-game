@@ -33,6 +33,7 @@ import ScoreScreen from './ScoreScreen';
 import TechScreen from './TechScreen';
 import TilePickerPopup from './TilePickerPopup';
 import TutorialOverlay from './TutorialOverlay';
+import WonderOverlay from './WonderOverlay';
 
 const HUMAN_IDX_HUD = 0;
 
@@ -96,6 +97,7 @@ export default function Hud() {
   const [legendOpen, setLegendOpen] = useState(false);
   const [scoreOpen, setScoreOpen] = useState(false);
   const [tutorialOpen, setTutorialOpen] = useState(false);
+  const [breakdown, setBreakdown] = useState<'gold' | 'science' | null>(null);
   const [cityTab, setCityTab] = useState<'units' | 'buildings' | 'wonders'>('units');
   const turn = useGame((s) => s.turn);
   const turnLimit = useGame((s) => s.turnLimit);
@@ -133,6 +135,8 @@ export default function Hud() {
   const toggleUnitExplore = useGame((s) => s.toggleUnitExplore);
   const exitToTitle = useGame((s) => s.exitToTitle);
   const dismissBattle = useGame((s) => s.dismissBattle);
+  const lastWonder = useGame((s) => s.lastWonder);
+  const dismissWonder = useGame((s) => s.dismissWonder);
 
   const selectedUnit = selectedUnitId ? units.find((u) => u.id === selectedUnitId) : null;
   const unitSpec = selectedUnit ? UNIT[selectedUnit.kind] : null;
@@ -258,7 +262,11 @@ export default function Hud() {
           />
           <Text style={styles.pillText}>{myUnitsCount}</Text>
         </View>
-        <Pressable style={styles.pill} onPress={() => setTechOpen(true)}>
+        <Pressable
+          style={styles.pill}
+          onPress={() => setTechOpen(true)}
+          onLongPress={() => setBreakdown('science')}
+        >
           <FontAwesome5
             name="flask"
             size={12}
@@ -273,10 +281,13 @@ export default function Hud() {
             <Text style={styles.pillText}>All researched</Text>
           )}
         </Pressable>
-        <View style={styles.pill}>
+        <Pressable
+          style={styles.pill}
+          onLongPress={() => setBreakdown('gold')}
+        >
           <GameIcon name="gold_bar" size={16} color={THEME.warn} style={styles.pillIcon} />
           <Text style={styles.pillText}>{gold}</Text>
-        </View>
+        </Pressable>
         <Pressable style={styles.pillSquare} onPress={() => setDiploOpen(true)}>
           <FontAwesome5 name="handshake" size={14} color={THEME.ink} />
         </Pressable>
@@ -978,6 +989,63 @@ export default function Hud() {
       {scoreOpen ? <ScoreScreen onClose={() => setScoreOpen(false)} /> : null}
       {tutorialOpen ? <TutorialOverlay onClose={closeTutorial} /> : null}
 
+      {lastWonder?.byHuman ? (
+        <WonderOverlay
+          kind={lastWonder.kind}
+          cityName={lastWonder.cityName}
+          onDismiss={dismissWonder}
+        />
+      ) : null}
+
+      {breakdown && map ? (() => {
+        const myCities = cities.filter((c) => c.ownerIdx === 0);
+        const tradeMap = computeTradeRoutes(0, cities, map);
+        type Row = { name: string; value: number; trade?: number };
+        const rows: Row[] = myCities.map((c) => {
+          const tradeBonus = tradeMap.get(c.id) ?? 0;
+          const y = computeCityYields(c, map, wonders, improvements, tradeBonus);
+          return breakdown === 'gold'
+            ? { name: c.name, value: y.gold, trade: tradeBonus }
+            : { name: c.name, value: y.science };
+        });
+        rows.sort((a, b) => b.value - a.value);
+        const total = rows.reduce((s, r) => s + r.value, 0);
+        return (
+          <Pressable
+            style={styles.breakdownBg}
+            onPress={() => setBreakdown(null)}
+          >
+            <Pressable style={styles.breakdownCard} onPress={() => {}}>
+              <Text style={styles.breakdownTitle}>
+                {breakdown === 'gold' ? 'Gold per turn' : 'Science per turn'}
+              </Text>
+              <Text style={styles.breakdownTotal}>
+                +{total} / turn total
+              </Text>
+              <View style={styles.breakdownDivider} />
+              {rows.length === 0 ? (
+                <Text style={styles.breakdownEmpty}>No cities yet.</Text>
+              ) : (
+                rows.map((r) => (
+                  <View key={r.name} style={styles.breakdownRow}>
+                    <Text style={styles.breakdownName} numberOfLines={1}>
+                      {r.name}
+                      {r.trade && r.trade > 0 ? (
+                        <Text style={styles.breakdownTradeNote}>
+                          {'  '}(incl. trade +{r.trade})
+                        </Text>
+                      ) : null}
+                    </Text>
+                    <Text style={styles.breakdownValue}>+{r.value}</Text>
+                  </View>
+                ))
+              )}
+              <Text style={styles.breakdownHint}>tap outside to close</Text>
+            </Pressable>
+          </Pressable>
+        );
+      })() : null}
+
       {tilePicker ? (() => {
         const u = units.find(
           (un) => un.x === tilePicker.x && un.y === tilePicker.y && un.ownerIdx === 0,
@@ -1200,6 +1268,65 @@ const styles = StyleSheet.create({
   actionAutoOnText: { color: '#0a1729' },
   workRow: { marginTop: 6 },
   unitActionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 },
+  breakdownBg: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(10, 23, 41, 0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  breakdownCard: {
+    backgroundColor: 'rgba(28, 22, 18, 0.96)',
+    borderColor: THEME.warn,
+    borderWidth: 1.5,
+    borderRadius: 12,
+    padding: 18,
+    width: '100%',
+    maxWidth: 360,
+  },
+  breakdownTitle: {
+    color: THEME.warn,
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 1.5,
+  },
+  breakdownTotal: {
+    color: THEME.ink,
+    fontSize: 22,
+    fontWeight: '900',
+    marginTop: 4,
+  },
+  breakdownDivider: {
+    height: 1,
+    backgroundColor: 'rgba(212, 184, 138, 0.3)',
+    marginVertical: 10,
+  },
+  breakdownRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  breakdownName: { color: THEME.ink, fontSize: 13, flex: 1 },
+  breakdownValue: {
+    color: THEME.warn,
+    fontSize: 13,
+    fontWeight: '800',
+    marginLeft: 8,
+  },
+  breakdownEmpty: { color: THEME.inkMuted, fontSize: 12, textAlign: 'center' },
+  breakdownTradeNote: { color: THEME.inkMuted, fontSize: 11 },
+  breakdownHint: {
+    color: THEME.inkMuted,
+    fontSize: 10,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginTop: 10,
+  },
   previewBlock: {
     marginTop: 6,
     borderColor: THEME.border,

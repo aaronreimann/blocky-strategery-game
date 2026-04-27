@@ -73,6 +73,7 @@ type GameState = {
   selectedUnitId: string | null;
   selectedCityId: string | null;
   lastBattle: Battle | null;
+  lastWonder: { kind: WonderKind; byHuman: boolean; cityName: string } | null;
   turnEvents: TurnEvent[];
   tilePicker: { x: number; y: number; screenX: number; screenY: number } | null;
   awaitingDestinationFor: string | null;
@@ -117,6 +118,7 @@ type GameState = {
   cancelSetDestination: () => void;
   endTurn: () => void;
   dismissBattle: () => void;
+  dismissWonder: () => void;
   dismissTurnEvents: () => void;
 };
 
@@ -341,6 +343,7 @@ export const useGame = create<GameState>((set, get) => ({
   selectedUnitId: null,
   selectedCityId: null,
   lastBattle: null,
+  lastWonder: null,
   turnEvents: [],
   tilePicker: null,
   awaitingDestinationFor: null,
@@ -382,6 +385,7 @@ export const useGame = create<GameState>((set, get) => ({
       selectedUnitId: null,
       selectedCityId: null,
       lastBattle: null,
+      lastWonder: null,
       gameOver: null,
     });
     autosave(get());
@@ -482,6 +486,7 @@ export const useGame = create<GameState>((set, get) => ({
       selectedUnitId: null,
       selectedCityId: null,
       lastBattle: null,
+      lastWonder: null,
       gameOver: data.gameOver ?? null,
     });
     return true;
@@ -507,6 +512,7 @@ export const useGame = create<GameState>((set, get) => ({
       selectedUnitId: null,
       selectedCityId: null,
       lastBattle: null,
+      lastWonder: null,
       gameOver: null,
     });
   },
@@ -1132,6 +1138,7 @@ export const useGame = create<GameState>((set, get) => ({
     const { units, cities, turn, map, players, improvements, wonders, difficulty, gameOver } = get();
     if (gameOver || !map) return;
     let workingWonders = wonders;
+    let humanWonderJustBuilt: { kind: WonderKind; cityName: string } | null = null;
     // King-difficulty AI bonus: +25% production and science from each AI city.
     const aiBonus = (ownerIdx: number) =>
       difficulty === 'hard' && !players.find((p) => p.idx === ownerIdx)?.isHuman
@@ -1288,6 +1295,7 @@ export const useGame = create<GameState>((set, get) => ({
             kind: 'built',
             text: `${city.name} completed the ${WONDER[wonderKind].name}!`,
           });
+          humanWonderJustBuilt = { kind: wonderKind, cityName: city.name };
         }
         return {
           ...city,
@@ -1927,6 +1935,9 @@ export const useGame = create<GameState>((set, get) => ({
       huts: workingHuts,
       relations: workingRelations,
       lastBattle: lastAIBattle,
+      lastWonder: humanWonderJustBuilt
+        ? { kind: humanWonderJustBuilt.kind, byHuman: true, cityName: humanWonderJustBuilt.cityName }
+        : get().lastWonder,
       turnEvents: events,
       gameOver: finished,
     });
@@ -1941,6 +1952,7 @@ export const useGame = create<GameState>((set, get) => ({
   },
 
   dismissBattle: () => set({ lastBattle: null }),
+  dismissWonder: () => set({ lastWonder: null }),
   dismissTurnEvents: () => set({ turnEvents: [] }),
 
   selectUnitFromPicker: (unitId: string) => {
