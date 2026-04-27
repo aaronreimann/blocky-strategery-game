@@ -1118,6 +1118,8 @@ export default function MapView({
         map={map}
         cities={cities}
         players={players}
+        explored={explored}
+        currentlyVisible={currentlyVisible}
         cameraTx={tx}
         cameraTy={ty}
         cameraScale={scale}

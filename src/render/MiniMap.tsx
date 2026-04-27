@@ -15,6 +15,8 @@ type Props = {
   map: GameMap;
   cities: City[];
   players: Player[];
+  explored: Set<string>;
+  currentlyVisible: Set<string>;
   cameraTx: SharedValue<number>;
   cameraTy: SharedValue<number>;
   cameraScale: SharedValue<number>;
@@ -28,6 +30,8 @@ export default function MiniMap({
   map,
   cities,
   players,
+  explored,
+  currentlyVisible,
   cameraTx,
   cameraTy,
   cameraScale,
@@ -59,17 +63,46 @@ export default function MiniMap({
 
   const cityLayer = useMemo(
     () =>
-      cities.map((c) => (
-        <Circle
-          key={`mmc-${c.id}`}
-          cx={c.x * tilePx + tilePx / 2}
-          cy={c.y * tilePx + tilePx / 2}
-          r={2.2}
-          color={players[c.ownerIdx]?.color ?? '#ffffff'}
-        />
-      )),
-    [cities, players, tilePx],
+      cities
+        // Only show enemy cities once you've ever explored their tile;
+        // own cities always show.
+        .filter((c) => c.ownerIdx === 0 || explored.has(`${c.x},${c.y}`))
+        .map((c) => (
+          <Circle
+            key={`mmc-${c.id}`}
+            cx={c.x * tilePx + tilePx / 2}
+            cy={c.y * tilePx + tilePx / 2}
+            r={2.2}
+            color={players[c.ownerIdx]?.color ?? '#ffffff'}
+          />
+        )),
+    [cities, players, explored, tilePx],
   );
+
+  // Fog overlay: dim seen-but-not-currently-visible tiles, near-black on
+  // never-explored tiles. Same palette as the main map's fogLayer so they
+  // read as the same world.
+  const fogLayer = useMemo(() => {
+    const out: React.ReactNode[] = [];
+    for (let y = 0; y < map.height; y++) {
+      for (let x = 0; x < map.width; x++) {
+        const k = `${x},${y}`;
+        if (currentlyVisible.has(k)) continue;
+        const seen = explored.has(k);
+        out.push(
+          <Rect
+            key={`mm-fog-${k}`}
+            x={x * tilePx}
+            y={y * tilePx}
+            width={tilePx + 0.5}
+            height={tilePx + 0.5}
+            color={seen ? 'rgba(0, 0, 0, 0.45)' : 'rgba(8, 14, 28, 0.94)'}
+          />,
+        );
+      }
+    }
+    return out;
+  }, [map.width, map.height, explored, currentlyVisible, tilePx]);
 
   // Viewport rectangle reflects current camera. World rect visible on screen
   // is x=[-tx/s, -tx/s + screenW/s], y=[-ty/s, -ty/s + screenH/s]; map that
@@ -110,6 +143,7 @@ export default function MiniMap({
           <Group>
             {terrainLayer}
             {cityLayer}
+            {fogLayer}
             <Rect
               x={viewX}
               y={viewY}
