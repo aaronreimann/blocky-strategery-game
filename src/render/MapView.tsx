@@ -958,11 +958,10 @@ export default function MapView({
       else if (u.kind === 'galley') img = galleyImg;
 
       if (img) {
-        // Disc fills (almost) the whole tile. Painted icon is sized to fit
-        // inside the disc — character canvas ≈ 0.85× tile so the figure
-        // (which fills ~80% of its own canvas) sits comfortably inside the
-        // owner-color medallion.
-        const DISC_R = TILE_SIZE * 0.5;
+        // Disc sits inside the tile with a small margin (10% smaller than
+        // the tile edge). Character canvas stays at 0.85× tile so the
+        // figure may slightly overflow the disc — that's intentional.
+        const DISC_R = TILE_SIZE * 0.45;
         const PAINTED_SIZE = Math.round(TILE_SIZE * 0.85);
         const pox = cx - PAINTED_SIZE / 2;
         const poy = cy - PAINTED_SIZE / 2;
