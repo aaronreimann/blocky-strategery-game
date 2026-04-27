@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { COUNTRIES } from '@/src/data/countries';
 import { getCachedLeaders } from '@/src/data/leaders';
 import { useGame } from '@/src/state/game';
 
@@ -11,6 +12,9 @@ export default function GameOverOverlay() {
   const newGame = useGame((s) => s.newGame);
   const exitToTitle = useGame((s) => s.exitToTitle);
   const difficulty = useGame((s) => s.difficulty);
+  const turnLimit = useGame((s) => s.turnLimit);
+  const victories = useGame((s) => s.victories);
+  const players = useGame((s) => s.players);
 
   if (!gameOver) return null;
 
@@ -27,7 +31,17 @@ export default function GameOverOverlay() {
   const onPlayAgain = async () => {
     if (currentSlot === null) return;
     const leaders = await getCachedLeaders();
-    newGame(currentSlot, Date.now() & 0x7fffffff, difficulty, leaders);
+    const human = players.find((p) => p.isHuman);
+    const humanCountryQid = human
+      ? (COUNTRIES.find((c) => c.iso === human.iso)?.qid ?? null)
+      : null;
+    newGame(currentSlot, Date.now() & 0x7fffffff, leaders, {
+      difficulty,
+      mapSize: 'medium',
+      turnLimit,
+      victories,
+      humanCountryQid,
+    });
   };
 
   return (

@@ -24,14 +24,17 @@ import {
   type City,
   type CityBuildTarget,
   type CityFocus,
+  DEFAULT_VICTORIES,
   type Difficulty,
   type GameOverState,
   type Hut,
   type HutReward,
   type Player,
   type RelationsMap,
+  type ScenarioOptions,
   type TurnEvent,
   type Unit,
+  type VictoryConditions,
   type Wonder,
 } from '@/src/game/types';
 import { cityRadius, computeCityYields, foodNeededToGrow } from '@/src/game/yields';
@@ -59,6 +62,8 @@ type GameState = {
   turn: number;
   seed: number;
   difficulty: Difficulty;
+  turnLimit: number; // 0 = endless
+  victories: VictoryConditions;
   currentSlot: number | null;
   selectedUnitId: string | null;
   selectedCityId: string | null;
@@ -69,7 +74,12 @@ type GameState = {
   pendingJumpTo: { x: number; y: number } | null;
   gameOver: GameOverState | null;
 
-  newGame: (slot: number, seed: number, difficulty: Difficulty, leaders: LeaderMap) => void;
+  newGame: (
+    slot: number,
+    seed: number,
+    leaders: LeaderMap,
+    scenario: ScenarioOptions,
+  ) => void;
   loadFromSlot: (slot: number) => Promise<boolean>;
   exitToTitle: () => void;
 
@@ -268,6 +278,8 @@ function autosave(state: GameState): void {
     seed: state.seed,
     turn: state.turn,
     difficulty: state.difficulty,
+    turnLimit: state.turnLimit,
+    victories: state.victories,
     map: state.map,
     players: state.players,
     units: state.units,
@@ -292,6 +304,8 @@ export const useGame = create<GameState>((set, get) => ({
   turn: 1,
   seed: 0,
   difficulty: 'normal',
+  turnLimit: 100,
+  victories: DEFAULT_VICTORIES,
   currentSlot: null,
   selectedUnitId: null,
   selectedCityId: null,
@@ -302,8 +316,11 @@ export const useGame = create<GameState>((set, get) => ({
   pendingJumpTo: null,
   gameOver: null,
 
-  newGame: (slot, seed, difficulty, leaders) => {
-    const initial = buildInitialState(seed, difficulty, leaders);
+  newGame: (slot, seed, leaders, scenario) => {
+    const initial = buildInitialState(seed, scenario.difficulty, leaders, {
+      mapSize: scenario.mapSize,
+      humanCountryQid: scenario.humanCountryQid,
+    });
     syncIdCounters(
       Math.max(0, ...initial.units.map((u) => parseIdNum(u.id))),
       Math.max(0, ...initial.cities.map((c) => parseIdNum(c.id))),
@@ -319,7 +336,9 @@ export const useGame = create<GameState>((set, get) => ({
       relations: {},
       turn: 1,
       seed,
-      difficulty,
+      difficulty: scenario.difficulty,
+      turnLimit: scenario.turnLimit,
+      victories: scenario.victories,
       currentSlot: slot,
       selectedUnitId: null,
       selectedCityId: null,
@@ -407,6 +426,8 @@ export const useGame = create<GameState>((set, get) => ({
       turn: data.turn,
       seed: data.seed,
       difficulty: data.difficulty,
+      turnLimit: data.turnLimit ?? 100,
+      victories: data.victories ?? DEFAULT_VICTORIES,
       currentSlot: slot,
       selectedUnitId: null,
       selectedCityId: null,
@@ -429,6 +450,8 @@ export const useGame = create<GameState>((set, get) => ({
       turn: 1,
       seed: 0,
       difficulty: 'normal',
+      turnLimit: 100,
+      victories: DEFAULT_VICTORIES,
       currentSlot: null,
       selectedUnitId: null,
       selectedCityId: null,
@@ -556,6 +579,8 @@ export const useGame = create<GameState>((set, get) => ({
               cities: nextCities,
               players,
               turn,
+              turnLimit: get().turnLimit,
+              victories: get().victories,
             });
             const prevOver = get().gameOver;
             set({
@@ -594,6 +619,8 @@ export const useGame = create<GameState>((set, get) => ({
           cities: nextCities,
           players,
           turn,
+          turnLimit: get().turnLimit,
+          victories: get().victories,
         });
         const prevOver = get().gameOver;
         set({
@@ -1496,6 +1523,8 @@ export const useGame = create<GameState>((set, get) => ({
       cities: workingCities,
       players: workingPlayers,
       turn: newTurn,
+      turnLimit: get().turnLimit,
+      victories: get().victories,
     });
 
     // Random events: 5% chance each per turn.

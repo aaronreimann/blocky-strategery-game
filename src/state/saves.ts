@@ -10,6 +10,7 @@ import type {
   Player,
   RelationsMap,
   Unit,
+  VictoryConditions,
   Wonder,
 } from '@/src/game/types';
 
@@ -24,6 +25,8 @@ export type SaveData = {
   seed: number;
   turn: number;
   difficulty: Difficulty;
+  turnLimit?: number;
+  victories?: VictoryConditions;
   map: GameMap;
   players: Player[];
   units: Unit[];

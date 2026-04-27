@@ -3,7 +3,7 @@ import { createNoise2D } from 'simplex-noise';
 import { RESOURCE, RESOURCE_TYPES, type Resource } from '@/src/data/resources';
 import type { Terrain } from '@/src/data/terrain';
 
-import { MAP_H, MAP_W, type GameMap, type Tile, getTile, tileIndex } from './map';
+import { type GameMap, type Tile, getTile, tileIndex } from './map';
 
 function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
@@ -41,22 +41,26 @@ function pickTerrain(elev: number, moist: number, lat: number): Terrain {
   return 'grassland';
 }
 
-export function generateMap(seed = 1): GameMap {
+export function generateMap(
+  seed = 1,
+  width = 48,
+  height = 36,
+): GameMap {
   const rng = mulberry32(seed);
   const elevNoise = createNoise2D(mulberry32(seed * 31 + 7));
   const moistNoise = createNoise2D(mulberry32(seed * 17 + 91));
 
-  const tiles: Tile[] = new Array(MAP_W * MAP_H);
+  const tiles: Tile[] = new Array(width * height);
 
   // Pass 1: terrain from noise + island falloff (push edges toward ocean).
-  const cx = MAP_W / 2;
-  const cy = MAP_H / 2;
+  const cx = width / 2;
+  const cy = height / 2;
   const maxDist = Math.hypot(cx, cy);
 
-  for (let y = 0; y < MAP_H; y++) {
-    for (let x = 0; x < MAP_W; x++) {
-      const nx = x / MAP_W;
-      const ny = y / MAP_H;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const nx = x / width;
+      const ny = y / height;
       const distFromCenter = Math.hypot(x - cx, y - cy) / maxDist; // 0..1
       const island = 1 - distFromCenter; // higher in middle
 
@@ -67,17 +71,17 @@ export function generateMap(seed = 1): GameMap {
       const lat = Math.abs(y - cy) / cy; // 0 at equator, 1 at poles
 
       const terrain = pickTerrain(elev, moist, lat);
-      tiles[tileIndex(x, y)] = { x, y, terrain, resource: null };
+      tiles[tileIndex(x, y, width)] = { x, y, terrain, resource: null };
     }
   }
 
-  const map: GameMap = { width: MAP_W, height: MAP_H, tiles, seed };
+  const map: GameMap = { width, height, tiles, seed };
 
   // Pass 2: ocean bordering land becomes coast.
   const coastFlips: number[] = [];
-  for (let y = 0; y < MAP_H; y++) {
-    for (let x = 0; x < MAP_W; x++) {
-      const t = tiles[tileIndex(x, y)];
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const t = tiles[tileIndex(x, y, width)];
       if (t.terrain !== 'ocean') continue;
       let touchesLand = false;
       for (let dy = -1; dy <= 1 && !touchesLand; dy++) {
@@ -87,7 +91,7 @@ export function generateMap(seed = 1): GameMap {
           if (n && n.terrain !== 'ocean' && n.terrain !== 'coast') touchesLand = true;
         }
       }
-      if (touchesLand) coastFlips.push(tileIndex(x, y));
+      if (touchesLand) coastFlips.push(tileIndex(x, y, width));
     }
   }
   for (const i of coastFlips) tiles[i].terrain = 'coast';

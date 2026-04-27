@@ -91,6 +91,7 @@ export default function Hud() {
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [cityTab, setCityTab] = useState<'units' | 'buildings' | 'wonders'>('units');
   const turn = useGame((s) => s.turn);
+  const turnLimit = useGame((s) => s.turnLimit);
   const map = useGame((s) => s.map);
   const units = useGame((s) => s.units);
   const cities = useGame((s) => s.cities);
@@ -204,9 +205,18 @@ export default function Hud() {
         <Pressable style={styles.pillSquare} onPress={exitToTitle}>
           <FontAwesome5 name="home" size={14} color={THEME.ink} />
         </Pressable>
-        <View style={styles.pill}>
-          <Text style={styles.pillText}>Turn {turn}</Text>
-        </View>
+        {(() => {
+          const turnsLeft = turnLimit > 0 ? turnLimit - turn + 1 : Infinity;
+          const warn = turnsLeft <= 5;
+          return (
+            <View style={[styles.pill, warn && styles.pillAlert]}>
+              <Text style={[styles.pillText, warn && styles.pillAlertText]}>
+                Turn {turn}
+                {turnLimit > 0 ? `/${turnLimit}` : ''}
+              </Text>
+            </View>
+          );
+        })()}
         <View style={styles.pill}>
           <GameIcon name="castle" size={16} color={THEME.ink} style={styles.pillIcon} />
           <Text style={styles.pillText}>{myCitiesCount}</Text>

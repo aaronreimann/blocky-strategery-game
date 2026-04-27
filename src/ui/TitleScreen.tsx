@@ -5,10 +5,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { buildFallbackLeaders, flagEmoji, type LeaderMap } from '@/src/data/countries';
 import { getCachedLeaders, refreshLeaders } from '@/src/data/leaders';
 import {
-  DIFFICULTIES,
-  DIFFICULTY_AI_COUNT,
   DIFFICULTY_LABELS,
-  type Difficulty,
+  type ScenarioOptions,
 } from '@/src/game/types';
 import { useGame } from '@/src/state/game';
 import {
@@ -22,6 +20,7 @@ import {
 } from '@/src/state/saves';
 
 import { THEME } from './palette';
+import ScenarioScreen from './ScenarioScreen';
 
 const RESULT_LABEL: Record<'win' | 'lose' | 'draw', string> = {
   win: 'Victory',
@@ -71,9 +70,9 @@ export default function TitleScreen() {
     }
   };
 
-  const onPickDifficulty = (difficulty: Difficulty) => {
+  const onStartScenario = (scenario: ScenarioOptions) => {
     if (pendingSlot !== null) {
-      newGame(pendingSlot, Date.now() & 0x7fffffff, difficulty, leadersRef.current);
+      newGame(pendingSlot, Date.now() & 0x7fffffff, leadersRef.current, scenario);
     }
     setPendingSlot(null);
   };
@@ -223,27 +222,12 @@ export default function TitleScreen() {
       })()}
 
       {pendingSlot !== null && (
-        <Pressable style={styles.modalBg} onPress={() => setPendingSlot(null)}>
-          <Pressable style={styles.modalCard} onPress={() => {}}>
-            <Text style={styles.modalTitle}>Pick a difficulty</Text>
-            <Text style={styles.modalSub}>Realm {pendingSlot + 1}</Text>
-            <View style={styles.modalRow}>
-              {DIFFICULTIES.map((d) => (
-                <Pressable
-                  key={d}
-                  style={styles.diffBtn}
-                  onPress={() => onPickDifficulty(d)}
-                >
-                  <Text style={styles.diffBtnLabel}>{DIFFICULTY_LABELS[d]}</Text>
-                  <Text style={styles.diffBtnCount}>{DIFFICULTY_AI_COUNT[d]} enemies</Text>
-                </Pressable>
-              ))}
-            </View>
-            <Pressable style={styles.modalCancel} onPress={() => setPendingSlot(null)}>
-              <Text style={styles.modalCancelText}>Cancel</Text>
-            </Pressable>
-          </Pressable>
-        </Pressable>
+        <ScenarioScreen
+          slot={pendingSlot}
+          leaders={leadersRef.current}
+          onCancel={() => setPendingSlot(null)}
+          onStart={onStartScenario}
+        />
       )}
 
       {historyOpen && (

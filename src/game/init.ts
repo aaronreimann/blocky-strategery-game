@@ -9,9 +9,11 @@ import { generateMap } from './mapgen';
 import { chebyshev, type GameMap } from './map';
 import {
   DIFFICULTY_AI_COUNT,
+  MAP_SIZE_DIMS,
   type City,
   type Difficulty,
   type Hut,
+  type MapSize,
   type Player,
   type Unit,
 } from './types';
@@ -134,15 +136,34 @@ function pickRandomCountries(count: number): Country[] {
   return shuffled.slice(0, count);
 }
 
+// If a country is requested for the human, place it first (idx 0); fill the
+// rest with random others (excluding the chosen one).
+function pickRealms(count: number, humanQid: string | null): Country[] {
+  if (!humanQid) return pickRandomCountries(count);
+  const human = COUNTRIES.find((c) => c.qid === humanQid);
+  if (!human) return pickRandomCountries(count);
+  const rest = COUNTRIES.filter((c) => c.qid !== humanQid).sort(
+    () => Math.random() - 0.5,
+  );
+  return [human, ...rest.slice(0, count - 1)];
+}
+
+export type BuildInitialOptions = {
+  mapSize?: MapSize;
+  humanCountryQid?: string | null;
+};
+
 export function buildInitialState(
   seed: number,
   difficulty: Difficulty,
   leaders: LeaderMap,
+  options: BuildInitialOptions = {},
 ): InitialState {
-  const map = generateMap(seed);
+  const dims = MAP_SIZE_DIMS[options.mapSize ?? 'medium'];
+  const map = generateMap(seed, dims.w, dims.h);
   const aiCount = DIFFICULTY_AI_COUNT[difficulty];
   const totalPlayers = 1 + aiCount;
-  const realms = pickRandomCountries(totalPlayers);
+  const realms = pickRealms(totalPlayers, options.humanCountryQid ?? null);
   const spawns = pickSpawnPoints(map, totalPlayers);
 
   const players: Player[] = realms.map((c, idx) => ({

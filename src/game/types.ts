@@ -19,6 +19,53 @@ export const DIFFICULTY_AI_COUNT: Record<Difficulty, number> = {
   hard: 7,
 };
 
+export const MAP_SIZES = ['small', 'medium', 'large'] as const;
+export type MapSize = (typeof MAP_SIZES)[number];
+
+export const MAP_SIZE_LABELS: Record<MapSize, string> = {
+  small: 'Small',
+  medium: 'Medium',
+  large: 'Large',
+};
+
+export const MAP_SIZE_DIMS: Record<MapSize, { w: number; h: number }> = {
+  small: { w: 32, h: 24 },
+  medium: { w: 48, h: 36 },
+  large: { w: 64, h: 48 },
+};
+
+export const TURN_LIMIT_OPTIONS = [50, 100, 200, 0] as const;
+export type TurnLimitOption = (typeof TURN_LIMIT_OPTIONS)[number];
+// 0 means "Endless" — time-victory never triggers.
+
+export type VictoryConditions = {
+  conquest: boolean;
+  tech: boolean;
+  time: boolean;
+};
+
+export const DEFAULT_VICTORIES: VictoryConditions = {
+  conquest: true,
+  tech: true,
+  time: true,
+};
+
+export type ScenarioOptions = {
+  difficulty: Difficulty;
+  mapSize: MapSize;
+  turnLimit: number; // 0 = endless
+  victories: VictoryConditions;
+  humanCountryQid: string | null; // null = random
+};
+
+export const DEFAULT_SCENARIO: ScenarioOptions = {
+  difficulty: 'normal',
+  mapSize: 'medium',
+  turnLimit: 100,
+  victories: DEFAULT_VICTORIES,
+  humanCountryQid: null,
+};
+
 export type GameOverState = {
   kind: 'win' | 'lose' | 'draw';
   reason: string;
