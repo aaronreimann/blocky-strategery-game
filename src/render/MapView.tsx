@@ -943,10 +943,10 @@ export default function MapView({
         const PAINTED_SIZE = Math.round(TILE_SIZE * 1.25);
         const pox = cx - PAINTED_SIZE / 2;
         const poy = cy - PAINTED_SIZE / 2;
-        // The bundled PNGs put the black ring at ~95% of the canvas radius
-        // with a visible thickness of ~5% of the canvas width.
-        const ringR = PAINTED_SIZE * 0.475;
-        const ringW = PAINTED_SIZE * 0.06;
+        // The bundled PNGs put the black ring at ~70% of the canvas radius
+        // (the character + ring composition sits inside transparent padding).
+        const ringR = PAINTED_SIZE * 0.36;
+        const ringW = PAINTED_SIZE * 0.045;
         elements.push(
           <Group key={`u-${u.id}`}>
             <SkiaImage
