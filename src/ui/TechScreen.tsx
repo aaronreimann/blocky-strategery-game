@@ -9,10 +9,24 @@ import {
 } from '@/src/data/tech';
 import { useGame } from '@/src/state/game';
 
+import { GameIcon } from './GameIcon';
 import { THEME } from './palette';
 
 type Props = {
   onClose: () => void;
+};
+
+// Each tech gets a flavor glyph. Many are loose thematic matches rather than
+// strict 1:1 mappings — the goal is a varied workshop wall, not literal art.
+const TECH_ICON: Record<TechId, string> = {
+  bronze_working: 'metal_bar',
+  horseback_riding: 'horse_head',
+  writing: 'wooden_sign',
+  currency: 'gold_bar',
+  sailing: 'caravel',
+  iron_working: 'broadsword',
+  mathematics: 'cog',
+  philosophy: 'chess_knight',
 };
 
 export default function TechScreen({ onClose }: Props) {
@@ -47,7 +61,7 @@ export default function TechScreen({ onClose }: Props) {
 
         <ScrollView
           style={styles.list}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={styles.grid}
           showsVerticalScrollIndicator
         >
           {TECH_IDS.map((tid) => {
@@ -55,13 +69,6 @@ export default function TechScreen({ onClose }: Props) {
             const done = human.researched.includes(tid);
             const current = human.researching === tid;
             const locked = !prereqsMet(human.researched, tid);
-            const status = done
-              ? '✓'
-              : current
-                ? `${human.science}/${t.cost}`
-                : locked
-                  ? '🔒'
-                  : `${t.cost}`;
             const tint = done
               ? THEME.good
               : current
@@ -69,27 +76,47 @@ export default function TechScreen({ onClose }: Props) {
                 : locked
                   ? THEME.inkMuted
                   : THEME.ink;
+            const iconName = (TECH_ICON[tid] ?? 'wooden_sign') as never;
             return (
               <Pressable
                 key={tid}
                 disabled={done || current || locked}
                 style={[
-                  styles.tech,
-                  current && styles.techCurrent,
-                  done && styles.techDone,
-                  locked && styles.techLocked,
+                  styles.card,
+                  current && styles.cardCurrent,
+                  done && styles.cardDone,
+                  locked && styles.cardLocked,
                 ]}
                 onPress={() => onPick(tid)}
               >
-                <View style={styles.techMain}>
-                  <Text style={[styles.techName, { color: tint }]} numberOfLines={1}>
-                    {t.name}
-                  </Text>
-                  <Text style={styles.techUnlocks} numberOfLines={1}>
-                    {t.unlocks}
-                  </Text>
+                <View style={styles.iconWrap}>
+                  <GameIcon name={iconName} size={42} color={tint} />
                 </View>
-                <Text style={[styles.techStatus, { color: tint }]}>{status}</Text>
+                <Text style={[styles.cardName, { color: tint }]} numberOfLines={1}>
+                  {t.name}
+                </Text>
+                <Text style={styles.cardUnlocks} numberOfLines={2}>
+                  {t.unlocks}
+                </Text>
+                {done ? (
+                  <View style={[styles.stamp, { borderColor: THEME.good }]}>
+                    <Text style={[styles.stampText, { color: THEME.good }]}>✓</Text>
+                  </View>
+                ) : current ? (
+                  <View style={[styles.badge, { backgroundColor: THEME.warn }]}>
+                    <Text style={styles.badgeText}>
+                      {human.science}/{t.cost}
+                    </Text>
+                  </View>
+                ) : locked ? (
+                  <View style={styles.lockedBadge}>
+                    <Text style={styles.lockedText}>🔒</Text>
+                  </View>
+                ) : (
+                  <View style={[styles.badge, styles.badgeAvailable]}>
+                    <Text style={styles.badgeAvailableText}>{t.cost}</Text>
+                  </View>
+                )}
               </Pressable>
             );
           })}
@@ -110,7 +137,7 @@ const styles = StyleSheet.create({
   },
   safe: {
     flex: 1,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingTop: 8,
     paddingBottom: 12,
   },
@@ -131,23 +158,91 @@ const styles = StyleSheet.create({
   },
   closeText: { color: THEME.ink, fontSize: 12, fontWeight: '700' },
   list: { flex: 1 },
-  listContent: { gap: 4, paddingBottom: 12 },
-  tech: {
+  grid: {
     flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: THEME.bg,
-    borderColor: THEME.border,
-    borderWidth: 1,
-    borderRadius: 6,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
+    flexWrap: 'wrap',
     gap: 10,
+    paddingBottom: 12,
   },
-  techCurrent: { borderColor: THEME.warn },
-  techDone: { borderColor: THEME.good, opacity: 0.65 },
-  techLocked: { opacity: 0.5 },
-  techMain: { flex: 1 },
-  techName: { fontSize: 13, fontWeight: '800' },
-  techUnlocks: { color: THEME.inkMuted, fontSize: 10, marginTop: 1 },
-  techStatus: { fontSize: 12, fontWeight: '800', minWidth: 48, textAlign: 'right' },
+  card: {
+    width: '31.5%',
+    aspectRatio: 1.2,
+    backgroundColor: 'rgba(45, 32, 22, 0.92)',
+    borderColor: 'rgba(212, 184, 138, 0.45)',
+    borderWidth: 1.5,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingTop: 10,
+    paddingBottom: 8,
+    justifyContent: 'flex-start',
+    overflow: 'hidden',
+  },
+  cardCurrent: {
+    borderColor: THEME.warn,
+    borderWidth: 2,
+    backgroundColor: 'rgba(56, 42, 18, 0.95)',
+  },
+  cardDone: {
+    borderColor: THEME.good,
+    opacity: 0.7,
+  },
+  cardLocked: {
+    opacity: 0.45,
+  },
+  iconWrap: {
+    alignItems: 'center',
+    marginBottom: 6,
+    marginTop: 2,
+  },
+  cardName: {
+    fontSize: 13,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  cardUnlocks: {
+    color: THEME.inkMuted,
+    fontSize: 10,
+    textAlign: 'center',
+    marginTop: 2,
+    lineHeight: 13,
+  },
+  badge: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    minWidth: 26,
+    height: 22,
+    paddingHorizontal: 6,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeText: { color: '#0a1729', fontSize: 11, fontWeight: '900' },
+  badgeAvailable: {
+    backgroundColor: 'rgba(212, 184, 138, 0.9)',
+  },
+  badgeAvailableText: { color: '#0a1729', fontSize: 11, fontWeight: '900' },
+  stamp: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    transform: [{ rotate: '-12deg' }],
+  },
+  stampText: { fontSize: 14, fontWeight: '900' },
+  lockedBadge: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  lockedText: { fontSize: 14 },
 });
