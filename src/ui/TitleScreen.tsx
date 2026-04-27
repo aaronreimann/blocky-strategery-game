@@ -312,7 +312,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 24,
   },
-  header: { alignItems: 'center', marginTop: 40 },
+  header: { alignItems: 'center', marginTop: -40 },
   bottomGroup: {
     position: 'absolute',
     left: 24,
