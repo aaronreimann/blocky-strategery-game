@@ -117,6 +117,21 @@ export async function clearHistory(): Promise<void> {
   await AsyncStorage.removeItem(HISTORY_KEY);
 }
 
+const TUTORIAL_KEY = 'civ_tutorial_seen';
+
+export async function isTutorialSeen(): Promise<boolean> {
+  const raw = await AsyncStorage.getItem(TUTORIAL_KEY);
+  return raw === '1';
+}
+
+export async function markTutorialSeen(): Promise<void> {
+  await AsyncStorage.setItem(TUTORIAL_KEY, '1');
+}
+
+export async function resetTutorial(): Promise<void> {
+  await AsyncStorage.removeItem(TUTORIAL_KEY);
+}
+
 export async function listSlots(): Promise<SlotInfo[]> {
   const out: SlotInfo[] = [];
   for (let i = 0; i < SLOT_COUNT; i++) {

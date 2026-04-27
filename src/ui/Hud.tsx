@@ -16,6 +16,7 @@ import {
   type CityBuildTarget,
 } from '@/src/game/types';
 import { useGame } from '@/src/state/game';
+import { isTutorialSeen, markTutorialSeen } from '@/src/state/saves';
 
 import DiplomacyScreen from './DiplomacyScreen';
 import KingdomMenu from './KingdomMenu';
@@ -24,6 +25,7 @@ import LegendScreen from './LegendScreen';
 import { THEME } from './palette';
 import ScoreScreen from './ScoreScreen';
 import TechScreen from './TechScreen';
+import TutorialOverlay from './TutorialOverlay';
 
 function eventStyle(kind: string): { color: string } {
   switch (kind) {
@@ -48,6 +50,7 @@ export default function Hud() {
   const [kingdomOpen, setKingdomOpen] = useState(false);
   const [legendOpen, setLegendOpen] = useState(false);
   const [scoreOpen, setScoreOpen] = useState(false);
+  const [tutorialOpen, setTutorialOpen] = useState(false);
   const [cityTab, setCityTab] = useState<'units' | 'buildings' | 'wonders'>('units');
   const turn = useGame((s) => s.turn);
   const map = useGame((s) => s.map);
@@ -94,6 +97,23 @@ export default function Hud() {
     setCityTab(k === 'building' ? 'buildings' : k === 'wonder' ? 'wonders' : 'units');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCityId]);
+
+  // First-run tutorial: open automatically on first session, then never
+  // again until the user explicitly resets. Reopenable from the Help pill.
+  useEffect(() => {
+    let cancelled = false;
+    isTutorialSeen().then((seen) => {
+      if (!cancelled && !seen) setTutorialOpen(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const closeTutorial = () => {
+    setTutorialOpen(false);
+    markTutorialSeen().catch(() => {});
+  };
 
   // Auto-dismiss the end-of-turn summary after a few seconds with a fade.
   const eventsOpacity = useRef(new Animated.Value(1)).current;
@@ -164,8 +184,15 @@ export default function Hud() {
         <Pressable style={styles.pillSquare} onPress={() => setDiploOpen(true)}>
           <FontAwesome5 name="handshake" size={14} color={THEME.ink} />
         </Pressable>
-        <Pressable style={styles.pillSquare} onPress={() => setLegendOpen(true)}>
+        <Pressable
+          style={styles.pillSquare}
+          onPress={() => setLegendOpen(true)}
+          onLongPress={() => setTutorialOpen(true)}
+        >
           <FontAwesome5 name="question" size={14} color={THEME.ink} />
+        </Pressable>
+        <Pressable style={styles.pillSquare} onPress={() => setTutorialOpen(true)}>
+          <FontAwesome5 name="book" size={13} color={THEME.ink} />
         </Pressable>
         <Pressable style={styles.pillSquare} onPress={() => setScoreOpen(true)}>
           <FontAwesome5 name="trophy" size={14} color={THEME.ink} />
@@ -647,6 +674,7 @@ export default function Hud() {
       ) : null}
       {legendOpen ? <LegendScreen onClose={() => setLegendOpen(false)} /> : null}
       {scoreOpen ? <ScoreScreen onClose={() => setScoreOpen(false)} /> : null}
+      {tutorialOpen ? <TutorialOverlay onClose={closeTutorial} /> : null}
 
       {tilePicker ? (() => {
         const u = units.find(
