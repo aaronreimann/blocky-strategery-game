@@ -40,6 +40,7 @@ export default function TitleScreen() {
 
   const [slots, setSlots] = useState<SlotInfo[]>([]);
   const [pendingSlot, setPendingSlot] = useState<number | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<number | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const leadersRef = useRef<LeaderMap>(buildFallbackLeaders());
@@ -154,7 +155,7 @@ export default function TitleScreen() {
                     </Text>
                     <Pressable
                       style={[styles.deleteBtn, ended && styles.deleteBtnStrong]}
-                      onPress={() => onDelete(info.slot)}
+                      onPress={() => setPendingDelete(info.slot)}
                       hitSlop={6}
                     >
                       <Text style={[styles.deleteBtnText, ended && styles.deleteBtnTextStrong]}>
@@ -174,6 +175,52 @@ export default function TitleScreen() {
           History {history.length > 0 ? `(${history.length})` : ''}
         </Text>
       </Pressable>
+
+      {pendingDelete !== null && (() => {
+        const target = slots.find((s) => s.slot === pendingDelete);
+        if (!target || target.empty) {
+          return null;
+        }
+        const ended = !!target.gameOver;
+        return (
+          <View style={styles.modalBg}>
+            <View style={styles.confirmCard}>
+              <Text style={styles.modalTitle}>
+                {ended ? 'Clear this slot?' : 'Delete this game?'}
+              </Text>
+              <Text style={styles.modalSub}>
+                {flagEmoji(target.humanRealm.iso)} {target.humanRealm.name}
+                {target.humanRealm.leader ? ` · ${target.humanRealm.leader}` : ''}
+              </Text>
+              <Text style={styles.confirmBody}>
+                {ended
+                  ? 'The result is already saved to History. The save itself will be removed.'
+                  : `Turn ${target.turn} progress (${target.cityCount} ${target.cityCount === 1 ? 'city' : 'cities'} · ${target.unitCount} units) will be lost. This can’t be undone.`}
+              </Text>
+              <View style={styles.confirmRow}>
+                <Pressable
+                  style={styles.confirmCancel}
+                  onPress={() => setPendingDelete(null)}
+                >
+                  <Text style={styles.confirmCancelText}>Cancel</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.confirmDelete}
+                  onPress={async () => {
+                    const slot = pendingDelete;
+                    setPendingDelete(null);
+                    await onDelete(slot);
+                  }}
+                >
+                  <Text style={styles.confirmDeleteText}>
+                    {ended ? 'Clear slot' : 'Delete'}
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        );
+      })()}
 
       {pendingSlot !== null && (
         <View style={styles.modalBg}>
@@ -417,4 +464,39 @@ const styles = StyleSheet.create({
   diffBtnCount: { color: THEME.inkMuted, fontSize: 11, marginTop: 4 },
   modalCancel: { marginTop: 16, paddingVertical: 8, paddingHorizontal: 16 },
   modalCancelText: { color: THEME.inkMuted, fontSize: 13, fontWeight: '600' },
+  confirmCard: {
+    backgroundColor: 'rgba(28, 22, 18, 0.92)',
+    borderColor: 'rgba(212, 184, 138, 0.45)',
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxWidth: 420,
+    alignItems: 'center',
+  },
+  confirmBody: {
+    color: THEME.ink,
+    fontSize: 13,
+    lineHeight: 18,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  confirmRow: { flexDirection: 'row', gap: 12 },
+  confirmCancel: {
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: THEME.border,
+  },
+  confirmCancelText: { color: THEME.ink, fontSize: 13, fontWeight: '700' },
+  confirmDelete: {
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 8,
+    backgroundColor: THEME.bad,
+    borderWidth: 1,
+    borderColor: THEME.bad,
+  },
+  confirmDeleteText: { color: '#0a1729', fontSize: 13, fontWeight: '800' },
 });
