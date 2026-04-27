@@ -74,6 +74,11 @@ type GameState = {
   selectedCityId: string | null;
   lastBattle: Battle | null;
   lastWonder: { kind: WonderKind; byHuman: boolean; cityName: string } | null;
+  // Tile coordinates of recent unit kills, drawn as a pulsing red dot on the
+  // mini-map (and main map) so the player can see "something died there" at
+  // a glance — especially useful for off-screen events. UI clears the array
+  // ~1.5s after a fight resolves.
+  combatFlashes: { x: number; y: number }[];
   turnEvents: TurnEvent[];
   tilePicker: { x: number; y: number; screenX: number; screenY: number } | null;
   awaitingDestinationFor: string | null;
@@ -119,6 +124,7 @@ type GameState = {
   endTurn: () => void;
   dismissBattle: () => void;
   dismissWonder: () => void;
+  clearCombatFlashes: () => void;
   dismissTurnEvents: () => void;
 };
 
@@ -344,6 +350,7 @@ export const useGame = create<GameState>((set, get) => ({
   selectedCityId: null,
   lastBattle: null,
   lastWonder: null,
+  combatFlashes: [],
   turnEvents: [],
   tilePicker: null,
   awaitingDestinationFor: null,
@@ -386,6 +393,7 @@ export const useGame = create<GameState>((set, get) => ({
       selectedCityId: null,
       lastBattle: null,
       lastWonder: null,
+      combatFlashes: [],
       gameOver: null,
     });
     autosave(get());
@@ -487,6 +495,7 @@ export const useGame = create<GameState>((set, get) => ({
       selectedCityId: null,
       lastBattle: null,
       lastWonder: null,
+      combatFlashes: [],
       gameOver: data.gameOver ?? null,
     });
     return true;
@@ -513,6 +522,7 @@ export const useGame = create<GameState>((set, get) => ({
       selectedCityId: null,
       lastBattle: null,
       lastWonder: null,
+      combatFlashes: [],
       gameOver: null,
     });
   },
@@ -632,6 +642,7 @@ export const useGame = create<GameState>((set, get) => ({
           battle = resolveCombat(selected, enemyUnitAtTile, defenderTile, wallsBonus, players);
           if (!battle.attackerWon) {
             nextUnits = nextUnits.filter((u) => u.id !== selected.id);
+            set({ combatFlashes: [...get().combatFlashes, { x: selected.x, y: selected.y }] });
             const finished = checkGameOver({
               units: nextUnits,
               cities: nextCities,
@@ -658,6 +669,12 @@ export const useGame = create<GameState>((set, get) => ({
             return;
           }
           nextUnits = nextUnits.filter((u) => u.id !== enemyUnitAtTile.id);
+          set({
+            combatFlashes: [
+              ...get().combatFlashes,
+              { x: enemyUnitAtTile.x, y: enemyUnitAtTile.y },
+            ],
+          });
         }
 
         nextUnits = nextUnits.map((u) =>
@@ -1644,6 +1661,7 @@ export const useGame = create<GameState>((set, get) => ({
     }
 
     let lastAIBattle: Battle | null = null;
+    const pendingFlashes: { x: number; y: number }[] = [];
     for (const player of workingPlayers) {
       if (player.isHuman) continue;
       const atPeaceWith = new Set<number>();
@@ -1680,6 +1698,15 @@ export const useGame = create<GameState>((set, get) => ({
       }
       if (result.battles.length > 0) {
         lastAIBattle = result.battles[result.battles.length - 1];
+      }
+      // Flash every AI battle's loser so the human can see "something died
+      // there" on the mini-map even when off-screen.
+      for (const b of result.battles) {
+        if (b.attackerWon) {
+          pendingFlashes.push({ x: b.defenderX, y: b.defenderY });
+        } else {
+          pendingFlashes.push({ x: b.attackerX, y: b.attackerY });
+        }
       }
     }
 
@@ -1786,6 +1813,7 @@ export const useGame = create<GameState>((set, get) => ({
           const battle = resolveCombat(me, target.unit, defenderTile, wallsBonus, workingPlayers);
           if (battle.attackerWon) {
             workingUnits = workingUnits.filter((u) => u.id !== target!.unit.id);
+            pendingFlashes.push({ x: target.x, y: target.y });
             if (target.unit.ownerIdx === HUMAN_IDX) {
               events.push({
                 kind: 'lost',
@@ -1795,6 +1823,7 @@ export const useGame = create<GameState>((set, get) => ({
             }
           } else {
             workingUnits = workingUnits.filter((u) => u.id !== me.id);
+            pendingFlashes.push({ x: me.x, y: me.y });
             if (target.unit.ownerIdx === HUMAN_IDX) {
               events.push({
                 kind: 'battle',
@@ -1938,6 +1967,9 @@ export const useGame = create<GameState>((set, get) => ({
       lastWonder: humanWonderJustBuilt
         ? { kind: humanWonderJustBuilt.kind, byHuman: true, cityName: humanWonderJustBuilt.cityName }
         : get().lastWonder,
+      combatFlashes: pendingFlashes.length > 0
+        ? [...get().combatFlashes, ...pendingFlashes]
+        : get().combatFlashes,
       turnEvents: events,
       gameOver: finished,
     });
@@ -1953,6 +1985,7 @@ export const useGame = create<GameState>((set, get) => ({
 
   dismissBattle: () => set({ lastBattle: null }),
   dismissWonder: () => set({ lastWonder: null }),
+  clearCombatFlashes: () => set({ combatFlashes: [] }),
   dismissTurnEvents: () => set({ turnEvents: [] }),
 
   selectUnitFromPicker: (unitId: string) => {

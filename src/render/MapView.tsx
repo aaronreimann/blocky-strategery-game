@@ -20,6 +20,8 @@ import Animated, {
   runOnJS,
   useDerivedValue,
   useSharedValue,
+  withRepeat,
+  withTiming,
 } from 'react-native-reanimated';
 
 import {
@@ -1148,6 +1150,15 @@ export default function MapView({
   // Honor jump-to requests from elsewhere in the UI (Kingdom Menu).
   const pendingJumpTo = useGame((s) => s.pendingJumpTo);
   const clearJumpRequest = useGame((s) => s.clearJumpRequest);
+  const combatFlashes = useGame((s) => s.combatFlashes);
+  const flashPulse = useSharedValue(0);
+  const flashRadius = useDerivedValue(() => TILE_SIZE * 0.25 + flashPulse.value * TILE_SIZE * 0.45);
+  const flashOpacity = useDerivedValue(() => 0.85 - flashPulse.value * 0.7);
+  useEffect(() => {
+    if (combatFlashes.length === 0) return;
+    flashPulse.value = 0;
+    flashPulse.value = withRepeat(withTiming(1, { duration: 600 }), -1, false);
+  }, [combatFlashes, flashPulse]);
   useEffect(() => {
     if (!pendingJumpTo) return;
     jumpTo(
@@ -1181,6 +1192,18 @@ export default function MapView({
             {workIndicatorLayer}
             {badgeLayer}
             {fogLayer}
+            {combatFlashes.map((f, i) => (
+              <Circle
+                key={`mflash-${i}-${f.x}-${f.y}`}
+                cx={f.x * TILE_SIZE + TILE_SIZE / 2}
+                cy={f.y * TILE_SIZE + TILE_SIZE / 2}
+                r={flashRadius}
+                color="#ef4444"
+                opacity={flashOpacity}
+                style="stroke"
+                strokeWidth={3}
+              />
+            ))}
             {selectionLayer}
             <Path
               path={dragLinePath}

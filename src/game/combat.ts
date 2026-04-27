@@ -15,6 +15,12 @@ export type Battle = {
   attackerWon: boolean;
   attackerRoll: number;
   defenderRoll: number;
+  // Tile coordinates of the participants — used for combat-flash markers
+  // on the mini-map and main map after a death.
+  attackerX: number;
+  attackerY: number;
+  defenderX: number;
+  defenderY: number;
 };
 
 function d6(): number {
@@ -126,5 +132,9 @@ export function resolveCombat(
     attackerWon: attackerRoll > defenderRoll,
     attackerRoll,
     defenderRoll,
+    attackerX: attacker.x,
+    attackerY: attacker.y,
+    defenderX: defender.x,
+    defenderY: defender.y,
   };
 }

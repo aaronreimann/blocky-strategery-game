@@ -1,12 +1,20 @@
 import { Canvas, Circle, Group, Rect } from '@shopify/react-native-skia';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { runOnJS, useDerivedValue, type SharedValue } from 'react-native-reanimated';
+import {
+  runOnJS,
+  useDerivedValue,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+  type SharedValue,
+} from 'react-native-reanimated';
 
 import { TERRAIN } from '@/src/data/terrain';
 import type { GameMap } from '@/src/game/map';
 import type { City, Player } from '@/src/game/types';
+import { useGame } from '@/src/state/game';
 
 const MM_W = 144;
 const MM_H = 108;
@@ -45,6 +53,23 @@ export default function MiniMap({
   const sx = MM_W / worldW;
   const sy = MM_H / worldH;
   const tilePx = MM_W / map.width;
+
+  const combatFlashes = useGame((s) => s.combatFlashes);
+  const clearCombatFlashes = useGame((s) => s.clearCombatFlashes);
+  const flashPulse = useSharedValue(0);
+  const flashRadius = useDerivedValue(() => 2 + flashPulse.value * 5);
+  const flashOpacity = useDerivedValue(() => 0.85 - flashPulse.value * 0.65);
+
+  // Pulse + auto-clear when combat flashes arrive.
+  useEffect(() => {
+    if (combatFlashes.length === 0) return;
+    flashPulse.value = 0;
+    flashPulse.value = withRepeat(withTiming(1, { duration: 600 }), -1, false);
+    const t = setTimeout(() => {
+      clearCombatFlashes();
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [combatFlashes, flashPulse, clearCombatFlashes]);
 
   const terrainLayer = useMemo(
     () =>
@@ -144,6 +169,16 @@ export default function MiniMap({
             {terrainLayer}
             {cityLayer}
             {fogLayer}
+            {combatFlashes.map((f, i) => (
+              <Circle
+                key={`flash-${i}-${f.x}-${f.y}`}
+                cx={f.x * tilePx + tilePx / 2}
+                cy={f.y * tilePx + tilePx / 2}
+                r={flashRadius}
+                color="#ef4444"
+                opacity={flashOpacity}
+              />
+            ))}
             <Rect
               x={viewX}
               y={viewY}
