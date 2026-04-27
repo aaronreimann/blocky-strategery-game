@@ -26,6 +26,9 @@ export async function getCachedLeaders(): Promise<LeaderMap> {
 }
 
 export async function refreshLeaders(): Promise<LeaderMap | null> {
+  // Culture qids (cult_*) aren't Wikidata items, so the SPARQL query would
+  // always return empty. Short-circuit to skip the fetch.
+  if (COUNTRIES.every((c) => !/^Q\d+$/.test(c.qid))) return null;
   const values = COUNTRIES.map((c) => `wd:${c.qid}`).join(' ');
   const query = `
     SELECT ?country ?leaderLabel WHERE {

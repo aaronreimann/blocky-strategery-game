@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { COUNTRIES, flagEmoji, type LeaderMap } from '@/src/data/countries';
+import { COUNTRIES, type LeaderMap } from '@/src/data/countries';
 import {
   DEFAULT_SCENARIO,
   DIFFICULTIES,
@@ -53,7 +53,9 @@ export default function ScenarioScreen({ slot, leaders, onCancel, onStart }: Pro
     countryQid === null
       ? null
       : COUNTRIES.find((c) => c.qid === countryQid) ?? null;
-  const humanLeader = human ? leaders[human.qid] ?? human.fallbackLeader : '';
+  // Reference `leaders` so the prop stays useful if cultures ever get
+  // dynamic leader names again. Currently always empty for cult_* qids.
+  void leaders;
 
   return (
     <View style={styles.bg}>
@@ -76,9 +78,7 @@ export default function ScenarioScreen({ slot, leaders, onCancel, onStart }: Pro
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Country</Text>
             <Text style={styles.sectionHint}>
-              {human
-                ? `${flagEmoji(human.iso)} ${human.name} · ${humanLeader}`
-                : 'Random — chosen at game start'}
+              {human ? human.name : 'Random — chosen at game start'}
             </Text>
             <View style={styles.countryGrid}>
               <Pressable
@@ -100,11 +100,26 @@ export default function ScenarioScreen({ slot, leaders, onCancel, onStart }: Pro
                     style={[styles.countryChip, cur && styles.chipActive]}
                     onPress={() => setCountryQid(c.qid)}
                   >
-                    <Text style={[styles.countryFlag, cur && styles.chipActiveText]}>
-                      {flagEmoji(c.iso)}
-                    </Text>
+                    <View
+                      style={[
+                        styles.cultureBadge,
+                        cur && { backgroundColor: '#0a1729' },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.cultureBadgeText,
+                          cur && { color: THEME.warn },
+                        ]}
+                      >
+                        {c.name.charAt(0)}
+                      </Text>
+                    </View>
                     <Text
-                      style={[styles.countryName, cur && styles.chipActiveText]}
+                      style={[
+                        styles.countryName,
+                        cur && styles.chipActiveText,
+                      ]}
                       numberOfLines={1}
                     >
                       {c.name}
@@ -307,6 +322,15 @@ const styles = StyleSheet.create({
   },
   chipActiveText: { color: '#0a1729' },
   countryFlag: { fontSize: 14 },
+  cultureBadge: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'rgba(212, 184, 138, 0.85)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cultureBadgeText: { color: '#0a1729', fontSize: 12, fontWeight: '900' },
   countryName: { color: THEME.ink, fontSize: 11, fontWeight: '700', flex: 1 },
   startBtn: {
     marginTop: 12,

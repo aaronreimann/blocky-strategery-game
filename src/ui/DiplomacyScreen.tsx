@@ -37,10 +37,10 @@ export default function DiplomacyScreen({ onClose }: Props) {
                 <View style={styles.rowLeft}>
                   <View style={[styles.colorChip, { backgroundColor: p.color }]} />
                   <View>
-                    <Text style={styles.realmName}>
-                      {flagEmoji(p.iso)} {p.name}
-                    </Text>
-                    <Text style={styles.realmLeader}>{p.leader}</Text>
+                    <Text style={styles.realmName}>{p.name}</Text>
+                    {p.leader ? (
+                      <Text style={styles.realmLeader}>{p.leader}</Text>
+                    ) : null}
                   </View>
                 </View>
                 <View style={styles.rowRight}>

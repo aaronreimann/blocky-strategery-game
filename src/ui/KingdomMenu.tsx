@@ -35,10 +35,10 @@ export default function KingdomMenu({ onClose, onOpenTech }: Props) {
       <Pressable style={styles.card} onPress={() => {}}>
         <View style={styles.header}>
           <View>
-            <Text style={styles.title}>
-              {flagEmoji(human.iso)} {human.name}
-            </Text>
-            <Text style={styles.subtitle}>{human.leader}</Text>
+            <Text style={styles.title}>{human.name}</Text>
+            {human.leader ? (
+              <Text style={styles.subtitle}>{human.leader}</Text>
+            ) : null}
           </View>
           <Pressable onPress={onClose} style={styles.closeBtn}>
             <Text style={styles.closeText}>Close</Text>
