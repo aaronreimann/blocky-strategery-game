@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import type { ImprovementMap } from '@/src/data/improvements';
+import { TERRAIN } from '@/src/data/terrain';
 import type { GameMap } from '@/src/game/map';
 import type {
   City,
@@ -40,6 +41,15 @@ export type SaveData = {
   savedAt: string;
 };
 
+export type SlotPreview = {
+  width: number;
+  height: number;
+  // Row-major terrain color hex strings, length width × height.
+  tileColors: string[];
+  // City dots — owner color shown as a small circle on the thumbnail.
+  cities: { x: number; y: number; color: string }[];
+};
+
 export type SlotInfo =
   | { slot: number; empty: true }
   | {
@@ -52,6 +62,7 @@ export type SlotInfo =
       humanRealm: { name: string; leader: string; iso: string };
       gameOver: GameOverState | null;
       savedAt: string;
+      preview: SlotPreview;
     };
 
 export type HistoryEntry = {
@@ -154,6 +165,12 @@ export async function listSlots(): Promise<SlotInfo[]> {
       out.push({ slot: i, empty: true });
     } else {
       const human = data.players.find((p) => p.isHuman);
+      const tileColors = data.map.tiles.map((t) => TERRAIN[t.terrain].color);
+      const cityDots = data.cities.map((c) => ({
+        x: c.x,
+        y: c.y,
+        color: data.players[c.ownerIdx]?.color ?? '#ffffff',
+      }));
       out.push({
         slot: i,
         empty: false,
@@ -168,6 +185,12 @@ export async function listSlots(): Promise<SlotInfo[]> {
         },
         gameOver: data.gameOver ?? null,
         savedAt: data.savedAt,
+        preview: {
+          width: data.map.width,
+          height: data.map.height,
+          tileColors,
+          cities: cityDots,
+        },
       });
     }
   }

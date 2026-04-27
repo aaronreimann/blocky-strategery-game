@@ -22,6 +22,7 @@ import {
 import { THEME } from './palette';
 import ScenarioScreen from './ScenarioScreen';
 import SettingsScreen from './SettingsScreen';
+import SlotThumbnail from './SlotThumbnail';
 
 const RESULT_LABEL: Record<'win' | 'lose' | 'draw', string> = {
   win: 'Victory',
@@ -136,6 +137,9 @@ export default function TitleScreen() {
                   </>
                 ) : (
                   <>
+                    <View style={styles.slotThumbWrap}>
+                      <SlotThumbnail preview={info.preview} width={120} height={72} />
+                    </View>
                     {ended && (
                       <Text style={[styles.slotResult, { color: RESULT_COLOR[ended.kind] }]}>
                         {RESULT_LABEL[ended.kind]}
@@ -350,6 +354,10 @@ const styles = StyleSheet.create({
     width: '100%',
     minHeight: 160,
     justifyContent: 'center',
+  },
+  slotThumbWrap: {
+    alignItems: 'center',
+    marginBottom: 8,
   },
   slotEmpty: { color: THEME.ink, fontSize: 18, fontWeight: '700' },
   slotMeta: { color: THEME.ink, fontSize: 14, fontWeight: '700', marginTop: 2 },
