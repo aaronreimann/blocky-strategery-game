@@ -1,4 +1,4 @@
-import { CULTURE_FLAVOR } from '@/src/data/cultures';
+import { CULTURE_FLAVOR, uniqueUnitFor } from '@/src/data/cultures';
 import { TERRAIN } from '@/src/data/terrain';
 import { UNIT, type UnitKind } from '@/src/data/units';
 
@@ -59,8 +59,10 @@ export function attackerCombatMod(
   defenderTile: Tile,
   attackerPlayer: Player | undefined,
 ): number {
+  const unique = uniqueUnitFor(attackerPlayer?.iso, attacker.kind);
   return (
     unitAttack(attacker)
+    + (unique?.attackBonus ?? 0)
     + (attacker.veteran ? 1 : 0)
     + cultureTerrainBonus(attackerPlayer, defenderTile.terrain).attack
   );
@@ -72,8 +74,10 @@ export function defenderCombatMod(
   defenderWallsBonus: number,
   defenderPlayer: Player | undefined,
 ): number {
+  const unique = uniqueUnitFor(defenderPlayer?.iso, defender.kind);
   return (
     unitDefense(defender)
+    + (unique?.defenseBonus ?? 0)
     + (defender.veteran ? 1 : 0)
     + TERRAIN[defenderTile.terrain].defenseBonus
     + defenderWallsBonus
@@ -110,13 +114,17 @@ export function resolveCombat(
   const defenderPlayer = players[defender.ownerIdx];
   const attackerCultureBonus = cultureTerrainBonus(attackerPlayer, defenderTile.terrain);
   const defenderCultureBonus = cultureTerrainBonus(defenderPlayer, defenderTile.terrain);
+  const attackerUnique = uniqueUnitFor(attackerPlayer?.iso, attacker.kind);
+  const defenderUnique = uniqueUnitFor(defenderPlayer?.iso, defender.kind);
   const attackerRoll =
     unitAttack(attacker)
+    + (attackerUnique?.attackBonus ?? 0)
     + (attacker.veteran ? 1 : 0)
     + attackerCultureBonus.attack
     + d6();
   const defenderRoll =
     unitDefense(defender)
+    + (defenderUnique?.defenseBonus ?? 0)
     + (defender.veteran ? 1 : 0)
     + TERRAIN[defenderTile.terrain].defenseBonus
     + defenderWallsBonus

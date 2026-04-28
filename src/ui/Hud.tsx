@@ -7,6 +7,7 @@ import { BUILDING, BUILDING_KINDS } from '@/src/data/buildings';
 import { flagEmoji } from '@/src/data/countries';
 import { IMPROVEMENT, tileKey } from '@/src/data/improvements';
 import { TECH } from '@/src/data/tech';
+import { effectiveUnitName, uniqueUnitFor } from '@/src/data/cultures';
 import { UNIT, UNIT_KINDS } from '@/src/data/units';
 import { WONDER, WONDER_KINDS } from '@/src/data/wonders';
 import {
@@ -359,7 +360,9 @@ export default function Hud() {
                       <Text style={styles.battleStack}>×{att.attackerStackSize}</Text>
                     ) : null}
                   </View>
-                  <Text style={styles.battleName}>{UNIT[att.attackerKind].name}</Text>
+                  <Text style={styles.battleName}>
+                    {effectiveUnitName(players[att.attackerOwnerIdx]?.iso, att.attackerKind)}
+                  </Text>
                   <Text style={[styles.battleRoll, attackerLost && styles.battleRollLost]}>
                     {att.attackerRoll}
                   </Text>
@@ -372,7 +375,9 @@ export default function Hud() {
                       <Text style={styles.battleStack}>×{att.defenderStackSize}</Text>
                     ) : null}
                   </View>
-                  <Text style={styles.battleName}>{UNIT[att.defenderKind].name}</Text>
+                  <Text style={styles.battleName}>
+                    {effectiveUnitName(players[att.defenderOwnerIdx]?.iso, att.defenderKind)}
+                  </Text>
                   <Text style={[styles.battleRoll, defenderLost && styles.battleRollLost]}>
                     {att.defenderRoll}
                   </Text>
@@ -427,21 +432,28 @@ export default function Hud() {
       ) : null}
 
       <View style={styles.bottomRightStack} pointerEvents="box-none">
-        {selectedUnit && unitSpec ? (
+        {selectedUnit && unitSpec ? (() => {
+          const ownerIso = players[selectedUnit.ownerIdx]?.iso;
+          const displayName = effectiveUnitName(ownerIso, selectedUnit.kind);
+          const unique = uniqueUnitFor(ownerIso, selectedUnit.kind);
+          const atkBonus = unique?.attackBonus ?? 0;
+          const defBonus = unique?.defenseBonus ?? 0;
+          const moveBonus = unique?.moveBonus ?? 0;
+          return (
           <View style={styles.card} pointerEvents="auto">
             <Text style={styles.cardTitle}>
-              {unitSpec.name}
+              {displayName}
               {selectedUnit.stack.length > 1 ? ` (Army x${selectedUnit.stack.length})` : ''}
             </Text>
             {selectedUnit.stack.length > 1 ? (
               <Text style={styles.cardMeta}>
-                Moves {selectedUnit.movesLeft}/{unitSpec.move} · ATK{' '}
-                {selectedUnit.stack.reduce((s, k) => s + UNIT[k].attack, 0)} · DEF{' '}
-                {selectedUnit.stack.reduce((s, k) => s + UNIT[k].defense, 0)}
+                Moves {selectedUnit.movesLeft}/{unitSpec.move + moveBonus} · ATK{' '}
+                {selectedUnit.stack.reduce((s, k) => s + UNIT[k].attack, 0) + atkBonus} · DEF{' '}
+                {selectedUnit.stack.reduce((s, k) => s + UNIT[k].defense, 0) + defBonus}
               </Text>
             ) : (
               <Text style={styles.cardMeta}>
-                Moves {selectedUnit.movesLeft}/{unitSpec.move} · ATK {unitSpec.attack} · DEF {unitSpec.defense}
+                Moves {selectedUnit.movesLeft}/{unitSpec.move + moveBonus} · ATK {unitSpec.attack + atkBonus} · DEF {unitSpec.defense + defBonus}
               </Text>
             )}
             {(() => {
@@ -497,7 +509,7 @@ export default function Hud() {
                   const stackTag = defender.stack.length > 1 ? ` ×${defender.stack.length}` : '';
                   targets.push({
                     key: k,
-                    label: `${UNIT[defender.kind].name}${stackTag}`,
+                    label: `${effectiveUnitName(players[defender.ownerIdx]?.iso, defender.kind)}${stackTag}`,
                     win: odds.win,
                     x,
                     y,
@@ -666,7 +678,8 @@ export default function Hud() {
               )
             ) : null}
           </View>
-        ) : selectedCity ? (
+          );
+        })() : selectedCity ? (
           (() => {
             const tradeBonus = map
               ? computeTradeRoutes(selectedCity.ownerIdx, cities, map).get(selectedCity.id) ?? 0
@@ -678,7 +691,7 @@ export default function Hud() {
             const buildTargetLabel = (() => {
               const b = selectedCity.building;
               if (!b) return 'Idle';
-              if (b.kind === 'unit') return UNIT[b.unit].name;
+              if (b.kind === 'unit') return effectiveUnitName(players[selectedCity.ownerIdx]?.iso, b.unit);
               if (b.kind === 'building') return BUILDING[b.building].name;
               return WONDER[b.wonder].name;
             })();
@@ -729,7 +742,7 @@ export default function Hud() {
                     {selectedCity.buildQueue.map((q, i) => {
                       const label =
                         q.kind === 'unit'
-                          ? UNIT[q.unit].name
+                          ? effectiveUnitName(players[selectedCity.ownerIdx]?.iso, q.unit)
                           : q.kind === 'building'
                             ? BUILDING[q.building].name
                             : WONDER[q.wonder].name;
@@ -890,7 +903,7 @@ export default function Hud() {
                                 cur && styles.buildBtnTextActive,
                               ]}
                             >
-                              {UNIT[kind].name}
+                              {effectiveUnitName(players[selectedCity.ownerIdx]?.iso, kind)}
                             </Text>
                             <Text
                               style={[

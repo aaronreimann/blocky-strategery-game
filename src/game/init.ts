@@ -1,9 +1,17 @@
 import { COUNTRIES, type Country, type LeaderMap } from '@/src/data/countries';
-import { CULTURE_FLAVOR } from '@/src/data/cultures';
+import { CULTURE_FLAVOR, uniqueUnitFor } from '@/src/data/cultures';
 import { pickCheapestAvailable } from '@/src/data/tech';
 import { TERRAIN } from '@/src/data/terrain';
 import { UNIT, type UnitKind } from '@/src/data/units';
 import { PLAYER_PALETTE } from '@/src/ui/palette';
+
+// Move count for a freshly-spawned unit, including any culture-unique
+// move bonus (e.g. Cornish Marauder's +1 move). Without this, a Marauder
+// would have base move on turn 1 and only get its bonus from turn 2 on.
+function spawnMove(iso: string, kind: UnitKind): number {
+  const unique = uniqueUnitFor(iso, kind);
+  return UNIT[kind].move + (unique?.moveBonus ?? 0);
+}
 
 import { nextUnitId } from './ids';
 import { generateMap } from './mapgen';
@@ -85,6 +93,7 @@ function spawnStartingUnits(
   ownerIdx: number,
   start: { x: number; y: number },
   map: GameMap,
+  iso: string,
 ): Unit[] {
   return [
     {
@@ -93,7 +102,7 @@ function spawnStartingUnits(
       ownerIdx,
       x: start.x,
       y: start.y,
-      movesLeft: UNIT.pioneer.move,
+      movesLeft: spawnMove(iso, 'pioneer'),
       workingOn: null,
       workTurnsLeft: 0,
       destination: null,
@@ -108,7 +117,7 @@ function spawnStartingUnits(
       ownerIdx,
       x: clamp(start.x + 1, 0, map.width - 1),
       y: start.y,
-      movesLeft: UNIT.footman.move,
+      movesLeft: spawnMove(iso, 'footman'),
       workingOn: null,
       workTurnsLeft: 0,
       destination: null,
@@ -123,7 +132,7 @@ function spawnStartingUnits(
       ownerIdx,
       x: start.x,
       y: clamp(start.y + 1, 0, map.height - 1),
-      movesLeft: UNIT.worker.move,
+      movesLeft: spawnMove(iso, 'worker'),
       workingOn: null,
       workTurnsLeft: 0,
       destination: null,
@@ -144,6 +153,7 @@ function spawnExtraUnit(
   map: GameMap,
   kind: UnitKind,
   alreadyPlaced: Unit[],
+  iso: string,
 ): Unit {
   const taken = new Set(alreadyPlaced.map((u) => `${u.x},${u.y}`));
   const candidates: { x: number; y: number }[] = [];
@@ -169,7 +179,7 @@ function spawnExtraUnit(
     ownerIdx,
     x: pos.x,
     y: pos.y,
-    movesLeft: UNIT[kind].move,
+    movesLeft: spawnMove(iso, kind),
     workingOn: null,
     workTurnsLeft: 0,
     destination: null,
@@ -235,10 +245,11 @@ export function buildInitialState(
   const units: Unit[] = [];
   for (let i = 0; i < totalPlayers; i++) {
     const start = spawns[i] ?? spawns[0];
-    units.push(...spawnStartingUnits(i, start, map));
-    const extra = CULTURE_FLAVOR[realms[i].iso]?.extraStartingUnit;
+    const iso = realms[i].iso;
+    units.push(...spawnStartingUnits(i, start, map, iso));
+    const extra = CULTURE_FLAVOR[iso]?.extraStartingUnit;
     if (extra) {
-      units.push(spawnExtraUnit(i, start, map, extra, units));
+      units.push(spawnExtraUnit(i, start, map, extra, units, iso));
     }
   }
 

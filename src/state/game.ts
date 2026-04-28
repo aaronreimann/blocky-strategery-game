@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 
 import { BUILDING, type BuildingKind } from '@/src/data/buildings';
+import { effectiveUnitName, uniqueUnitFor } from '@/src/data/cultures';
 import { WONDER, type WonderKind } from '@/src/data/wonders';
 import type { LeaderMap } from '@/src/data/countries';
 import {
@@ -1175,6 +1176,7 @@ export const useGame = create<GameState>((set, get) => ({
 
     // Refresh moves; +1 movement bonus when starting on a road tile.
     // Lighthouse wonder: owner's sea units get +1 movement permanently.
+    // Culture unique units may also add a flat move bonus (e.g. Birlinn).
     let workingUnits: Unit[] = units.map((u) => {
       const baseMove = UNIT[u.kind].move;
       const roadBonus = improvements[tileKey(u.x, u.y)] === 'road' ? 1 : 0;
@@ -1182,7 +1184,10 @@ export const useGame = create<GameState>((set, get) => ({
         UNIT[u.kind].domain === 'sea' &&
         wonders.some((w) => w.kind === 'lighthouse' && w.ownerIdx === u.ownerIdx);
       const seaBonus = hasLighthouse ? 1 : 0;
-      return { ...u, movesLeft: baseMove + roadBonus + seaBonus };
+      const owner = players.find((p) => p.idx === u.ownerIdx);
+      const unique = uniqueUnitFor(owner?.iso, u.kind);
+      const uniqueMove = unique?.moveBonus ?? 0;
+      return { ...u, movesLeft: baseMove + roadBonus + seaBonus + uniqueMove };
     });
 
     // Advance any in-progress work; complete improvements when done.
@@ -1241,13 +1246,15 @@ export const useGame = create<GameState>((set, get) => ({
         if (!spawnPos) {
           return { ...city, population: nextPop, food: nextFood, production: accrued };
         }
+        const cityOwner = players.find((p) => p.idx === city.ownerIdx);
+        const unique = uniqueUnitFor(cityOwner?.iso, unitKind);
         workingUnits.push({
           id: nextUnitId(),
           kind: unitKind,
           ownerIdx: city.ownerIdx,
           x: spawnPos.x,
           y: spawnPos.y,
-          movesLeft: UNIT[unitKind].move,
+          movesLeft: UNIT[unitKind].move + (unique?.moveBonus ?? 0),
           workingOn: null,
           workTurnsLeft: 0,
           destination: null,
@@ -1259,7 +1266,7 @@ export const useGame = create<GameState>((set, get) => ({
         if (city.ownerIdx === HUMAN_IDX) {
           events.push({
             kind: 'built',
-            text: `${city.name} built a ${UNIT[unitKind].name}.`,
+            text: `${city.name} built a ${effectiveUnitName(cityOwner?.iso, unitKind)}.`,
           });
         }
         // Pick next build: queue first, then AI selection, then repeat.
