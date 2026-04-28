@@ -64,25 +64,33 @@ export const CULTURE_FLAVOR: Record<string, CultureFlavor> = {
     blurb: 'Schiltron — +2 def on hills; Spearmen are Highlanders (+1 atk).',
   },
   picts: {
-    color: '#5c940d',  // dark olive — woad and forest
+    // Was dark olive #5c940d — clashed with forest/grassland. Woad was
+    // historically a blue dye, so this sky-blue is more accurate too.
+    color: '#0ea5e9',  // woad sky-blue
     terrainCombatBonus: { terrain: 'forest', defense: 2 },
     uniqueUnit: { replaces: 'footman', name: 'Painted Warrior', defenseBonus: 1 },
     blurb: 'Woad warriors — +2 def in forests; Footmen are Painted Warriors (+1 def).',
   },
   irish: {
-    color: '#2f9e44',  // emerald
+    // Was emerald #2f9e44 — clashed with grassland. Lime is yellow-shifted
+    // so it reads cleanly above blue-green grass.
+    color: '#84cc16',  // lime
     extraStartingUnit: 'pioneer',
     uniqueUnit: { replaces: 'swordsman', name: 'Gallowglass', defenseBonus: 1 },
     blurb: 'Túatha — extra Wayfarer; Swordsmen are Gallowglasses (+1 def).',
   },
   cornish: {
-    color: '#868e96',  // St Piran black-and-white → mid grey
+    // Was mid grey #868e96 — clashed with mountains and tundra. Bumped to
+    // a near-white silver, evoking St Piran's white cross.
+    color: '#e9ecef',  // St Piran silver
     startingGold: 60,
     uniqueUnit: { replaces: 'footman', name: 'Marauder', moveBonus: 1 },
     blurb: 'Tin trade — 60 starting gold; Footmen are Marauders (+1 move).',
   },
   cumbrians: {
-    color: '#1971c2',  // Strathclyde silver-eagle on blue
+    // Was Strathclyde blue #1971c2 — clashed with ocean and coast. Moved
+    // to a magenta-purple, distinct from Danes' deep violet.
+    color: '#9333ea',  // Strathclyde magenta-purple
     startingResearched: ['bronze_working'],
     uniqueUnit: { replaces: 'spearman', name: 'Hammerman', attackBonus: 1 },
     blurb: 'Smiths of Strathclyde — start with Bronze Working; Spearmen are Hammermen (+1 atk).',
@@ -95,7 +103,9 @@ export const CULTURE_FLAVOR: Record<string, CultureFlavor> = {
     blurb: 'Sea-raiders — extra Footman, +1 atk on coast; Footmen are Berserkers (+2 atk).',
   },
   islesmen: {
-    color: '#0c8599',  // sea teal
+    // Was sea teal #0c8599 — clashed with coast/ocean. Bright cyan reads
+    // "sea culture" without matching the actual water tile color.
+    color: '#06b6d4',  // bright cyan
     startingResearched: ['sailing'],
     uniqueUnit: { replaces: 'galley', name: 'Birlinn', attackBonus: 1, moveBonus: 1 },
     blurb: 'Galley lords — start with Sailing; Galleys are Birlinns (+1 atk, +1 move).',
