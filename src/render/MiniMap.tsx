@@ -121,7 +121,7 @@ export default function MiniMap({
             y={y * tilePx}
             width={tilePx + 0.5}
             height={tilePx + 0.5}
-            color={seen ? 'rgba(0, 0, 0, 0.45)' : 'rgba(8, 14, 28, 0.94)'}
+            color={seen ? 'rgba(150, 158, 170, 0.55)' : 'rgba(8, 14, 28, 0.94)'}
           />,
         );
       }

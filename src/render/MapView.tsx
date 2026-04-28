@@ -1173,8 +1173,10 @@ export default function MapView({
     );
   }, [selectedUnitId, selectedCityId, units, cities]);
 
-  // Fog of war: dim explored-but-not-currently-visible tiles, hide unexplored
-  // tiles entirely. Drawn after everything else so it overlays the world.
+  // Fog of war: explored-but-not-currently-visible tiles get a cool gray
+  // wash so terrain is still readable but visibly drained of color. Never
+  // -explored tiles get a near-opaque dark blue. Drawn after everything
+  // else so it overlays the world.
   const fogLayer = useMemo(() => {
     const out: React.ReactNode[] = [];
     for (let y = 0; y < map.height; y++) {
@@ -1189,7 +1191,7 @@ export default function MapView({
             y={y * TILE_SIZE}
             width={TILE_SIZE}
             height={TILE_SIZE}
-            color={seen ? 'rgba(0, 0, 0, 0.45)' : 'rgba(8, 14, 28, 0.94)'}
+            color={seen ? 'rgba(150, 158, 170, 0.55)' : 'rgba(8, 14, 28, 0.94)'}
           />,
         );
       }

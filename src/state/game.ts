@@ -1657,6 +1657,17 @@ export const useGame = create<GameState>((set, get) => ({
       );
       const targetByUnit = new Map<string, { x: number; y: number }>();
       const claimedTargets: { x: number; y: number }[] = [];
+      // Pre-pin the current positions of all explorers as repulsion
+      // points. Without this, a Footman built in the city after another
+      // Footman has already walked NW will still see "frontier is NW"
+      // as the closest unexplored area and head the same way. Treating
+      // the other unit's current location as a claim pushes the new
+      // explorer toward a different bearing.
+      const explorerPositions = explorers.map((e) => ({
+        id: e.id,
+        x: e.x,
+        y: e.y,
+      }));
       for (const u of explorers) {
         const blocked = new Set<string>();
         for (const o of workingUnits) {
@@ -1665,13 +1676,16 @@ export const useGame = create<GameState>((set, get) => ({
         for (const c of workingCities) {
           if (c.ownerIdx !== u.ownerIdx) blocked.add(`${c.x},${c.y}`);
         }
+        const otherExplorerPositions = explorerPositions
+          .filter((p) => p.id !== u.id)
+          .map(({ x, y }) => ({ x, y }));
         const target = pickExploreTarget(
           { x: u.x, y: u.y },
           exploredSet,
           blocked,
           map,
           (x, y) => canEnterTerrain(u.kind, map.tiles[y * map.width + x].terrain),
-          claimedTargets,
+          [...otherExplorerPositions, ...claimedTargets],
         );
         if (target) {
           targetByUnit.set(u.id, target);
