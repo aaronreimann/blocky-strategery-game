@@ -167,8 +167,10 @@ export default function MapView({
   const ty = useSharedValue(0);
   const scale = useSharedValue(1);
 
-  const startTx = useSharedValue(0);
-  const startTy = useSharedValue(0);
+  const panStartTx = useSharedValue(0);
+  const panStartTy = useSharedValue(0);
+  const pinchStartTx = useSharedValue(0);
+  const pinchStartTy = useSharedValue(0);
   const startScale = useSharedValue(1);
 
   // Drag-from-selected-unit state, synced from React props each render so the
@@ -209,12 +211,19 @@ export default function MapView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Declared before pan/pinch so both worklets capture it correctly. If
+  // pinchActive lives below pan, pan's worklet closure captures it as
+  // undefined and crashes on first pan with "Cannot read property 'value'
+  // of undefined".
+  const pinchActive = useSharedValue(false);
+
   const pan = Gesture.Pan()
     .minDistance(8)
+    .maxPointers(1)
     .onStart((e) => {
       'worklet';
-      startTx.value = tx.value;
-      startTy.value = ty.value;
+      panStartTx.value = tx.value;
+      panStartTy.value = ty.value;
       // If the gesture began on the selected unit's tile, treat as a
       // destination drag rather than a camera pan.
       const wx = (e.x - tx.value) / scale.value;
@@ -238,20 +247,25 @@ export default function MapView({
         dragWorldY.value = wy;
         return;
       }
+
+      if (!Number.isFinite(e.translationX) || !Number.isFinite(e.translationY)) return;
+
       // While pinch owns the camera, pan stops writing tx/ty (otherwise
       // pan and pinch race each frame and pan wins, dragging the zoom
-      // anchor off-screen). Rebase startTx/startTy to the current tx/ty
+      // anchor off-screen). Rebase panStartTx/panStartTy to the current tx/ty
       // minus the running translation so pan resumes seamlessly when
       // pinch ends.
       if (pinchActive.value) {
-        const tX = e.translationX || 0;
-        const tY = e.translationY || 0;
-        startTx.value = tx.value - tX;
-        startTy.value = ty.value - tY;
+        panStartTx.value = tx.value - e.translationX;
+        panStartTy.value = ty.value - e.translationY;
         return;
       }
-      tx.value = startTx.value + e.translationX;
-      ty.value = startTy.value + e.translationY;
+      
+      const newTx = panStartTx.value + e.translationX;
+      const newTy = panStartTy.value + e.translationY;
+      
+      if (Number.isFinite(newTx)) tx.value = newTx;
+      if (Number.isFinite(newTy)) ty.value = newTy;
     })
     .onEnd((e) => {
       'worklet';
@@ -270,13 +284,12 @@ export default function MapView({
   // on Pinch's own e.scale (which is reliable everywhere) and lock the
   // focal to the screen center. You zoom toward the middle, which loses
   // some precision vs. true two-finger anchoring but is rock solid.
-  const pinchActive = useSharedValue(false);
   const pinch = Gesture.Pinch()
     .onStart(() => {
       'worklet';
       startScale.value = scale.value;
-      startTx.value = tx.value;
-      startTy.value = ty.value;
+      pinchStartTx.value = tx.value;
+      pinchStartTy.value = ty.value;
       pinchActive.value = true;
     })
     .onUpdate((e) => {
@@ -288,10 +301,15 @@ export default function MapView({
         MAX_SCALE,
       );
       const ratio = next / startScale.value;
+      if (!Number.isFinite(ratio)) return;
+
       const fx = screenW / 2;
       const fy = screenH / 2;
-      tx.value = fx - (fx - startTx.value) * ratio;
-      ty.value = fy - (fy - startTy.value) * ratio;
+      const newTx = fx - (fx - pinchStartTx.value) * ratio;
+      const newTy = fy - (fy - pinchStartTy.value) * ratio;
+
+      if (Number.isFinite(newTx)) tx.value = newTx;
+      if (Number.isFinite(newTy)) ty.value = newTy;
       scale.value = next;
     })
     .onEnd(() => {
@@ -323,11 +341,16 @@ export default function MapView({
 
   const gesture = Gesture.Race(longPress, tap, Gesture.Simultaneous(pan, pinch));
 
-  const transform = useDerivedValue(() => [
-    { translateX: tx.value },
-    { translateY: ty.value },
-    { scale: scale.value },
-  ]);
+  const transform = useDerivedValue(() => {
+    const safeTx = Number.isFinite(tx.value) ? tx.value : 0;
+    const safeTy = Number.isFinite(ty.value) ? ty.value : 0;
+    const safeScale = Number.isFinite(scale.value) && scale.value > 0 ? scale.value : 1;
+    return [
+      { translateX: safeTx },
+      { translateY: safeTy },
+      { scale: safeScale },
+    ];
+  });
 
   const baseLayer = useMemo(
     () =>
