@@ -14,7 +14,7 @@
     },
     "android": {
       "package": "com.aaronr.blockystrategery",
-      "versionCode": 6,
+      "versionCode": 7,
       "adaptiveIcon": {
         "backgroundColor": "#0a1729",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
