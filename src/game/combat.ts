@@ -13,6 +13,11 @@ export type Battle = {
   attackerOwnerIdx: number;
   defenderOwnerIdx: number;
   attackerWon: boolean;
+  // With the strength-ratio formula these are no longer dice rolls but
+  // the final strength values (base stat + culture/veteran/terrain/walls
+  // /unique-unit bonuses). The Hud shows them as the matchup numbers,
+  // so a Footman of strength 2 vs a Spearman of strength 4 reads as
+  // "you're the underdog" at a glance.
   attackerRoll: number;
   defenderRoll: number;
   // Tile coordinates of the participants — used for combat-flash markers
@@ -23,10 +28,6 @@ export type Battle = {
   defenderY: number;
 };
 
-function d6(): number {
-  return 1 + Math.floor(Math.random() * 6);
-}
-
 export function unitAttack(unit: Unit): number {
   return unit.stack.reduce((sum, k) => sum + UNIT[k].attack, 0);
 }
@@ -35,25 +36,31 @@ export function unitDefense(unit: Unit): number {
   return unit.stack.reduce((sum, k) => sum + UNIT[k].defense, 0);
 }
 
-// Compute exact win probability for an attacker rolling 1d6 + attMod
-// against a defender rolling 1d6 + defMod, where ties go to the defender
-// (matches resolveCombat()'s `attackerRoll > defenderRoll`). 36 outcomes,
-// closed-form.
+// Win probability for an attacker of given strength against a defender
+// of given strength, using the squared-ratio formula
+//   P(attacker wins) = atk² / (atk² + def²)
+// Squaring widens the gap between similar values, so a Footman (atk 1)
+// vs a Serf (def 1) is 50/50 but a Footman (atk 2) vs a Serf (def 0.5)
+// is ~94% — small absolute differences in stats now actually decide
+// fights instead of getting drowned out by d6 noise.
+//
+// Defender strength is floored at 0.5 to avoid divide-by-zero when the
+// defender has 0 effective defense, and to leave non-zero attackers a
+// non-zero chance of failure.
 export function attackOdds(
   attMod: number,
   defMod: number,
 ): { win: number; lose: number } {
-  let wins = 0;
-  for (let a = 1; a <= 6; a++) {
-    for (let d = 1; d <= 6; d++) {
-      if (attMod + a > defMod + d) wins++;
-    }
-  }
-  return { win: wins / 36, lose: 1 - wins / 36 };
+  const a = Math.max(0, attMod);
+  const d = Math.max(0.5, defMod);
+  const aa = a * a;
+  const dd = d * d;
+  const win = aa / (aa + dd);
+  return { win, lose: 1 - win };
 }
 
-// Same as resolveCombat's modifier math but exposed as helpers so the UI
-// can preview combat without rolling dice.
+// Helpers exposed so the UI can preview a fight before the player
+// commits to attacking.
 export function attackerCombatMod(
   attacker: Unit,
   defenderTile: Tile,
@@ -112,24 +119,19 @@ export function resolveCombat(
 ): Battle {
   const attackerPlayer = players[attacker.ownerIdx];
   const defenderPlayer = players[defender.ownerIdx];
-  const attackerCultureBonus = cultureTerrainBonus(attackerPlayer, defenderTile.terrain);
-  const defenderCultureBonus = cultureTerrainBonus(defenderPlayer, defenderTile.terrain);
-  const attackerUnique = uniqueUnitFor(attackerPlayer?.iso, attacker.kind);
-  const defenderUnique = uniqueUnitFor(defenderPlayer?.iso, defender.kind);
-  const attackerRoll =
-    unitAttack(attacker)
-    + (attackerUnique?.attackBonus ?? 0)
-    + (attacker.veteran ? 1 : 0)
-    + attackerCultureBonus.attack
-    + d6();
-  const defenderRoll =
-    unitDefense(defender)
-    + (defenderUnique?.defenseBonus ?? 0)
-    + (defender.veteran ? 1 : 0)
-    + TERRAIN[defenderTile.terrain].defenseBonus
-    + defenderWallsBonus
-    + defenderCultureBonus.defense
-    + d6();
+  const attackerStrength = attackerCombatMod(
+    attacker,
+    defenderTile,
+    attackerPlayer,
+  );
+  const defenderStrength = defenderCombatMod(
+    defender,
+    defenderTile,
+    defenderWallsBonus,
+    defenderPlayer,
+  );
+  const odds = attackOdds(attackerStrength, defenderStrength);
+  const attackerWon = Math.random() < odds.win;
   return {
     attackerKind: attacker.kind,
     defenderKind: defender.kind,
@@ -137,9 +139,9 @@ export function resolveCombat(
     defenderStackSize: defender.stack.length,
     attackerOwnerIdx: attacker.ownerIdx,
     defenderOwnerIdx: defender.ownerIdx,
-    attackerWon: attackerRoll > defenderRoll,
-    attackerRoll,
-    defenderRoll,
+    attackerWon,
+    attackerRoll: attackerStrength,
+    defenderRoll: defenderStrength,
     attackerX: attacker.x,
     attackerY: attacker.y,
     defenderX: defender.x,
