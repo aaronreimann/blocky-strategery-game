@@ -200,10 +200,13 @@ export function computeCityYields(
 
   let science = city.population;
   if (city.buildings.includes('library')) science *= 2;
+  if (city.buildings.includes('observatory')) science = Math.floor(science * 1.5);
+  if (city.buildings.includes('university')) science = Math.floor(science * 1.5);
   if (hasGreatLibrary) science = Math.floor(science * 1.5);
 
   let gold = trade;
   if (city.buildings.includes('marketplace')) gold = Math.floor(gold * 1.5);
+  if (city.buildings.includes('bank')) gold = Math.floor(gold * 1.5);
   if (hasColossusHere) gold = Math.floor(gold * 1.5);
   // Trade-route gold is added after multipliers — represents external
   // commerce, not local terrain trade, so marketplace doesn't compound it.
@@ -211,8 +214,9 @@ export function computeCityYields(
 
   const templeHappy = city.buildings.includes('temple') ? 1 : 0;
   const courthouseHappy = city.buildings.includes('courthouse') ? 1 : 0;
+  const cathedralHappy = city.buildings.includes('cathedral') ? 2 : 0;
   const wonderHappy = hasHangingGardens ? 1 : 0;
-  const happy = templeHappy + courthouseHappy + wonderHappy;
+  const happy = templeHappy + courthouseHappy + cathedralHappy + wonderHappy;
   const unhappy = Math.max(0, city.population - HAPPY_POP_THRESHOLD);
   const disorder = unhappy > happy;
   if (disorder) prod = 0;

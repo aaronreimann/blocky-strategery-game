@@ -1,6 +1,19 @@
 import type { TechId } from './tech';
 
-export const BUILDING_KINDS = ['granary', 'walls', 'library', 'marketplace', 'temple', 'courthouse', 'barracks', 'aqueduct'] as const;
+export const BUILDING_KINDS = [
+  'granary',
+  'walls',
+  'barracks',
+  'library',
+  'marketplace',
+  'temple',
+  'courthouse',
+  'aqueduct',
+  'observatory',
+  'university',
+  'bank',
+  'cathedral',
+] as const;
 export type BuildingKind = (typeof BUILDING_KINDS)[number];
 
 export type BuildingSpec = {
@@ -45,7 +58,7 @@ export const BUILDING: Record<BuildingKind, BuildingSpec> = {
     name: 'Courthouse',
     cost: 50,
     description: '+1 happy citizen — works on top of Temple for big cities.',
-    tech: null,
+    tech: 'code_of_laws',
   },
   barracks: {
     name: 'Barracks',
@@ -57,6 +70,30 @@ export const BUILDING: Record<BuildingKind, BuildingSpec> = {
     name: 'Aqueduct',
     cost: 60,
     description: 'Required for the city to grow past size 6.',
-    tech: null,
+    tech: 'construction',
+  },
+  observatory: {
+    name: 'Observatory',
+    cost: 60,
+    description: '+50% science. Stacks with Library.',
+    tech: 'astronomy',
+  },
+  university: {
+    name: 'University',
+    cost: 80,
+    description: '+50% science. Stacks with Library and Observatory.',
+    tech: 'monarchy',
+  },
+  bank: {
+    name: 'Bank',
+    cost: 60,
+    description: '+50% gold. Stacks with Marketplace.',
+    tech: 'banking',
+  },
+  cathedral: {
+    name: 'Cathedral',
+    cost: 80,
+    description: '+2 happy citizens.',
+    tech: 'theology',
   },
 };

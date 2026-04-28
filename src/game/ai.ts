@@ -232,7 +232,8 @@ export function pickAINextBuild(
 
   // Build infrastructure that THIS city is missing.
   const buildingPriority: BuildingKind[] = [
-    'granary', 'library', 'marketplace', 'walls', 'barracks', 'temple', 'courthouse',
+    'granary', 'library', 'marketplace', 'walls', 'barracks', 'temple',
+    'courthouse', 'aqueduct', 'observatory', 'bank', 'cathedral', 'university',
   ];
   for (const b of buildingPriority) {
     if (city.buildings.includes(b)) continue;
@@ -240,6 +241,8 @@ export function pickAINextBuild(
     if (tech !== null && !researched.includes(tech)) continue;
     if (b === 'temple' && city.population < 3) continue;
     if (b === 'courthouse' && city.population < 5) continue;
+    if (b === 'aqueduct' && city.population < 5) continue;
+    if (b === 'cathedral' && city.population < 5) continue;
     return { kind: 'building', building: b };
   }
 

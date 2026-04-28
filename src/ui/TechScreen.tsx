@@ -19,13 +19,25 @@ type Props = {
 // Each tech gets a flavor glyph. Many are loose thematic matches rather than
 // strict 1:1 mappings — the goal is a varied workshop wall, not literal art.
 const TECH_ICON: Record<TechId, string> = {
+  pottery: 'wheat',
   bronze_working: 'metal_bar',
   horseback_riding: 'horse_head',
+  masonry: 'stone_axe',
+  alphabet: 'wooden_sign',
+  sailing: 'caravel',
   writing: 'wooden_sign',
   currency: 'gold_bar',
-  sailing: 'caravel',
+  the_wheel: 'cog',
   iron_working: 'broadsword',
   mathematics: 'cog',
+  literacy: 'wooden_sign',
+  code_of_laws: 'wooden_sign',
+  construction: 'stone_axe',
+  monarchy: 'castle',
+  engineering: 'cog',
+  astronomy: 'wooden_sign',
+  banking: 'gold_bar',
+  theology: 'castle',
   philosophy: 'chess_knight',
 };
 
