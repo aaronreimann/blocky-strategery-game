@@ -265,68 +265,36 @@ export default function MapView({
       }
     });
 
-  // Pinch zoom — compute the focal ourselves from raw touch positions
-  // instead of trusting e.focalX/focalY (broken on Android new arch).
-  // onTouchesDown fires for every additional finger down; once we see two
-  // touches, snapshot their midpoint as the anchor and the initial finger
-  // distance as the baseline for the zoom ratio.
-  const pinchFocalX = useSharedValue(0);
-  const pinchFocalY = useSharedValue(0);
-  const pinchStartDist = useSharedValue(0);
+  // Pinch zoom — minimal handler. The onTouches API + computing focal from
+  // raw touch positions kept crashing on Android. Drop both: lean entirely
+  // on Pinch's own e.scale (which is reliable everywhere) and lock the
+  // focal to the screen center. You zoom toward the middle, which loses
+  // some precision vs. true two-finger anchoring but is rock solid.
   const pinchActive = useSharedValue(false);
   const pinch = Gesture.Pinch()
-    .onTouchesDown((event) => {
+    .onStart(() => {
       'worklet';
-      const t = event.allTouches ?? [];
-      if (t.length < 2 || pinchActive.value) return;
-      const t0 = t[0];
-      const t1 = t[1];
-      if (!t0 || !t1) return;
-      const ax = t0.absoluteX || t0.x || 0;
-      const ay = t0.absoluteY || t0.y || 0;
-      const bx = t1.absoluteX || t1.x || 0;
-      const by = t1.absoluteY || t1.y || 0;
-      pinchFocalX.value = (ax + bx) / 2;
-      pinchFocalY.value = (ay + by) / 2;
-      const d = Math.hypot(bx - ax, by - ay);
-      pinchStartDist.value = d > 1 ? d : 1;
       startScale.value = scale.value;
       startTx.value = tx.value;
       startTy.value = ty.value;
       pinchActive.value = true;
     })
-    .onTouchesMove((event) => {
+    .onUpdate((e) => {
       'worklet';
-      if (!pinchActive.value) return;
-      const t = event.allTouches ?? [];
-      if (t.length < 2) return;
-      const t0 = t[0];
-      const t1 = t[1];
-      if (!t0 || !t1) return;
-      const ax = t0.absoluteX || t0.x || 0;
-      const ay = t0.absoluteY || t0.y || 0;
-      const bx = t1.absoluteX || t1.x || 0;
-      const by = t1.absoluteY || t1.y || 0;
-      const d = Math.hypot(bx - ax, by - ay);
-      const dist = d > 1 ? d : 1;
-      const factor = dist / pinchStartDist.value;
-      if (!Number.isFinite(factor) || factor <= 0) return;
+      const s = e.scale;
+      if (!Number.isFinite(s) || s <= 0) return;
       const next = Math.min(
-        Math.max(startScale.value * factor, MIN_SCALE),
+        Math.max(startScale.value * s, MIN_SCALE),
         MAX_SCALE,
       );
       const ratio = next / startScale.value;
-      const fx = pinchFocalX.value;
-      const fy = pinchFocalY.value;
+      const fx = screenW / 2;
+      const fy = screenH / 2;
       tx.value = fx - (fx - startTx.value) * ratio;
       ty.value = fy - (fy - startTy.value) * ratio;
       scale.value = next;
     })
-    .onTouchesUp(() => {
-      'worklet';
-      pinchActive.value = false;
-    })
-    .onTouchesCancelled(() => {
+    .onEnd(() => {
       'worklet';
       pinchActive.value = false;
     });
