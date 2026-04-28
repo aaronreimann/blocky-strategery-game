@@ -10,6 +10,7 @@ import type {
   Hut,
   Player,
   RelationsMap,
+  TreatiesMap,
   Unit,
   VictoryConditions,
   Wonder,
@@ -37,6 +38,7 @@ export type SaveData = {
   wonders: Wonder[];
   huts: Hut[];
   relations: RelationsMap;
+  treaties?: TreatiesMap;
   gameOver: GameOverState | null;
   savedAt: string;
 };

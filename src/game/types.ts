@@ -87,6 +87,32 @@ export function relationKey(a: number, b: number): string {
   return a < b ? `${a},${b}` : `${b},${a}`;
 }
 
+// Per-pair diplomatic state beyond the simple war/peace flag. Keyed by
+// the same relationKey() string as RelationsMap.
+export type TreatyDetails = {
+  // Turns left on the current peace agreement. While > 0, declaring war
+  // counts as breaking the treaty and adds heavy grudge. Decrements each
+  // turn. Set to PEACE_DURATION_TURNS when peace is signed.
+  peaceTurnsLeft: number;
+  // Accumulated resentment. Goes up when this player declares war,
+  // breaks a peace, or refuses a fair trade. Decays slowly over time.
+  // Higher grudge → AI less willing to accept peace, tribute, or trades.
+  grudge: number;
+};
+export type TreatiesMap = Record<string, TreatyDetails>;
+
+export const PEACE_DURATION_TURNS = 10;
+export const GRUDGE_DECAY_INTERVAL = 5; // every N turns, grudge -= 1
+
+// Convenience getter that returns sensible defaults when no entry exists.
+export function treatyFor(
+  treaties: TreatiesMap,
+  a: number,
+  b: number,
+): TreatyDetails {
+  return treaties[relationKey(a, b)] ?? { peaceTurnsLeft: 0, grudge: 0 };
+}
+
 export type TurnEvent = {
   kind: 'battle' | 'grew' | 'built' | 'research' | 'captured' | 'lost' | 'event';
   text: string;

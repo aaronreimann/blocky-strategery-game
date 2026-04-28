@@ -21,7 +21,10 @@ import { buildInitialState } from '@/src/game/init';
 import { chebyshev, type GameMap } from '@/src/game/map';
 import { nextStepToTiles } from '@/src/game/path';
 import {
+  GRUDGE_DECAY_INTERVAL,
+  PEACE_DURATION_TURNS,
   relationKey,
+  treatyFor,
   type City,
   type CityBuildTarget,
   type CityFocus,
@@ -34,6 +37,7 @@ import {
   type Player,
   type RelationsMap,
   type ScenarioOptions,
+  type TreatiesMap,
   type TurnEvent,
   type Unit,
   type VictoryConditions,
@@ -63,6 +67,7 @@ type GameState = {
   wonders: Wonder[];
   huts: Hut[];
   relations: RelationsMap;
+  treaties: TreatiesMap;
   turn: number;
   seed: number;
   difficulty: Difficulty;
@@ -113,8 +118,9 @@ type GameState = {
   toggleWorkerAuto: () => void;
   toggleUnitExplore: () => void;
   rushBuild: (cityId: string) => void;
-  proposePeace: (otherIdx: number) => boolean;
+  proposePeace: (otherIdx: number, tribute?: number) => boolean;
   declareWar: (otherIdx: number) => void;
+  proposeTechTrade: (otherIdx: number, ourTech: TechId, theirTech: TechId) => boolean;
   requestJumpTo: (x: number, y: number) => void;
   clearJumpRequest: () => void;
   openTilePicker: (x: number, y: number, screenX: number, screenY: number) => void;
@@ -328,6 +334,7 @@ function autosave(state: GameState): void {
     wonders: state.wonders,
     huts: state.huts,
     relations: state.relations,
+    treaties: state.treaties,
     gameOver: state.gameOver,
     humanVisibility: state.humanVisibility,
   }).catch((err) => console.warn('autosave failed', err));
@@ -342,6 +349,7 @@ export const useGame = create<GameState>((set, get) => ({
   wonders: [],
   huts: [],
   relations: {},
+  treaties: {},
   turn: 1,
   seed: 0,
   difficulty: 'normal',
@@ -379,6 +387,7 @@ export const useGame = create<GameState>((set, get) => ({
       wonders: [],
       huts: initial.huts,
       relations: {},
+      treaties: {},
       turn: 1,
       seed,
       difficulty: scenario.difficulty,
@@ -479,6 +488,7 @@ export const useGame = create<GameState>((set, get) => ({
       wonders: data.wonders ?? [],
       huts: data.huts ?? [],
       relations: data.relations ?? {},
+      treaties: data.treaties ?? {},
       turn: data.turn,
       seed: data.seed,
       difficulty: data.difficulty,
@@ -515,6 +525,7 @@ export const useGame = create<GameState>((set, get) => ({
       wonders: [],
       huts: [],
       relations: {},
+      treaties: {},
       turn: 1,
       seed: 0,
       difficulty: 'normal',
@@ -607,13 +618,23 @@ export const useGame = create<GameState>((set, get) => ({
       }
 
       // Attack / capture path. Attacking automatically declares war if we
-      // were at peace with the target.
+      // were at peace with the target — and breaks any active peace
+      // treaty, adding heavy grudge.
       if (enemyUnitAtTile || enemyCityAtTile) {
         const targetOwner = enemyUnitAtTile?.ownerIdx ?? enemyCityAtTile!.ownerIdx;
         const k = relationKey(HUMAN_IDX, targetOwner);
         if (state.relations[k] === 'peace') {
+          const existing = state.treaties[k] ?? { peaceTurnsLeft: 0, grudge: 0 };
+          const grudgeAdd = existing.peaceTurnsLeft > 0 ? 10 : 5;
           set({
             relations: { ...state.relations, [k]: 'war' },
+            treaties: {
+              ...state.treaties,
+              [k]: {
+                peaceTurnsLeft: 0,
+                grudge: existing.grudge + grudgeAdd,
+              },
+            },
           });
         }
         if (selected.movesLeft <= 0) {
@@ -1022,32 +1043,62 @@ export const useGame = create<GameState>((set, get) => ({
     autosave(get());
   },
 
-  proposePeace: (otherIdx) => {
-    const { players, cities, units, relations, gameOver } = get();
+  proposePeace: (otherIdx, tribute = 0) => {
+    const { players, cities, units, relations, treaties, gameOver } = get();
     if (gameOver) return false;
     if (otherIdx === HUMAN_IDX) return false;
     const them = players[otherIdx];
     if (!them) return false;
-    // Score-based acceptance: AI accepts if it's behind.
+    const human = players[HUMAN_IDX];
+    if (!human) return false;
+    const safeTribute = Math.max(0, Math.min(tribute, human.gold));
+
+    // Score-based acceptance, modified by accumulated grudge and gold
+    // tribute. Tribute makes the AI more willing even when winning;
+    // grudge makes it stubborn even when behind.
     const score = (idx: number) =>
       cities.filter((c) => c.ownerIdx === idx).length * 10 +
       units.filter((u) => u.ownerIdx === idx).length * 2 +
       (players[idx]?.researched.length ?? 0) * 5;
-    const myScore = score(HUMAN_IDX);
-    const theirScore = score(otherIdx);
-    const accept = theirScore <= myScore;
-    set({
-      relations: {
-        ...relations,
-        [relationKey(HUMAN_IDX, otherIdx)]: accept ? 'peace' : 'war',
-      },
-      turnEvents: [
-        {
-          kind: 'battle',
-          text: `${them.name} ${accept ? 'accepts peace.' : 'refuses peace.'}`,
+    const scoreDelta = score(otherIdx) - score(HUMAN_IDX);
+    const grudge = treatyFor(treaties, HUMAN_IDX, otherIdx).grudge;
+    // Threshold: AI accepts if (their lead) - (tribute/10) - 0 <= 0,
+    // bumped up by grudge. Tribute of 50g cancels a 5-point lead.
+    const accept = scoreDelta - safeTribute / 10 + grudge * 0.5 <= 0;
+
+    const k = relationKey(HUMAN_IDX, otherIdx);
+    if (accept) {
+      const nextHuman = { ...human, gold: human.gold - safeTribute };
+      const nextThem = { ...them, gold: them.gold + safeTribute };
+      const nextPlayers = players.map((p) =>
+        p.idx === HUMAN_IDX ? nextHuman : p.idx === otherIdx ? nextThem : p,
+      );
+      const tributeText = safeTribute > 0 ? ` for ${safeTribute}g` : '';
+      set({
+        players: nextPlayers,
+        relations: { ...relations, [k]: 'peace' },
+        treaties: {
+          ...treaties,
+          [k]: {
+            peaceTurnsLeft: PEACE_DURATION_TURNS,
+            // Successful peace doesn't erase grudge but soft-decays it.
+            grudge: Math.max(0, grudge - 2),
+          },
         },
-      ],
-    });
+        turnEvents: [
+          { kind: 'battle', text: `${them.name} accepts peace${tributeText}.` },
+        ],
+      });
+    } else {
+      set({
+        turnEvents: [
+          {
+            kind: 'battle',
+            text: `${them.name} refuses peace${safeTribute > 0 ? ' (gold returned)' : ''}.`,
+          },
+        ],
+      });
+    }
     autosave(get());
     return accept;
   },
@@ -1056,23 +1107,75 @@ export const useGame = create<GameState>((set, get) => ({
   clearJumpRequest: () => set({ pendingJumpTo: null }),
 
   declareWar: (otherIdx) => {
-    const { relations, players, gameOver } = get();
+    const { relations, treaties, players, gameOver } = get();
     if (gameOver) return;
     if (otherIdx === HUMAN_IDX) return;
     const them = players[otherIdx];
+    const k = relationKey(HUMAN_IDX, otherIdx);
+    const existing = treatyFor(treaties, HUMAN_IDX, otherIdx);
+    // Breaking an active peace treaty is a much heavier grudge hit than
+    // declaring war on someone we were already at war with.
+    const grudgeAdd = existing.peaceTurnsLeft > 0 ? 10 : 5;
+    const breakNote = existing.peaceTurnsLeft > 0 ? ' (peace treaty broken)' : '';
     set({
-      relations: {
-        ...relations,
-        [relationKey(HUMAN_IDX, otherIdx)]: 'war',
+      relations: { ...relations, [k]: 'war' },
+      treaties: {
+        ...treaties,
+        [k]: {
+          peaceTurnsLeft: 0,
+          grudge: existing.grudge + grudgeAdd,
+        },
       },
       turnEvents: [
         {
           kind: 'battle',
-          text: `War declared on ${them?.name ?? `Player ${otherIdx}`}.`,
+          text: `War declared on ${them?.name ?? `Player ${otherIdx}`}${breakNote}.`,
         },
       ],
     });
     autosave(get());
+  },
+
+  proposeTechTrade: (otherIdx, ourTech, theirTech) => {
+    const { players, treaties, gameOver } = get();
+    if (gameOver) return false;
+    if (otherIdx === HUMAN_IDX) return false;
+    const human = players[HUMAN_IDX];
+    const them = players[otherIdx];
+    if (!human || !them) return false;
+    if (!human.researched.includes(ourTech)) return false;
+    if (!them.researched.includes(theirTech)) return false;
+    if (human.researched.includes(theirTech)) return false;
+    if (them.researched.includes(ourTech)) return false;
+
+    // AI accepts if theirs costs <= ours by enough to absorb their grudge.
+    // Comparing cost-of-tech-given to cost-of-tech-received.
+    const ourCost = TECH[ourTech].cost;
+    const theirCost = TECH[theirTech].cost;
+    const grudge = treatyFor(treaties, HUMAN_IDX, otherIdx).grudge;
+    const accept = ourCost - theirCost - grudge * 2 >= 0;
+
+    if (accept) {
+      const nextPlayers = players.map((p) => {
+        if (p.idx === HUMAN_IDX) return { ...p, researched: [...p.researched, theirTech] };
+        if (p.idx === otherIdx) return { ...p, researched: [...p.researched, ourTech] };
+        return p;
+      });
+      set({
+        players: nextPlayers,
+        turnEvents: [
+          { kind: 'research', text: `${them.name} traded ${TECH[theirTech].name} for ${TECH[ourTech].name}.` },
+        ],
+      });
+    } else {
+      set({
+        turnEvents: [
+          { kind: 'battle', text: `${them.name} rejects the tech trade.` },
+        ],
+      });
+    }
+    autosave(get());
+    return accept;
   },
 
   toggleWorkerAuto: () => {
@@ -1651,26 +1754,53 @@ export const useGame = create<GameState>((set, get) => ({
       return { ...p, science, researching, researched, gold: p.gold + goldGain };
     });
 
+    // Treaty tick: decrement peace timers, slow-decay grudge so old
+    // grievances fade. Done before AI re-evaluates its stance.
+    const prevTreaties = get().treaties;
+    const turnNow = get().turn;
+    const tickedTreaties: TreatiesMap = {};
+    for (const [k, t] of Object.entries(prevTreaties)) {
+      const grudgeDecay = turnNow % GRUDGE_DECAY_INTERVAL === 0 ? 1 : 0;
+      tickedTreaties[k] = {
+        peaceTurnsLeft: Math.max(0, t.peaceTurnsLeft - 1),
+        grudge: Math.max(0, t.grudge - grudgeDecay),
+      };
+    }
+
     // AI diplomacy: each AI re-evaluates its stance toward the human
-    // based on score. Falling behind → sue for peace. Pulling ahead while
-    // at peace → declare war.
+    // based on score and grudge. Falling behind → sue for peace.
+    // Pulling ahead while at peace → declare war (but respects active
+    // peace treaty: while peaceTurnsLeft > 0 the AI won't break it).
     const aiScore = (idx: number) =>
       workingCities.filter((c) => c.ownerIdx === idx).length * 10 +
       workingUnits.filter((u) => u.ownerIdx === idx).length * 2 +
       (workingPlayers[idx]?.researched.length ?? 0) * 5;
     const humanScoreNow = aiScore(HUMAN_IDX);
-    let workingRelations: typeof get extends never ? never : Record<string, 'war' | 'peace'> =
-      { ...get().relations };
+    let workingRelations: RelationsMap = { ...get().relations };
+    let workingTreaties: TreatiesMap = { ...tickedTreaties };
     for (const p of workingPlayers) {
       if (p.isHuman) continue;
       const k = relationKey(HUMAN_IDX, p.idx);
       const cur = workingRelations[k] ?? 'war';
+      const treaty = workingTreaties[k] ?? { peaceTurnsLeft: 0, grudge: 0 };
       const ratio = aiScore(p.idx) / Math.max(1, humanScoreNow);
-      if (cur === 'war' && ratio < 0.7) {
+      // High grudge makes AI slower to forgive (won't sue for peace) and
+      // quicker to attack again (lower threshold for war).
+      const peaceCutoff = 0.7 - treaty.grudge * 0.02;
+      const warCutoff = 1.6 - treaty.grudge * 0.04;
+      if (cur === 'war' && ratio < peaceCutoff) {
         workingRelations[k] = 'peace';
+        workingTreaties[k] = {
+          peaceTurnsLeft: PEACE_DURATION_TURNS,
+          grudge: Math.max(0, treaty.grudge - 2),
+        };
         events.push({ kind: 'event', text: `${p.name} sues for peace.` });
-      } else if (cur === 'peace' && ratio > 1.6) {
+      } else if (cur === 'peace' && ratio > warCutoff && treaty.peaceTurnsLeft <= 0) {
         workingRelations[k] = 'war';
+        workingTreaties[k] = {
+          peaceTurnsLeft: 0,
+          grudge: treaty.grudge + 5,
+        };
         events.push({ kind: 'battle', text: `${p.name} has declared war on you!` });
       }
     }
@@ -1978,6 +2108,7 @@ export const useGame = create<GameState>((set, get) => ({
       wonders: workingWonders,
       huts: workingHuts,
       relations: workingRelations,
+      treaties: workingTreaties,
       lastBattle: lastAIBattle,
       lastWonder: humanWonderJustBuilt
         ? { kind: humanWonderJustBuilt.kind, byHuman: true, cityName: humanWonderJustBuilt.cityName }
