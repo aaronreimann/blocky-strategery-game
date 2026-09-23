@@ -125,7 +125,7 @@ export default function LegendScreen({ onClose }: Props) {
             <View style={[styles.indicatorBox, { borderColor: '#facc15' }]}>
               <Text style={[styles.indicatorText, { color: '#facc15' }]}>M</Text>
             </View>
-            <Text style={styles.rowName}>"M" badge</Text>
+            <Text style={styles.rowName}>&quot;M&quot; badge</Text>
             <Text style={styles.rowDesc}>
               unit has a destination set; auto-walks each turn
             </Text>
@@ -134,7 +134,7 @@ export default function LegendScreen({ onClose }: Props) {
             <View style={[styles.indicatorBox, { borderColor: '#facc15' }]}>
               <Text style={[styles.indicatorText, { color: '#facc15' }]}>A</Text>
             </View>
-            <Text style={styles.rowName}>"A" badge</Text>
+            <Text style={styles.rowName}>&quot;A&quot; badge</Text>
             <Text style={styles.rowDesc}>
               Serf on auto-pilot (city focus or per-unit)
             </Text>
@@ -143,7 +143,7 @@ export default function LegendScreen({ onClose }: Props) {
             <View style={[styles.indicatorBox, { borderColor: '#facc15' }]}>
               <Text style={[styles.indicatorText, { color: '#facc15' }]}>x2</Text>
             </View>
-            <Text style={styles.rowName}>"xN" badge</Text>
+            <Text style={styles.rowName}>&quot;xN&quot; badge</Text>
             <Text style={styles.rowDesc}>
               army of N units stacked on one tile (max 3)
             </Text>

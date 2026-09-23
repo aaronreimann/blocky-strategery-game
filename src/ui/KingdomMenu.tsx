@@ -1,6 +1,5 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { flagEmoji } from '@/src/data/countries';
 import { TECH } from '@/src/data/tech';
 import { useGame } from '@/src/state/game';
 

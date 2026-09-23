@@ -4,7 +4,6 @@ import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BUILDING, BUILDING_KINDS } from '@/src/data/buildings';
-import { flagEmoji } from '@/src/data/countries';
 import { IMPROVEMENT, tileKey } from '@/src/data/improvements';
 import { TECH } from '@/src/data/tech';
 import { effectiveUnitName, uniqueUnitFor } from '@/src/data/cultures';
@@ -109,7 +108,6 @@ export default function Hud() {
   const improvements = useGame((s) => s.improvements);
   const wonders = useGame((s) => s.wonders);
   const players = useGame((s) => s.players);
-  const currentSlot = useGame((s) => s.currentSlot);
   const selectedUnitId = useGame((s) => s.selectedUnitId);
   const selectedCityId = useGame((s) => s.selectedCityId);
   const lastBattle = useGame((s) => s.lastBattle);

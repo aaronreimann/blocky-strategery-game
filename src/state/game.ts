@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-import { BUILDING, type BuildingKind } from '@/src/data/buildings';
+import { BUILDING } from '@/src/data/buildings';
 import { effectiveUnitName, uniqueUnitFor } from '@/src/data/cultures';
 import { WONDER, type WonderKind } from '@/src/data/wonders';
 import type { LeaderMap } from '@/src/data/countries';
@@ -159,7 +159,7 @@ function findSpawnTile(
     if (c.x < 0 || c.y < 0 || c.x >= map.width || c.y >= map.height) continue;
     const tile = map.tiles[c.y * map.width + c.x];
     if (!canEnterTerrain(unitKind, tile.terrain)) continue;
-    if (units.some((u) => u.x === c.x && u.y === c.y && u.ownerIdx === city.ownerIdx)) continue;
+    if (units.some((u) => u.x === c.x && u.y === c.y)) continue;
     return c;
   }
   return null;
@@ -407,6 +407,11 @@ export const useGame = create<GameState>((set, get) => ({
       lastBattle: null,
       lastWonder: null,
       combatFlashes: [],
+      turnEvents: [],
+      tilePicker: null,
+      tileTooltip: null,
+      awaitingDestinationFor: null,
+      pendingJumpTo: null,
       gameOver: null,
     });
     autosave(get());
@@ -538,6 +543,11 @@ export const useGame = create<GameState>((set, get) => ({
       lastBattle: null,
       lastWonder: null,
       combatFlashes: [],
+      turnEvents: [],
+      tilePicker: null,
+      tileTooltip: null,
+      awaitingDestinationFor: null,
+      pendingJumpTo: null,
       gameOver: null,
     });
   },
@@ -786,11 +796,28 @@ export const useGame = create<GameState>((set, get) => ({
           }
         }
       }
+      const finished = checkGameOver({
+        units: movedUnits,
+        cities: get().cities,
+        players: movedPlayers,
+        turn,
+        turnLimit: get().turnLimit,
+        victories: get().victories,
+      });
+      const prevOver = get().gameOver;
       set({
         units: movedUnits,
         players: movedPlayers,
         huts: movedHuts,
+        gameOver: finished,
         turnEvents: hutEvent ? [...get().turnEvents, hutEvent] : get().turnEvents,
+      });
+      recordGameOver(prevOver, finished, {
+        turn,
+        difficulty: get().difficulty,
+        players: movedPlayers,
+        cities: get().cities,
+        units: movedUnits,
       });
       commitWithVisibility(set, get);
       return;
@@ -917,10 +944,28 @@ export const useGame = create<GameState>((set, get) => ({
       researching = null; // human picks next manually
     }
 
+    const nextPlayers = players.map((p) =>
+      p.isHuman ? { ...p, science, researched, researching } : p,
+    );
+    const finished = checkGameOver({
+      units: get().units,
+      cities: get().cities,
+      players: nextPlayers,
+      turn: get().turn,
+      turnLimit: get().turnLimit,
+      victories: get().victories,
+    });
+    const prevOver = get().gameOver;
     set({
-      players: players.map((p) =>
-        p.isHuman ? { ...p, science, researched, researching } : p,
-      ),
+      players: nextPlayers,
+      gameOver: finished,
+    });
+    recordGameOver(prevOver, finished, {
+      turn: get().turn,
+      difficulty: get().difficulty,
+      players: nextPlayers,
+      cities: get().cities,
+      units: get().units,
     });
     autosave(get());
   },
@@ -1157,15 +1202,46 @@ export const useGame = create<GameState>((set, get) => ({
 
     if (accept) {
       const nextPlayers = players.map((p) => {
-        if (p.idx === HUMAN_IDX) return { ...p, researched: [...p.researched, theirTech] };
-        if (p.idx === otherIdx) return { ...p, researched: [...p.researched, ourTech] };
+        if (p.idx === HUMAN_IDX) {
+          const nextResearched = [...p.researched, theirTech];
+          const researching =
+            p.researching === theirTech
+              ? pickCheapestAvailable(nextResearched)
+              : p.researching;
+          return { ...p, researched: nextResearched, researching };
+        }
+        if (p.idx === otherIdx) {
+          const nextResearched = [...p.researched, ourTech];
+          const researching =
+            p.researching === ourTech
+              ? pickCheapestAvailable(nextResearched)
+              : p.researching;
+          return { ...p, researched: nextResearched, researching };
+        }
         return p;
       });
+      const finished = checkGameOver({
+        units: get().units,
+        cities: get().cities,
+        players: nextPlayers,
+        turn: get().turn,
+        turnLimit: get().turnLimit,
+        victories: get().victories,
+      });
+      const prevOver = get().gameOver;
       set({
         players: nextPlayers,
+        gameOver: finished,
         turnEvents: [
           { kind: 'research', text: `${them.name} traded ${TECH[theirTech].name} for ${TECH[ourTech].name}.` },
         ],
+      });
+      recordGameOver(prevOver, finished, {
+        turn: get().turn,
+        difficulty: get().difficulty,
+        players: nextPlayers,
+        cities: get().cities,
+        units: get().units,
       });
     } else {
       set({

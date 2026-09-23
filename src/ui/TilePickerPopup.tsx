@@ -50,7 +50,7 @@ export default function TilePickerPopup({
   onPickCity,
   onDismiss,
 }: Props) {
-  const { width: screenW, height: screenH } = useWindowDimensions();
+  const { width: screenW } = useWindowDimensions();
   const scale = useSharedValue(0.5);
   const opacity = useSharedValue(0);
 

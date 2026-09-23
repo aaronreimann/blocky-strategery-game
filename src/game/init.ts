@@ -5,17 +5,9 @@ import { TERRAIN } from '@/src/data/terrain';
 import { UNIT, type UnitKind } from '@/src/data/units';
 import { PLAYER_PALETTE } from '@/src/ui/palette';
 
-// Move count for a freshly-spawned unit, including any culture-unique
-// move bonus (e.g. Cornish Marauder's +1 move). Without this, a Marauder
-// would have base move on turn 1 and only get its bonus from turn 2 on.
-function spawnMove(iso: string, kind: UnitKind): number {
-  const unique = uniqueUnitFor(iso, kind);
-  return UNIT[kind].move + (unique?.moveBonus ?? 0);
-}
-
 import { nextUnitId } from './ids';
-import { generateMap } from './mapgen';
 import { chebyshev, type GameMap } from './map';
+import { generateMap } from './mapgen';
 import {
   DIFFICULTY_AI_COUNT,
   MAP_SIZE_DIMS,
@@ -26,6 +18,14 @@ import {
   type Player,
   type Unit,
 } from './types';
+
+// Move count for a freshly-spawned unit, including any culture-unique
+// move bonus (e.g. Cornish Marauder's +1 move). Without this, a Marauder
+// would have base move on turn 1 and only get its bonus from turn 2 on.
+function spawnMove(iso: string, kind: UnitKind): number {
+  const unique = uniqueUnitFor(iso, kind);
+  return UNIT[kind].move + (unique?.moveBonus ?? 0);
+}
 
 export type InitialState = {
   map: GameMap;

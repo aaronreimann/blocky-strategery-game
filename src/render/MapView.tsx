@@ -8,7 +8,6 @@ import {
   Rect,
   Skia,
   Text as SkText,
-  useFont,
   useImage,
   Image as SkiaImage,
   type SkPath,
@@ -32,7 +31,6 @@ import {
 import type { ImprovementMap } from '@/src/data/improvements';
 import { RESOURCE, type Resource } from '@/src/data/resources';
 import { TERRAIN } from '@/src/data/terrain';
-import { type UnitKind } from '@/src/data/units';
 import type { GameMap } from '@/src/game/map';
 import { BARBARIAN_COLOR, BARBARIAN_OWNER_IDX, type City, type Hut, type Player, type Unit } from '@/src/game/types';
 import { cityRadius, computeTradeRoutes } from '@/src/game/yields';
@@ -42,20 +40,6 @@ import { useGame } from '@/src/state/game';
 
 import { decorateTile } from './decor';
 import MiniMap from './MiniMap';
-
-// Map every unit/city kind to a game-icons glyph (medieval theme).
-const UNIT_ICON: Record<UnitKind, GameIconName> = {
-  pioneer:   'wood_axe',
-  worker:    'stone_axe',
-  footman:   'visored_helm',
-  spearman:  'spear_hook',
-  horseman:  'horse_head',
-  swordsman: 'broadsword',
-  catapult:  'catapult',
-  galley:    'caravel',
-};
-const CITY_CAPITAL_ICON: GameIconName = 'castle';
-const CITY_HOUSE_ICON: GameIconName = 'house';
 
 // Resource → game-icons mapping (rendered in the resource's color so the
 // existing color legend still applies).
@@ -150,13 +134,6 @@ export default function MapView({
   const capitalImg = useImage(require('../../assets/images/icons/icon_capital.png'));
   const goodyHutImg = useImage(require('../../assets/images/icons/icon_goody_hut.png'));
   const { width: screenW, height: screenH } = useWindowDimensions();
-
-  // Font Awesome 5 Solid for unit + city icons. While loading we just skip
-  // rendering them (units appear a beat later on first launch).
-  const iconFont = useFont(
-    require('@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome5_Solid.ttf'),
-    ICON_SIZE,
-  );
 
   const mapPxW = map.width * TILE_SIZE;
   const mapPxH = map.height * TILE_SIZE;

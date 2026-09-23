@@ -49,7 +49,7 @@ export async function refreshLeaders(): Promise<LeaderMap | null> {
     });
     if (!res.ok) return null;
     const json = (await res.json()) as {
-      results: { bindings: Array<{ country?: { value: string }; leaderLabel?: { value: string } }> };
+      results: { bindings: { country?: { value: string }; leaderLabel?: { value: string } }[] };
     };
     const data: LeaderMap = {};
     for (const b of json.results.bindings) {

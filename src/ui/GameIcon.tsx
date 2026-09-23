@@ -29,6 +29,33 @@ type Props = {
   style?: StyleProp<ViewStyle>;
 };
 
+function VectorGameIcon({
+  name,
+  size,
+  color,
+  style,
+}: {
+  name: GameIconName;
+  size: number;
+  color: string;
+  style?: StyleProp<ViewStyle>;
+}) {
+  const pathData = ICON_PATHS[name];
+  const skPath = useMemo(
+    () => (pathData ? Skia.Path.MakeFromSVGString(pathData) : null),
+    [pathData],
+  );
+  if (!skPath) return null;
+  const scale = size / ICON_VIEWBOX;
+  return (
+    <Canvas style={[{ width: size, height: size }, style]}>
+      <Group transform={[{ scale }]}>
+        <Path path={skPath} color={color} />
+      </Group>
+    </Canvas>
+  );
+}
+
 // Skia-rendered medieval icons sourced from game-icons.net (via Iconify).
 // We use Skia here so the app doesn't need to bundle react-native-svg as a
 // new native dependency — it ships with the same Skia we already use for
@@ -46,14 +73,13 @@ export function GameIcon({ name, size = 24, color = '#f5f1e8', style }: Props) {
     }
   }
 
-  const skPath = useMemo(() => Skia.Path.MakeFromSVGString(ICON_PATHS[name as GameIconName]), [name]);
-  if (!skPath) return null;
-  const scale = size / ICON_VIEWBOX;
   return (
-    <Canvas style={[{ width: size, height: size }, style]}>
-      <Group transform={[{ scale }]}>
-        <Path path={skPath} color={color} />
-      </Group>
-    </Canvas>
+    <VectorGameIcon
+      name={name as GameIconName}
+      size={size}
+      color={color}
+      style={style}
+    />
   );
 }
+
